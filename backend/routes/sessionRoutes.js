@@ -3,13 +3,10 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 
-// 2.1 POST /session/init
 router.post('/init', (req, res) => {
-  // สร้าง Session ID แบบสุ่ม (ใช้เป็นชื่อ Folder ใน Cloud Storage)
   const sessionId = `sess_${uuidv4().split('-')[0]}`; 
-  const expiresIn = 1800; // 30 นาที
+  const expiresIn = 1800; // 30 mins
 
-  // สร้าง JWT Token
   const token = jwt.sign({ session_id: sessionId }, process.env.JWT_SECRET, { expiresIn });
 
   res.json({

@@ -34,6 +34,7 @@ const formRoutes = require('./routes/formRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const validationRoutes = require('./routes/validationRoutes');
 const documentRoutes = require('./routes/documentRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 // API Versioning Base URL: /api/v1
 const BASE_URL = '/api/v1';
@@ -44,6 +45,7 @@ app.use(`${BASE_URL}/forms`, formRoutes);
 app.use(`${BASE_URL}/upload`, uploadRoutes);
 app.use(`${BASE_URL}/validation`, validationRoutes);
 app.use(`${BASE_URL}/documents`, documentRoutes);
+app.use(`${BASE_URL}/chat`, chatRoutes);
 
 // ✅ Add: Global Error Handler (ดัก Error ที่หลุดรอดมา)
 app.use((err, req, res, next) => {

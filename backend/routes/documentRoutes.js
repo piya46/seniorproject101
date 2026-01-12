@@ -8,49 +8,44 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
-// 7.1 POST /documents/merge
 router.post('/merge', authMiddleware, async (req, res) => {
   try {
     const { form_code, department_id, gcs_paths } = req.body;
     const sessionId = req.session.session_id;
 
-    // 1. สร้าง PDF Doc ใหม่ (เป็นเล่มเปล่าๆ รอรวม)
+    // 1. Create new PDF
     const mergedPdf = await PDFDocument.create();
 
-    // 2. Loop ดาวน์โหลดไฟล์และรวม
+    // 2. Loop & Merge
     for (const path of gcs_paths) {
-      // ดาวน์โหลดไฟล์จาก GCS เข้า Memory
       const fileRef = bucket.file(path);
       const [fileBuffer] = await fileRef.download();
-      
-      // ดึง Metadata เพื่อดูว่าเป็น PDF หรือ รูปภาพ
       const [metadata] = await fileRef.getMetadata();
       const contentType = metadata.contentType;
 
       if (contentType === 'application/pdf') {
-        // ✅ กรณีเป็น PDF: Load และ Copy หน้ามาใส่
         const pdf = await PDFDocument.load(fileBuffer);
         const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         copiedPages.forEach((page) => mergedPdf.addPage(page));
 
       } else if (['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
-        // ✅ กรณีเป็นรูปภาพ: ต้อง Embed ภาพ แล้ววาดลงบนหน้ากระดาษใหม่
         let image;
-        if (contentType === 'image/jpeg') {
-          image = await mergedPdf.embedJpg(fileBuffer);
-        } else if (contentType === 'image/png') {
-          image = await mergedPdf.embedPng(fileBuffer);
-        } else {
-            // กรณี WebP หรืออื่นๆ ที่ pdf-lib อาจไม่รองรับตรงๆ อาจต้องข้ามไปก่อน หรือแจ้ง error
-            // (ในที่นี้ขอข้ามไปก่อนเพื่อกัน crash)
-            console.warn(`Skipping unsupported image format for merge: ${contentType}`);
-            continue; 
+        try {
+            if (contentType === 'image/jpeg') {
+              image = await mergedPdf.embedJpg(fileBuffer);
+            } else if (contentType === 'image/png') {
+              image = await mergedPdf.embedPng(fileBuffer);
+            } else {
+               console.warn(`Skipping unsupported image format: ${contentType}`);
+               continue; 
+            }
+        } catch (imgError) {
+            console.error(`Error embedding image ${path}:`, imgError);
+            continue;
         }
 
-        // เพิ่มหน้ากระดาษเปล่า ขนาดเท่ารูปภาพ
+        // Add page with original image dimensions
         const page = mergedPdf.addPage([image.width, image.height]);
-        
-        // วาดรูปลงไป
         page.drawImage(image, {
           x: 0,
           y: 0,
@@ -60,10 +55,8 @@ router.post('/merge', authMiddleware, async (req, res) => {
       }
     }
 
-    // 3. Save PDF ที่รวมเสร็จแล้ว
+    // 3. Save & Upload
     const mergedPdfBytes = await mergedPdf.save();
-    
-    // 4. Upload กลับขึ้น GCS
     const mergedFileName = `${sessionId}/merged_${form_code}.pdf`;
     const mergedFile = bucket.file(mergedFileName);
     
@@ -72,14 +65,13 @@ router.post('/merge', authMiddleware, async (req, res) => {
       resumable: false
     });
 
-    // 5. สร้าง Public URL หรือ Signed URL สำหรับดาวน์โหลด (อายุ 1 ชม.)
+    // 4. Generate Signed URL
     const [downloadUrl] = await mergedFile.getSignedUrl({
       version: 'v4',
       action: 'read',
-      expires: Date.now() + 60 * 60 * 1000,
+      expires: Date.now() + 60 * 60 * 1000, // 1 hour
     });
 
-    // 6. หาข้อมูล Department เพื่อสร้างคำแนะนำ
     const dept = departments.find(d => d.id === department_id);
     const targetEmail = dept ? dept.email : 'N/A';
 
@@ -96,7 +88,7 @@ router.post('/merge', authMiddleware, async (req, res) => {
 
   } catch (error) {
     console.error('Merge Error:', error);
-    res.status(500).json({ error: 'Failed to merge documents' });
+    res.status(500).json({ error: 'Failed to merge documents', details: error.message });
   }
 });
 

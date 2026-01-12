@@ -9,10 +9,10 @@ const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 // 5.1 POST /upload/signed-url
 router.post('/signed-url', authMiddleware, async (req, res) => {
   try {
-    const { file_type, file_key, file_size } = req.body; // รับ file_size เพิ่มเพื่อตรวจสอบ
+    const { file_type, file_key, file_size } = req.body;
     const sessionId = req.session.session_id;
 
-    // 1. Validate File Type (อนุญาตแค่ PDF และรูปภาพ)
+    // 1. Validate File Type
     const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
     if (!allowedMimeTypes.includes(file_type)) {
       return res.status(400).json({ 
@@ -20,15 +20,14 @@ router.post('/signed-url', authMiddleware, async (req, res) => {
       });
     }
 
-    // 2. Validate File Size (ต้องไม่เกิน 5MB)
-    const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+    // 2. Validate File Size
+    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
     if (file_size && file_size > MAX_SIZE) {
       return res.status(400).json({ 
-        error: `File size exceeds limit. Maximum allowed is 5MB. (Your file: ${(file_size / 1024 / 1024).toFixed(2)} MB)` 
+        error: `File size exceeds limit. Maximum allowed is 5MB.` 
       });
     }
 
-    // สร้าง Path: sess_xxxx/file_key.extension
     const extensionMap = {
       'application/pdf': 'pdf',
       'image/jpeg': 'jpg',
@@ -39,23 +38,20 @@ router.post('/signed-url', authMiddleware, async (req, res) => {
     const gcsPath = `${sessionId}/${file_key}.${extension}`;
     const file = bucket.file(gcsPath);
 
-    // Config สำหรับ Signed URL
     const options = {
       version: 'v4',
       action: 'write',
-      expires: Date.now() + 15 * 60 * 1000, // URL อายุ 15 นาที
+      expires: Date.now() + 15 * 60 * 1000,
       contentType: file_type,
     };
 
-    // 3. Security: ถ้า Client ส่งขนาดไฟล์มา ให้ผูก Content-Length เข้ากับ Signature ด้วย
-    // ทำให้ Client ต้องอัปโหลดไฟล์ขนาดเท่านี้เป๊ะๆ เท่านั้น (โกงขนาดไม่ได้)
+    // 3. Security: Bind Content-Length
     if (file_size) {
       options.extensionHeaders = {
         'Content-Length': file_size.toString()
       };
     }
 
-    // สร้าง Signed URL
     const [url] = await file.getSignedUrl(options);
 
     res.json({
