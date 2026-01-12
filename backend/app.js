@@ -16,7 +16,15 @@ if (missingEnv.length > 0) {
 // ------------------------------------------
 
 // Middlewares
-app.use(cors());
+// ✅ FIX: ปรับ CORS ให้ปลอดภัยขึ้นสำหรับ Production
+// (ใน Local อาจจะยอมให้ทุก Origin แต่บน Cloud ควรระบุ Domain)
+const corsOptions = {
+    origin: process.env.FRONTEND_URL || '*', // ควรตั้งค่า FRONTEND_URL ใน Env
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
+
 app.use(express.json());
 
 // Import Routes
@@ -31,11 +39,20 @@ const documentRoutes = require('./routes/documentRoutes');
 const BASE_URL = '/api/v1';
 
 app.use(`${BASE_URL}/session`, sessionRoutes);
-app.use(`${BASE_URL}/departments`, metaRoutes); // Group 3: Metadata
-app.use(`${BASE_URL}/forms`, formRoutes);       // Group 4: Form Info
-app.use(`${BASE_URL}/upload`, uploadRoutes);    // Group 5: Upload
-app.use(`${BASE_URL}/validation`, validationRoutes); // Group 6: Validation
-app.use(`${BASE_URL}/documents`, documentRoutes);    // Group 7: Submission
+app.use(`${BASE_URL}/departments`, metaRoutes);
+app.use(`${BASE_URL}/forms`, formRoutes);
+app.use(`${BASE_URL}/upload`, uploadRoutes);
+app.use(`${BASE_URL}/validation`, validationRoutes);
+app.use(`${BASE_URL}/documents`, documentRoutes);
+
+// ✅ Add: Global Error Handler (ดัก Error ที่หลุดรอดมา)
+app.use((err, req, res, next) => {
+    console.error('🔥 Unhandled Error:', err);
+    res.status(500).json({
+        error: 'Internal Server Error',
+        message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+    });
+});
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {

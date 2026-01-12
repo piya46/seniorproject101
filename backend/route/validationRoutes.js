@@ -96,7 +96,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
       // ดึง Metadata เพื่อดูขนาดและประเภทไฟล์จริง
       const [metadata] = await gcsFile.getMetadata();
       const fileSize = parseInt(metadata.size, 10);
-      const mimeType = metadata.contentType;
+      const mimeType = metadata.contentType; // ดึง MimeType จริงตรงนี้
 
       // Check 1: ขนาดต้องไม่เกิน 5 MB (5 * 1024 * 1024 bytes)
       if (fileSize > 5 * 1024 * 1024) {
@@ -118,7 +118,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
       // เตรียม Object สำหรับส่งให้ Gemini
       fileParts.push({
         fileData: {
-          mimeType: mimeType, // ใช้ mimeType จริงจากไฟล์
+          mimeType: mimeType, // ✅ FIX: ใช้ค่า mimeType ที่ดึงมาจริง (ห้าม Hardcode เป็น pdf)
           fileUri: `gs://${bucketName}/${file.gcs_path}`
         }
       });
@@ -144,8 +144,8 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
             "checks": [
               { 
                 "key": "ชื่อ key ของไฟล์ (ตาม input)", 
-                "status": "pass" หรือ "fail", 
-                "message": "เหตุผลสั้นๆ ภาษาไทย" 
+                "status": "ผ่าน" หรือ "ไม่ผ่าน", 
+                "message": "ในกรณีไม่ผ่านขอเหตุผลสั้นๆ ภาษาไทยที่บอกได้ว่าลืมหรือผิดตรงไหน" 
               }
             ]
           }
