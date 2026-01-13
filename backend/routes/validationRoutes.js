@@ -75,7 +75,7 @@ const { getFormConfig } = require('../data/staticData');
 const storage = new Storage();
 const vertex_ai = new VertexAI({
   project: process.env.GCP_PROJECT_ID,
-  location: global
+  location: "global"
 });
 
 // ✅ Use 'gemini-1.5-flash' for speed and cost efficiency

@@ -6,7 +6,7 @@ const { forms } = require('../data/staticData');
 
 // 🛡️ Debug Check: ตรวจสอบ Config ก่อนเริ่ม
 const projectId = process.env.GCP_PROJECT_ID;
-const location = global;
+const location = "global";
 
 if (!projectId || !location) {
     console.error("❌ CRITICAL: Vertex AI Config Missing", { projectId, location });

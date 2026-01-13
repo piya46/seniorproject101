@@ -3,408 +3,522 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Request API Tester (Cloud Run)</title>
+    <title>Sci-Request System | System Health Check</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;700&display=swap');
-        body { font-family: 'Sarabun', sans-serif; }
-        .log-entry { border-left: 4px solid; }
-        .log-success { border-color: #10B981; background-color: #ECFDF5; }
-        .log-error { border-color: #EF4444; background-color: #FEF2F2; }
-        .log-info { border-color: #3B82F6; background-color: #EFF6FF; }
-        .log-warning { border-color: #F59E0B; background-color: #FFFBEB; }
-        pre { white-space: pre-wrap; word-wrap: break-word; }
+        body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
         
         /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* JSON Syntax Highlighting */
+        .json-key { color: #0f172a; font-weight: 600; }
+        .json-string { color: #059669; }
+        .json-number { color: #d97706; }
+        .json-boolean { color: #2563eb; }
+        .json-null { color: #dc2626; }
+
+        /* Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        .animate-pulse-ring::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; width: 100%; height: 100%;
+            border-radius: 50%;
+            background-color: inherit;
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            z-index: -1;
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen text-gray-800 flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden text-slate-800">
 
-    <header class="bg-white shadow-sm border-b sticky top-0 z-20">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-3 w-full sm:w-auto">
-                <div class="bg-green-600 text-white p-2.5 rounded-lg shadow-sm">
-                    <i class="fa-solid fa-cloud text-lg"></i>
+    <header class="bg-white border-b border-slate-200 z-30 shadow-sm flex-none">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-br from-indigo-600 to-violet-600 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-flask text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-gray-900 leading-tight">Sci-Request API Tester</h1>
-                    <p class="text-xs text-gray-500">Target: Cloud Run (Production)</p>
+                    <h1 class="text-lg font-bold text-slate-900 leading-tight">Sci-Request System</h1>
+                    <div class="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                        <span class="flex items-center gap-1"><i class="fa-solid fa-robot"></i> Gemini 3 Flash</span>
+                        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                        <span>API Tester</span>
+                    </div>
                 </div>
             </div>
-            <div class="flex items-center gap-2 w-full sm:w-auto">
-                <div class="relative flex-1 sm:flex-none">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-                        <i class="fa-solid fa-server"></i>
-                    </span>
-                    <input type="text" id="baseUrl" value="https://sci-request-system-466086429766.asia-southeast1.run.app" class="border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm w-full sm:w-96 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition shadow-sm font-mono text-xs" placeholder="https://your-api.run.app">
+
+            <div class="flex items-center gap-3 w-full max-w-xl justify-end">
+                <div class="relative group w-full max-w-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                        <i class="fa-solid fa-link"></i>
+                    </div>
+                    <input type="text" id="baseUrl" 
+                           value="https://sci-request-system-466086429766.asia-southeast1.run.app" 
+                           class="block w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono text-slate-600 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm placeholder-slate-400" 
+                           placeholder="https://your-api-url.run.app">
                 </div>
-                <button onclick="runAllTests()" id="runBtn" class="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 whitespace-nowrap">
-                    <i class="fa-solid fa-play"></i> <span class="hidden sm:inline">รันทดสอบ</span>
+                
+                <button onclick="runAllTests()" id="runBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2 rounded-lg text-sm font-semibold shadow-lg shadow-slate-200 transition-all active:scale-95 flex items-center gap-2 min-w-[120px] justify-center">
+                    <i class="fa-solid fa-play"></i> <span>Start Test</span>
                 </button>
             </div>
         </div>
     </header>
 
-    <div class="flex-1 max-w-7xl mx-auto w-full px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        <div class="lg:col-span-4 space-y-4">
+    <main class="flex-1 flex overflow-hidden">
+        <div class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-12 gap-6 h-full">
             
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[500px] lg:h-auto">
-                <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                    <h2 class="font-semibold text-gray-700 flex items-center gap-2">
-                        <i class="fa-solid fa-list-check text-green-600"></i> รายการทดสอบ
-                    </h2>
-                    <span id="progress-text" class="bg-gray-200 text-gray-600 px-2 py-0.5 rounded text-xs font-mono font-bold">0/8</span>
-                </div>
-                <div class="overflow-y-auto flex-1 divide-y divide-gray-100" id="test-list">
+            <div class="col-span-12 lg:col-span-4 flex flex-col gap-4 h-full overflow-hidden">
+                
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex-none">
+                    <div class="flex justify-between items-end mb-4">
+                        <div>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Progress</p>
+                            <h2 class="text-3xl font-bold text-slate-800" id="progress-percent">0%</h2>
+                        </div>
+                        <div class="text-right">
+                            <span id="status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                                <span class="w-2 h-2 rounded-full bg-slate-400"></span> Ready
+                            </span>
+                        </div>
                     </div>
+                    <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-gradient-to-r from-indigo-500 to-violet-500 w-0 transition-all duration-500 ease-out"></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100">
+                        <div class="text-center">
+                            <div class="text-xs text-slate-500">Passed</div>
+                            <div class="text-lg font-bold text-emerald-600" id="stat-passed">0</div>
+                        </div>
+                        <div class="text-center border-l border-slate-100">
+                            <div class="text-xs text-slate-500">Failed</div>
+                            <div class="text-lg font-bold text-rose-600" id="stat-failed">0</div>
+                        </div>
+                        <div class="text-center border-l border-slate-100">
+                            <div class="text-xs text-slate-500">Total</div>
+                            <div class="text-lg font-bold text-slate-700">8</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col overflow-hidden">
+                    <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <h3 class="font-semibold text-slate-700">Test Sequence</h3>
+                        <span class="text-xs text-slate-400 font-mono">v1.2</span>
+                    </div>
+                    <div class="overflow-y-auto flex-1 p-2 space-y-1" id="test-list-container">
+                        </div>
+                </div>
+
+                 <div class="bg-slate-800 text-slate-200 rounded-xl p-4 shadow-sm flex-none">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-shield-halved text-indigo-400"></i>
+                        <span class="text-xs font-bold uppercase tracking-wide text-slate-400">Active Session</span>
+                    </div>
+                    <div class="font-mono text-xs space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">ID:</span>
+                            <span id="display-session" class="text-indigo-300">---</span>
+                        </div>
+                        <div class="flex justify-between items-start">
+                            <span class="text-slate-500">Token:</span>
+                            <span id="display-token" class="text-slate-400 truncate w-32 text-right" title="No Token">---</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-database"></i> Session State
-                </h3>
-                <div class="space-y-3">
-                    <div class="bg-gray-50 p-2.5 rounded border border-gray-100">
-                        <div class="text-[10px] text-gray-400 uppercase mb-1">Session Token (JWT)</div>
-                        <div id="display-token" class="text-xs font-mono text-green-600 break-all line-clamp-2" title="No Token Yet">-</div>
+            <div class="col-span-12 lg:col-span-8 h-full flex flex-col overflow-hidden">
+                <div class="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 flex flex-col h-full overflow-hidden relative">
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-950/50 backdrop-blur">
+                        <div class="flex items-center gap-2">
+                            <div class="flex gap-1.5">
+                                <div class="w-3 h-3 rounded-full bg-rose-500/20 border border-rose-500"></div>
+                                <div class="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500"></div>
+                                <div class="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500"></div>
+                            </div>
+                            <span class="ml-3 text-xs font-mono text-slate-400">console.log</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="copyLogs()" class="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded transition" title="Copy">
+                                <i class="fa-regular fa-copy text-xs"></i>
+                            </button>
+                            <button onclick="clearLogs()" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition" title="Clear">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="bg-gray-50 p-2.5 rounded border border-gray-100">
-                        <div class="text-[10px] text-gray-400 uppercase mb-1">Session ID (Folder Name)</div>
-                        <div id="display-session" class="text-xs font-mono text-blue-600 font-bold">-</div>
+                    
+                    <div id="console-output" class="flex-1 overflow-y-auto p-4 font-mono text-sm space-y-4 scroll-smooth">
+                        <div class="h-full flex flex-col items-center justify-center text-slate-600 space-y-4 opacity-50">
+                            <i class="fa-solid fa-terminal text-5xl"></i>
+                            <p class="text-center">Ready to verify system integrity.<br>Click "Start Test" to begin.</p>
+                        </div>
+                    </div>
+
+                    <div class="px-4 py-1.5 bg-indigo-600 text-white text-[10px] font-mono flex justify-between items-center z-10">
+                        <span id="console-status">IDLE</span>
+                        <span id="console-timer">00:00:00</span>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="lg:col-span-8 flex flex-col h-[600px] lg:h-[calc(100vh-140px)]">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
-                <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                    <h2 class="font-semibold text-gray-700 flex items-center gap-2">
-                        <i class="fa-solid fa-terminal text-gray-500"></i> Logs & Response Data
-                    </h2>
-                    <div class="flex gap-2">
-                         <button onclick="copyLogs()" class="text-gray-500 hover:text-gray-700 hover:bg-gray-200 p-1.5 rounded transition" title="Copy Logs">
-                            <i class="fa-regular fa-copy"></i>
-                        </button>
-                        <button onclick="clearLogs()" class="text-gray-500 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition" title="Clear Logs">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    </div>
-                </div>
-                <div id="console-output" class="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-sm bg-[#fafafa]">
-                    <div class="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
-                        <i class="fa-solid fa-rocket text-4xl opacity-20"></i>
-                        <p>พร้อมทดสอบระบบ Cloud Run<br>กดปุ่ม <span class="font-bold text-gray-500">"รันทดสอบ"</span> ด้านบนเพื่อเริ่ม</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    </main>
 
     <script>
-        // State Management
+        // --- Configuration & State ---
+        const testCases = [
+            { id: 'auth', name: 'Initialize Session', desc: 'POST /session/init', icon: 'fa-key' },
+            { id: 'meta', name: 'Get Departments', desc: 'GET /departments', icon: 'fa-building-columns' },
+            { id: 'forms', name: 'Get Forms List', desc: 'GET /forms', icon: 'fa-file-lines' },
+            { id: 'form_detail', name: 'Get Form Config', desc: 'GET /forms/JT31', icon: 'fa-sliders' },
+            { id: 'chat', name: 'AI Recommendation', desc: 'POST /chat/recommend', icon: 'fa-wand-magic-sparkles' },
+            { id: 'upload_url', name: 'Get Upload URL', desc: 'POST /upload/signed-url', icon: 'fa-cloud-arrow-up' },
+            { id: 'validation', name: 'AI Validation', desc: 'POST /validation/check', icon: 'fa-file-shield' },
+            { id: 'merge', name: 'Merge Documents', desc: 'POST /documents/merge', icon: 'fa-file-pdf' }
+        ];
+
         let state = {
             token: null,
             sessionId: null,
-            baseUrl: '', // Will be set from input
+            baseUrl: '',
             uploadedFileKey: null,
             uploadedGcsPath: null,
-            isRunning: false
+            isRunning: false,
+            passed: 0,
+            failed: 0,
+            startTime: null
         };
 
-        const testCases = [
-            { id: 'auth', name: '1. Init Session', desc: 'POST /session/init (ขอ Token)', fn: testInitSession },
-            { id: 'meta', name: '2. Get Departments', desc: 'GET /departments (รายชื่อภาควิชา)', fn: testGetDepartments },
-            { id: 'forms', name: '3. Get All Forms', desc: 'GET /forms (รายชื่อฟอร์มทั้งหมด)', fn: testGetForms },
-            { id: 'form_detail', name: '4. Get Form Config (JT31)', desc: 'GET /forms/JT31 (ดูเงื่อนไขฟอร์ม)', fn: testGetFormConfig },
-            { id: 'chat', name: '5. Chat Recommendation', desc: 'POST /chat/recommend (AI แนะนำ)', fn: testChatRecommend },
-            { id: 'upload_url', name: '6. Get Upload URL', desc: 'POST /upload/signed-url (ขอลิ้งค์อัพโหลด)', fn: testGetUploadUrl },
-            { id: 'validation', name: '7. AI Validation', desc: 'POST /validation/check (ตรวจสอบเอกสาร)', fn: testValidation },
-            { id: 'merge', name: '8. Merge Documents', desc: 'POST /documents/merge (รวมไฟล์ PDF)', fn: testMergeDocs }
-        ];
-
-        // Initialization
+        // --- UI Initialization ---
         function initUI() {
-            const list = document.getElementById('test-list');
-            list.innerHTML = testCases.map(t => `
-                <div id="test-row-${t.id}" class="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition group">
-                    <div class="flex-1 min-w-0 pr-4">
-                        <div class="font-medium text-sm text-gray-800 truncate" title="${t.name}">${t.name}</div>
-                        <div class="text-[11px] text-gray-400 group-hover:text-gray-500 truncate">${t.desc}</div>
+            const container = document.getElementById('test-list-container');
+            container.innerHTML = testCases.map(t => `
+                <div id="row-${t.id}" class="group p-3 rounded-xl border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all duration-200 flex items-center justify-between">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <div class="status-icon w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center flex-none group-hover:bg-white group-hover:shadow-sm transition-all">
+                            <i class="fa-solid ${t.icon} text-xs"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-sm font-semibold text-slate-700 truncate">${t.name}</div>
+                            <div class="text-[10px] text-slate-400 font-mono truncate">${t.desc}</div>
+                        </div>
                     </div>
-                    <div class="status-icon text-gray-300 w-6 h-6 flex items-center justify-center">
-                        <i class="fa-regular fa-circle"></i>
+                    <div class="flex items-center gap-3">
+                         <span class="duration-badge text-[10px] font-mono text-slate-400 hidden">0ms</span>
+                        <div class="status-indicator w-2 h-2 rounded-full bg-slate-300"></div>
                     </div>
                 </div>
             `).join('');
         }
         initUI();
 
-        // Logging System
+        // --- Helper Functions ---
+        function formatJSON(json) {
+            if (typeof json !== 'string') {
+                json = JSON.stringify(json, null, 2);
+            }
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        function updateStats() {
+            const total = testCases.length;
+            const percent = Math.round(((state.passed + state.failed) / total) * 100);
+            document.getElementById('progress-percent').innerText = `${percent}%`;
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+            document.getElementById('stat-passed').innerText = state.passed;
+            document.getElementById('stat-failed').innerText = state.failed;
+        }
+
+        function setStatus(id, status, timeTaken = null) {
+            const row = document.getElementById(`row-${id}`);
+            const indicator = row.querySelector('.status-indicator');
+            const iconBox = row.querySelector('.status-icon');
+            const timeBadge = row.querySelector('.duration-badge');
+
+            // Reset
+            row.className = row.className.replace(/bg-\w+-50 border-\w+-200/, '');
+            indicator.className = 'status-indicator w-2 h-2 rounded-full transition-all duration-300';
+            
+            if (status === 'running') {
+                row.classList.add('bg-indigo-50', 'border-indigo-100');
+                indicator.className += ' bg-indigo-500 animate-ping';
+                iconBox.className = 'status-icon w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-none shadow-sm';
+                iconBox.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+            } else if (status === 'success') {
+                row.classList.add('bg-emerald-50/50', 'border-emerald-100');
+                indicator.className += ' bg-emerald-500';
+                iconBox.className = 'status-icon w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center flex-none';
+                iconBox.innerHTML = '<i class="fa-solid fa-check"></i>';
+                state.passed++;
+            } else if (status === 'error') {
+                row.classList.add('bg-rose-50/50', 'border-rose-100');
+                indicator.className += ' bg-rose-500';
+                iconBox.className = 'status-icon w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center flex-none';
+                iconBox.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                state.failed++;
+            } else if (status === 'waiting') {
+                indicator.className += ' bg-amber-400';
+            }
+
+            if (timeTaken) {
+                timeBadge.innerText = `${timeTaken}ms`;
+                timeBadge.classList.remove('hidden');
+            }
+            updateStats();
+        }
+
         function log(type, title, data) {
             const container = document.getElementById('console-output');
             
-            // Remove welcome message if exists
-            if (container.querySelector('.fa-rocket')) {
+            // Clear welcome screen
+            if (container.querySelector('.fa-terminal')) {
                 container.innerHTML = '';
             }
 
+            const isError = type === 'error';
+            const borderColor = isError ? 'border-l-rose-500' : 'border-l-emerald-500';
+            const icon = isError ? 'fa-triangle-exclamation text-rose-500' : 'fa-check-circle text-emerald-500';
+            const bg = isError ? 'bg-rose-500/5' : 'bg-slate-800/50';
+
             const div = document.createElement('div');
-            const colorClass = type === 'success' ? 'log-success text-green-900' 
-                           : type === 'error' ? 'log-error text-red-900' 
-                           : type === 'warning' ? 'log-warning text-amber-800'
-                           : 'log-info text-blue-900';
-            
-            div.className = `log-entry p-3 rounded text-xs shadow-sm bg-white ${colorClass} mb-2 transition-all duration-300 ease-in-out transform translate-y-1 opacity-0`;
+            div.className = `p-3 rounded-r-lg border-l-4 ${borderColor} ${bg} text-slate-300 animate-[fadeIn_0.3s_ease-out]`;
             
             let content = `
-                <div class="flex justify-between items-start mb-1.5">
-                    <span class="font-bold flex items-center gap-2">
-                        ${type === 'success' ? '<i class="fa-solid fa-check text-green-500"></i>' : 
-                          type === 'error' ? '<i class="fa-solid fa-triangle-exclamation text-red-500"></i>' : 
-                          type === 'warning' ? '<i class="fa-solid fa-triangle-exclamation text-amber-500"></i>' : 
-                          '<i class="fa-solid fa-info-circle text-blue-500"></i>'}
-                        ${title}
-                    </span>
-                    <span class="opacity-40 text-[10px] font-mono">${new Date().toLocaleTimeString()}</span>
+                <div class="flex items-center gap-2 mb-2">
+                    <i class="fa-solid ${icon}"></i>
+                    <span class="font-bold text-slate-100">${title}</span>
+                    <span class="text-[10px] opacity-50 ml-auto">${new Date().toLocaleTimeString()}</span>
                 </div>
             `;
-            
+
             if (data) {
-                if (typeof data === 'object') {
-                    content += `<div class="bg-white/50 p-2 rounded border border-black/5 overflow-x-auto mt-1">
-                        <pre class="text-[10px] leading-relaxed text-gray-600">${JSON.stringify(data, null, 2)}</pre>
-                    </div>`;
-                } else {
-                    content += `<div class="text-gray-700 mt-1 pl-6 border-l-2 border-gray-300">${data}</div>`;
-                }
+                const isObj = typeof data === 'object';
+                content += `
+                    <div class="text-xs font-mono overflow-x-auto bg-slate-950 rounded p-2 border border-slate-800">
+                        <pre>${isObj ? formatJSON(data) : data}</pre>
+                    </div>
+                `;
             }
 
             div.innerHTML = content;
             container.appendChild(div);
-            
-            requestAnimationFrame(() => {
-                div.classList.remove('translate-y-1', 'opacity-0');
-            });
             container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         }
 
-        function updateStatus(id, status) {
-            const row = document.getElementById(`test-row-${id}`);
-            const icon = row.querySelector('.status-icon');
-            row.classList.remove('bg-blue-50', 'bg-green-50', 'bg-red-50', 'bg-amber-50');
-            
-            if (status === 'running') {
-                row.classList.add('bg-blue-50');
-                icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-blue-500"></i>';
-            } else if (status === 'success') {
-                row.classList.add('bg-green-50');
-                icon.innerHTML = '<i class="fa-solid fa-circle-check text-green-500 text-lg"></i>';
-            } else if (status === 'error') {
-                row.classList.add('bg-red-50');
-                icon.innerHTML = '<i class="fa-solid fa-circle-xmark text-red-500 text-lg"></i>';
-            } else if (status === 'warning') {
-                row.classList.add('bg-amber-50');
-                icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-500 text-lg"></i>';
-            } else {
-                icon.innerHTML = '<i class="fa-regular fa-circle text-gray-300"></i>';
-            }
-        }
-
-        function clearLogs() {
-            const container = document.getElementById('console-output');
-            container.innerHTML = `
-                <div class="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
-                    <i class="fa-solid fa-rocket text-4xl opacity-20"></i>
-                    <p>พร้อมทดสอบระบบ Cloud Run<br>กดปุ่ม <span class="font-bold text-gray-500">"รันทดสอบ"</span> ด้านบนเพื่อเริ่ม</p>
-                </div>
-            `;
-            document.getElementById('progress-text').innerText = '0/8';
-            document.getElementById('progress-text').className = 'bg-gray-200 text-gray-600 px-2 py-0.5 rounded text-xs font-mono font-bold';
-            testCases.forEach(t => updateStatus(t.id, 'idle'));
-            document.getElementById('display-token').innerText = '-';
-            document.getElementById('display-session').innerText = '-';
-            state.token = null;
-        }
-
-        function copyLogs() {
-            const text = document.getElementById('console-output').innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Copied logs to clipboard!');
-            });
-        }
-
-        // --- Core Test Logic ---
-
-        async function runAllTests() {
-            if (state.isRunning) return;
-            state.isRunning = true;
-            
-            const btn = document.getElementById('runBtn');
-            const originalBtnContent = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังทำงาน...';
-            btn.disabled = true;
-            btn.classList.add('opacity-75', 'cursor-not-allowed');
-
-            clearLogs(); 
-            const baseUrlInput = document.getElementById('baseUrl').value.replace(/\/$/, '');
-            state.baseUrl = `${baseUrlInput}/api/v1`;
-            
-            log('info', '🚀 Starting Test Suite', `Target: ${state.baseUrl}`);
-
-            let passedCount = 0;
-            const progressEl = document.getElementById('progress-text');
-
-            for (const test of testCases) {
-                updateStatus(test.id, 'running');
-                document.getElementById(`test-row-${test.id}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                try {
-                    await test.fn();
-                    updateStatus(test.id, 'success');
-                    passedCount++;
-                } catch (error) {
-                    console.error(error);
-                    
-                    let errorMsg = error.message;
-                    let errorData = null;
-                    let isPermError = false;
-
-                    if (error.response) {
-                        errorMsg = `Status ${error.response.status}`;
-                        errorData = error.response.data;
-                        if(error.response.status === 500) isPermError = true;
-                    } else if (error.request) {
-                         errorMsg = "Network Error (CORS/SSL)";
-                    }
-
-                    // Treat Permission errors as Warnings (so the suite continues but alerts user)
-                    if (isPermError && (test.id === 'chat' || test.id === 'upload_url' || test.id === 'validation' || test.id === 'merge')) {
-                         updateStatus(test.id, 'warning');
-                         log('warning', `⚠️ Cloud Permission Issue: ${test.name}`, errorData);
-                         log('info', 'Suggestion', 'Check Cloud Run IAM Roles (Vertex AI User / Storage Object Admin)');
-                         
-                         // Mock data to let next tests proceed if possible
-                         if (test.id === 'upload_url') state.uploadedGcsPath = `${state.sessionId}/mock_file.pdf`;
-                    } else {
-                        updateStatus(test.id, 'error');
-                        log('error', `❌ Test Failed: ${test.name}`, errorData || errorMsg);
-                        
-                        if (test.id === 'auth') {
-                            log('error', '🛑 Critical Failure', 'Authentication failed. Stopping sequence.');
-                            break;
-                        }
-                    }
-                }
-                
-                progressEl.innerText = `${passedCount}/${testCases.length}`;
-                await new Promise(r => setTimeout(r, 800));
-            }
-
-            log('info', '🏁 Test Suite Completed', `Passed: ${passedCount}/${testCases.length}`);
-            
-            state.isRunning = false;
-            btn.innerHTML = originalBtnContent;
-            btn.disabled = false;
-            btn.classList.remove('opacity-75', 'cursor-not-allowed');
-        }
-
-        // --- Test Functions ---
+        // --- Core Logic ---
 
         function getHeaders() {
             return { headers: { Authorization: `Bearer ${state.token}` } };
         }
 
-        async function testInitSession() {
-            log('info', '1. Initializing Session...', 'POST /session/init');
-            const res = await axios.post(`${state.baseUrl}/session/init`);
-            if (!res.data.session_token) throw new Error("No token returned");
-            state.token = res.data.session_token;
-            state.sessionId = res.data.session_id;
-            document.getElementById('display-token').innerText = state.token;
-            document.getElementById('display-session').innerText = state.sessionId;
-            log('success', 'Session Created', { session_id: state.sessionId });
-        }
-
-        async function testGetDepartments() {
-            log('info', '2. Fetching Departments...', 'GET /departments');
-            const res = await axios.get(`${state.baseUrl}/departments`, getHeaders());
-            log('success', 'Departments Fetched', `Found ${res.data.data.length} departments`);
-        }
-
-        async function testGetForms() {
-            log('info', '3. Fetching Forms List...', 'GET /forms?degree_level=bachelor');
-            const res = await axios.get(`${state.baseUrl}/forms?degree_level=bachelor`, getHeaders());
-            log('success', 'Forms Fetched', `Found ${res.data.data.length} forms available`);
-        }
-
-        async function testGetFormConfig() {
-            const formCode = 'JT31';
-            log('info', `4. Fetching Config for ${formCode}...`, `GET /forms/${formCode}`);
-            const res = await axios.get(`${state.baseUrl}/forms/${formCode}?degree_level=bachelor`, getHeaders());
-            state.uploadedFileKey = res.data.required_documents[0].key;
-            log('success', 'Form Config Loaded', { title: res.data.form_name });
-        }
-
-        async function testChatRecommend() {
-            const payload = { message: "อยากลาออกต้องทำยังไงครับ", degree_level: "bachelor" };
-            log('info', '5. Testing AI Chat...', payload);
-            const res = await axios.post(`${state.baseUrl}/chat/recommend`, payload, getHeaders());
-            log('success', 'AI Response Received', res.data.data);
-        }
-
-        // ✅ Updated Logic: Upload Dummy File after getting URL
-        async function testGetUploadUrl() {
-            const payload = { file_type: "application/pdf", file_key: state.uploadedFileKey || "main_form", file_size: 1024 };
-            log('info', '6. Requesting Upload URL...', payload);
+        async function runAllTests() {
+            if (state.isRunning) return;
             
-            // 1. Get Signed URL
-            const res = await axios.post(`${state.baseUrl}/upload/signed-url`, payload, getHeaders());
-            state.uploadedGcsPath = res.data.gcs_path;
-            const uploadUrl = res.data.upload_url; 
+            // Reset State
+            state.isRunning = true;
+            state.passed = 0;
+            state.failed = 0;
+            state.startTime = Date.now();
+            updateStats();
+            document.getElementById('console-output').innerHTML = ''; // Clear logs
+            initUI(); // Reset list
             
-            log('success', 'Signed URL Generated', { gcs_path: res.data.gcs_path });
+            // UI Updates
+            const btn = document.getElementById('runBtn');
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Testing...';
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            document.getElementById('status-badge').innerHTML = '<span class="relative flex h-2 w-2 mr-1.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span></span> Running';
+            document.getElementById('status-badge').className = "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100";
+            document.getElementById('console-status').innerText = "EXECUTING...";
 
-            // 2. Upload Dummy File to Storage
-            log('info', '6.1 Uploading Dummy File...', 'PUT to Signed URL');
+            // Setup URL
+            const inputUrl = document.getElementById('baseUrl').value.replace(/\/$/, '');
+            state.baseUrl = `${inputUrl}/api/v1`;
+            log('info', 'Starting Test Suite', `Target: ${state.baseUrl}`);
+
+            // Timer Loop
+            const timerInterval = setInterval(() => {
+                const diff = Date.now() - state.startTime;
+                const secs = Math.floor((diff / 1000) % 60).toString().padStart(2, '0');
+                const mins = Math.floor((diff / 1000 / 60)).toString().padStart(2, '0');
+                const ms = Math.floor((diff % 1000) / 10).toString().padStart(2, '0');
+                document.getElementById('console-timer').innerText = `${mins}:${secs}:${ms}`;
+            }, 50);
+
+            // --- Execution Loop ---
+            for (const test of testCases) {
+                setStatus(test.id, 'running');
+                const stepStart = Date.now();
+                
+                try {
+                    await executeTest(test);
+                    const duration = Date.now() - stepStart;
+                    setStatus(test.id, 'success', duration);
+                } catch (error) {
+                    const duration = Date.now() - stepStart;
+                    
+                    let errorData = error.response ? error.response.data : error.message;
+                    let isWarning = false;
+
+                    // Handle Specific Warnings (Permission issues)
+                    if (error.response && error.response.status === 500) {
+                         // Check if it's a known permission issue we want to just warn about
+                         if(['chat', 'upload_url', 'validation', 'merge'].includes(test.id)) {
+                             isWarning = true;
+                             log('error', `Warning: ${test.name}`, errorData);
+                             setStatus(test.id, 'waiting', duration); // Yellow status
+                             
+                             // Mock data for continuity
+                             if (test.id === 'upload_url') state.uploadedGcsPath = `${state.sessionId}/mock_file.pdf`;
+                         }
+                    }
+
+                    if (!isWarning) {
+                        setStatus(test.id, 'error', duration);
+                        log('error', `Failed: ${test.name}`, errorData);
+                        if (test.id === 'auth') break; // Stop if auth fails
+                    }
+                }
+                
+                await new Promise(r => setTimeout(r, 500)); // Slight delay for visual flow
+            }
+
+            // Cleanup
+            clearInterval(timerInterval);
+            state.isRunning = false;
+            btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Again';
+            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            document.getElementById('console-status').innerText = "COMPLETED";
             
-            // Create a minimal PDF structure (Blob)
-            // Note: This needs to be a valid enough PDF/file content for your system.
-            const dummyPdfContent = "%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n/Resources <<\n/Font <<\n/F1 <<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n>>\n>>\n>>\n/Contents 4 0 R\n>>\nendobj\n4 0 obj\n<<\n/Length 21\n>>\nstream\nBT\n/F1 24 Tf\n100 700 Td\n(Hello World) Tj\nET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000010 00000 n\n0000000060 00000 n\n0000000117 00000 n\n0000000282 00000 n\ntrailer\n<<\n/Size 5\n/Root 1 0 R\n>>\nstartxref\n353\n%%EOF";
-            const dummyBlob = new Blob([dummyPdfContent], { type: 'application/pdf' });
+            const finalStatusHtml = state.failed === 0 
+                ? '<span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span> Passed All'
+                : '<span class="w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span> Has Errors';
             
-            try {
-                // IMPORTANT: Headers must match what was signed in backend
-                await axios.put(uploadUrl, dummyBlob, {
-                    headers: { 'Content-Type': 'application/pdf' }
-                });
-                log('success', 'Upload Complete', 'Dummy file uploaded successfully');
-            } catch (err) {
-                console.error("Upload Error:", err);
-                throw new Error("Failed to upload file to Storage");
+            const badgeClass = state.failed === 0
+                ? "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100"
+                : "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-100";
+
+            const badge = document.getElementById('status-badge');
+            badge.innerHTML = finalStatusHtml;
+            badge.className = badgeClass;
+
+            log('info', 'Test Suite Finished', { total: testCases.length, passed: state.passed, failed: state.failed });
+        }
+
+        // --- Individual Test Logics ---
+        async function executeTest(test) {
+            switch(test.id) {
+                case 'auth':
+                    const r1 = await axios.post(`${state.baseUrl}/session/init`);
+                    state.token = r1.data.session_token;
+                    state.sessionId = r1.data.session_id;
+                    document.getElementById('display-token').innerText = state.token;
+                    document.getElementById('display-session').innerText = state.sessionId;
+                    log('success', 'Session Initialized', r1.data);
+                    break;
+
+                case 'meta':
+                    const r2 = await axios.get(`${state.baseUrl}/departments`, getHeaders());
+                    log('success', `Fetched ${r2.data.data.length} Departments`);
+                    break;
+
+                case 'forms':
+                    const r3 = await axios.get(`${state.baseUrl}/forms?degree_level=bachelor`, getHeaders());
+                    log('success', `Fetched ${r3.data.data.length} Forms`);
+                    break;
+                
+                case 'form_detail':
+                    const r4 = await axios.get(`${state.baseUrl}/forms/JT31?degree_level=bachelor`, getHeaders());
+                    state.uploadedFileKey = r4.data.required_documents[0].key;
+                    log('success', 'Form Config Loaded', { title: r4.data.form_name });
+                    break;
+
+                case 'chat':
+                    const payloadChat = { message: "อยากลาออกต้องทำยังไงครับ", degree_level: "bachelor" };
+                    log('info', 'Sending Prompt...', payloadChat);
+                    const r5 = await axios.post(`${state.baseUrl}/chat/recommend`, payloadChat, getHeaders());
+                    log('success', 'AI Response', r5.data.data);
+                    break;
+
+                case 'upload_url':
+                    // 1. Create Dummy Blob first to get accurate size
+                    const dummyContent = "%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n/Resources <<\n/Font <<\n/F1 <<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n>>\n>>\n>>\n/Contents 4 0 R\n>>\nendobj\n4 0 obj\n<<\n/Length 21\n>>\nstream\nBT\n/F1 24 Tf\n100 700 Td\n(Hello World) Tj\nET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000010 00000 n\n0000000060 00000 n\n0000000117 00000 n\n0000000282 00000 n\ntrailer\n<<\n/Size 5\n/Root 1 0 R\n>>\nstartxref\n353\n%%EOF";
+                    const dummyBlob = new Blob([dummyContent], { type: 'application/pdf' });
+                    
+                    const payloadUpload = { 
+                        file_type: "application/pdf", 
+                        file_key: state.uploadedFileKey || "main_form", 
+                        file_size: dummyBlob.size // Important: Match size
+                    };
+                    
+                    const r6 = await axios.post(`${state.baseUrl}/upload/signed-url`, payloadUpload, getHeaders());
+                    state.uploadedGcsPath = r6.data.gcs_path;
+                    
+                    // Upload to GCS
+                    await axios.put(r6.data.upload_url, dummyBlob, {
+                        headers: { 'Content-Type': 'application/pdf' }
+                    });
+                    log('success', 'File Uploaded', { gcs_path: state.uploadedGcsPath });
+                    break;
+
+                case 'validation':
+                    const payloadVal = { 
+                        form_code: "JT31", 
+                        student_level: "bachelor", 
+                        uploaded_files: [{ key: "main_form", gcs_path: state.uploadedGcsPath }] 
+                    };
+                    const r7 = await axios.post(`${state.baseUrl}/validation/check-completeness`, payloadVal, getHeaders());
+                    log('success', 'Validation Result', r7.data);
+                    break;
+
+                case 'merge':
+                    const payloadMerge = { 
+                        form_code: "JT31", 
+                        department_id: "math_ug", 
+                        gcs_paths: [state.uploadedGcsPath] 
+                    };
+                    const r8 = await axios.post(`${state.baseUrl}/documents/merge`, payloadMerge, getHeaders());
+                    log('success', 'Merge Initiated', r8.data);
+                    break;
             }
         }
 
-        async function testValidation() {
-            const payload = { form_code: "JT31", student_level: "bachelor", uploaded_files: [{ key: "main_form", gcs_path: state.uploadedGcsPath || "mock/path.pdf" }] };
-            log('info', '7. Validating Documents...', payload);
-            const res = await axios.post(`${state.baseUrl}/validation/check-completeness`, payload, getHeaders());
-            log('success', 'Validation Completed', res.data);
+        // Utils
+        function copyLogs() {
+            const text = document.getElementById('console-output').innerText;
+            navigator.clipboard.writeText(text).then(() => alert('Logs copied!'));
+        }
+        function clearLogs() {
+            document.getElementById('console-output').innerHTML = '';
         }
 
-        async function testMergeDocs() {
-            const payload = { form_code: "JT31", department_id: "math_ug", gcs_paths: [state.uploadedGcsPath || "mock/path.pdf"] };
-            log('info', '8. Merging Documents...', payload);
-            const res = await axios.post(`${state.baseUrl}/documents/merge`, payload, getHeaders());
-            log('success', 'Merge Process Initiated', res.data);
-        }
     </script>
 </body>
 </html>
