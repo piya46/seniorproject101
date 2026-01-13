@@ -9,13 +9,15 @@ const { getFormConfig } = require('../data/staticData');
 const storage = new Storage();
 const vertex_ai = new VertexAI({
   project: process.env.GCP_PROJECT_ID,
-  location: 'global', // 🟢 global only
-  apiEndpoint: 'us-central1-aiplatform.googleapis.com' // 🟢 บังคับ Route เข้า Gateway หลัก
+  location: process.env.GCP_LOCATION || 'us-central1'
 });
 
-// ✅ Gemini 3 Flash Preview
-const model = vertex_ai.preview.getGenerativeModel({
-  model: 'gemini-3-flash-preview',
+// ✅ ใช้ตัวปกติ ไม่ต้อง .preview และบังคับ JSON Output
+const model = vertex_ai.getGenerativeModel({
+  model: 'gemini-1.5-flash-001',
+  generationConfig: {
+    responseMimeType: "application/json"
+  }
 });
 
 router.post('/check-completeness', authMiddleware, async (req, res) => {
@@ -37,6 +39,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
         });
     }
 
+    // เตรียมข้อมูลไฟล์เพื่อส่งให้ Gemini
     const fileProcessingPromises = uploaded_files.map(async (file, index) => {
         const gcsFile = bucket.file(file.gcs_path);
         const [metadata] = await gcsFile.getMetadata();
@@ -45,60 +48,74 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
         const rule = criteriaMap[file.key] || "ตรวจสอบความถูกต้องทั่วไป";
 
         return {
-            part: {
+            inlinePart: {
                 fileData: {
                     mimeType: mimeType,
                     fileUri: `gs://${bucketName}/${file.gcs_path}`
                 }
             },
-            ruleDescription: `- ไฟล์ลำดับที่ ${index + 1} (${file.key}): ${rule}`
+            ruleDescription: `- ไฟล์ [${file.key}]: ${rule}`
         };
     });
 
-    let processedFiles;
-    try {
-        processedFiles = await Promise.all(fileProcessingPromises);
-    } catch (validationError) {
-        return res.status(400).json({ status: 'error', message: validationError.message });
-    }
-
-    const fileParts = processedFiles.map(f => f.part);
+    const processedFiles = await Promise.all(fileProcessingPromises);
+    const fileParts = processedFiles.map(f => f.inlinePart);
     const promptRules = processedFiles.map(f => f.ruleDescription).join('\n');
     
     const promptText = `
-      ตรวจสอบความถูกต้องของเอกสารตามเงื่อนไข:
+      คุณคือผู้เชี่ยวชาญการตรวจสอบเอกสาร หน้าที่ของคุณคือตรวจสอบไฟล์ที่แนบมาว่าถูกต้องตามเงื่อนไขหรือไม่
+      
+      เงื่อนไขการตรวจสอบ:
       ${promptRules}
       
-      ตอบกลับเป็น JSON:
+      ตอบกลับเป็น JSON เท่านั้นตามโครงสร้างนี้:
       {
         "status": "success",
         "data": {
           "is_complete": boolean, 
           "validation_details": {
-            "checks": [{ "key": "file_key", "status": "ผ่าน/ไม่ผ่าน", "message": "เหตุผล" }]
+            "checks": [{ "key": "ชื่อ key ของไฟล์", "status": "ผ่าน/ไม่ผ่าน", "message": "ระบุเหตุผลที่ชัดเจน" }]
           }
         }
       }
     `;
 
-    const parts = [{ text: promptText }, ...fileParts];
+    // รวม Text Prompt กับ File Parts
+    const contents = [
+      {
+        role: 'user',
+        parts: [
+          { text: promptText },
+          ...fileParts
+        ]
+      }
+    ];
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts }]
-    });
-
+    const result = await model.generateContent({ contents });
     const response = await result.response;
+    
     let aiText = response.candidates[0].content.parts[0].text;
     
-    const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) aiText = jsonMatch[0];
+    // Clean string เผื่อมี markdown backticks
+    aiText = aiText.replace(/```json|```/g, '').trim();
 
-    let aiResponse = JSON.parse(aiText);
-    res.json(aiResponse);
+    try {
+        const aiResponse = JSON.parse(aiText);
+        res.json(aiResponse);
+    } catch (parseError) {
+        console.error("AI JSON Parse Error:", aiText);
+        res.status(500).json({ 
+            error: 'AI Response Format Error', 
+            details: 'AI ตอบกลับในรูปแบบที่ไม่ใช่ JSON' 
+        });
+    }
 
   } catch (error) {
     console.error('Vertex AI Error:', error);
-    res.status(500).json({ error: 'AI Validation Failed', details: error.message });
+    res.status(500).json({ 
+        error: 'AI Validation Failed', 
+        details: error.message 
+    });
   }
 });
 
