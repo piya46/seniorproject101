@@ -4,20 +4,18 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { forms } = require('../data/staticData'); 
 
-// 🛡️ Debug Check: ตรวจสอบ Config ก่อนเริ่ม
+// รับค่า Config (จะได้รับ us-central1 จาก Deploy script)
 const projectId = process.env.GCP_PROJECT_ID;
-const location = "global";
-
-if (!projectId || !location) {
-    console.error("❌ CRITICAL: Vertex AI Config Missing", { projectId, location });
-}
+const location = process.env.GCP_LOCATION; 
 
 // Init AI
 const vertex_ai = new VertexAI({
-  project: projectId,
-  location: location || 'asia-southeast1'
+  project: process.env.GCP_PROJECT_ID,
+  location: 'global', // 🟢 ต้องใช้ global ตาม Doc
+  apiEndpoint: 'us-central1-aiplatform.googleapis.com' // 🟢 สำคัญมาก! ต้องชี้ไปที่ Gateway นี้ไม่งั้น SDK จะหลงทาง
 });
 
+// ✅ ใช้ Gemini 3 Flash Preview (ผ่าน Gateway us-central1)
 const model = vertex_ai.preview.getGenerativeModel({
   model: 'gemini-3-flash-preview',
 });
@@ -38,33 +36,20 @@ router.post('/recommend', authMiddleware, async (req, res) => {
     
     if (!message) return res.status(400).json({ error: "Message is required" });
 
-    // ตรวจสอบอีกครั้งก่อนเรียก AI
-    if (!process.env.GCP_LOCATION) {
-        throw new Error("GCP_LOCATION environment variable is missing.");
-    }
-
     const formsInfo = getFormsContext();
     
     const prompt = `
-      คุณคือ "พี่ทะเบียนใจดี" (Smart Assistant) ของคณะวิทยาศาสตร์ จุฬาฯ
-      หน้าที่ของคุณคือ: แนะนำนิสิตว่าปัญหาที่เขาเจอ ควรใช้ "แบบฟอร์มคำร้อง" ตัวไหน
+      คุณคือ "พี่ทะเบียนใจดี" ของคณะวิทยาศาสตร์ จุฬาฯ
+      หน้าที่: แนะนำแบบฟอร์มคำร้องให้นิสิต
       
-      ข้อมูลแบบฟอร์มที่มีในระบบ:
-      ${formsInfo}
+      ข้อมูลฟอร์ม: ${formsInfo}
+      ข้อมูลนิสิต: ${degree_level || 'ไม่ระบุ'}
+      คำถาม: "${message}"
       
-      ข้อมูลนิสิต: ระดับการศึกษา ${degree_level || 'ไม่ระบุ'}
-      คำถามของนิสิต: "${message}"
-      
-      คำสั่ง:
-      1. วิเคราะห์ปัญหาของนิสิต แล้วจับคู่กับแบบฟอร์มที่เหมาะสมที่สุด
-      2. ตอบกลับด้วยภาษาที่สุภาพ เป็นกันเอง และเข้าใจง่าย
-      3. ถ้าปัญหาตรงกับฟอร์มไหน ให้ระบุ "รหัสฟอร์ม" (form_code) ให้ชัดเจน เพื่อให้ Frontend สร้างปุ่มกดไปต่อได้
-      4. ถ้าไม่แน่ใจ หรือไม่มีฟอร์มที่ตรง ให้แนะนำให้ติดต่อภาควิชาโดยตรง
-      
-      Output Format (JSON Only):
+      ตอบเป็น JSON เท่านั้น:
       {
-        "recommended_form": "JTxx" (หรือ null ถ้าไม่มี),
-        "reply_message": "ข้อความตอบกลับนิสิต...",
+        "recommended_form": "รหัสฟอร์ม หรือ null",
+        "reply_message": "คำตอบที่สุภาพและเป็นประโยชน์",
         "confidence": "high/medium/low"
       }
     `;
@@ -76,6 +61,7 @@ router.post('/recommend', authMiddleware, async (req, res) => {
     const response = await result.response;
     let aiText = response.candidates[0].content.parts[0].text;
     
+    // Clean JSON
     const jsonMatch = aiText.match(/\{[\s\S]*\}/);
     if (jsonMatch) aiText = jsonMatch[0];
 
@@ -83,23 +69,16 @@ router.post('/recommend', authMiddleware, async (req, res) => {
     try {
         aiResponse = JSON.parse(aiText);
     } catch (e) {
-        console.error("AI Response Parsing Error:", aiText);
-        aiResponse = {
-            recommended_form: null,
-            reply_message: "ระบบขัดข้องชั่วคราว (AI Parse Error)",
-            confidence: "low"
-        };
+        aiResponse = { reply_message: aiText, recommended_form: null };
     }
 
     res.json({ data: aiResponse });
 
   } catch (error) {
-    console.error('Chat AI Error Details:', error); // Log ลง Cloud Run
-    // ✅ ส่ง Error จริงกลับไปให้ Frontend (ApiTester) เห็น
+    console.error('Chat AI Error:', error);
     res.status(500).json({ 
         error: 'Failed to process chat request',
-        details: error.message, // ข้อความ Error จาก Google
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: error.message
     });
   }
 });

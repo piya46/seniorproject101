@@ -1,38 +1,27 @@
 #!/bin/bash
 
 # ==========================================
-# ⚙️ CONFIGURATION (ตั้งค่าตรงนี้ครั้งเดียว)
+# ⚙️ CONFIGURATION
 # ==========================================
-
-# 1. ชื่อ Project ID ใน Google Cloud ของคุณ
 PROJECT_ID="seniorproject101"
-
-# 2. ชื่อ Service ที่ต้องการให้แสดงใน Cloud Run
 SERVICE_NAME="sci-request-system"
-
-# 3. ชื่อ Bucket เก็บไฟล์ (ต้องตรงกับที่สร้างไว้)
 BUCKET_NAME="sci-request-files-prod"
-
-# 4. Region (แนะนำ asia-southeast1 สิงคโปร์)
-REGION="asia-southeast1"
-
-# 5. URL ของ Frontend (ถ้ายังไม่มีใส่ * ไปก่อน)
+SECRET_NAME="JWT_SECRET"
 FRONTEND_URL="*"
 
-# 6. ชื่อ Secret ใน Secret Manager (ต้องสร้างไว้ก่อนแล้ว)
-SECRET_NAME="JWT_SECRET"
+# ✅ 1. App Region (Cloud Run): รันที่สิงคโปร์เพื่อให้ใกล้ไทย
+REGION="asia-southeast1"
 
-# ==========================================
-# 🚀 START DEPLOYMENT
-# ==========================================
+# ✅ 2. AI Region (Vertex AI): ใช้ us-central1 เป็น Gateway เข้าถึง Gemini 3 Global
+AI_LOCATION="us-central1"
 
 echo "--------------------------------------------------"
 echo "🚀 Starting deployment for $SERVICE_NAME..."
-echo "📍 Region: $REGION"
-echo "📦 Project: $PROJECT_ID"
+echo "📍 App Region: $REGION"
+echo "🧠 AI Region: $AI_LOCATION (Gemini 3 Gateway)"
 echo "--------------------------------------------------"
 
-# ตรวจสอบว่า Login gcloud หรือยัง
+# ตรวจสอบ gcloud
 if ! command -v gcloud &> /dev/null
 then
     echo "❌ Error: gcloud CLI is not installed."
@@ -47,7 +36,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --allow-unauthenticated \
   --set-env-vars GCP_PROJECT_ID="$PROJECT_ID" \
   --set-env-vars GCS_BUCKET_NAME="$BUCKET_NAME" \
-  --set-env-vars GCP_LOCATION="$REGION" \
+  --set-env-vars GCP_LOCATION="$AI_LOCATION" \
   --set-env-vars FRONTEND_URL="$FRONTEND_URL" \
   --set-secrets JWT_SECRET="$SECRET_NAME:latest"
 
