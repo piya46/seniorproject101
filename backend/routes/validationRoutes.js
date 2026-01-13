@@ -13,7 +13,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
     }
 
     // ✅ ใช้ Project Number โดยตรง
-    const projectNumber = "466086429766";
+    const projectNumber = "seniorproject101";
     const location = process.env.GCP_LOCATION || 'asia-southeast1';
     const bucketName = process.env.GCS_BUCKET_NAME;
 
@@ -25,7 +25,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
     });
 
     const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash-001',
       generationConfig: {
         responseMimeType: "application/json"
       }

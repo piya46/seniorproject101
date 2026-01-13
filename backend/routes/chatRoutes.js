@@ -20,7 +20,7 @@ router.post('/recommend', authMiddleware, async (req, res) => {
     if (!message) return res.status(400).json({ error: "Message is required" });
 
     // ✅ ใช้ Project Number โดยตรงในโค้ด AI เพื่อแก้ปัญหา 404
-    const projectNumber = "466086429766"; 
+    const projectNumber = "seniorproject101"; 
     const location = process.env.GCP_LOCATION || 'asia-southeast1';
 
     const vertex_ai = new VertexAI({
@@ -29,7 +29,7 @@ router.post('/recommend', authMiddleware, async (req, res) => {
     });
 
     const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash-001',
       generationConfig: {
         responseMimeType: "application/json"
       }
