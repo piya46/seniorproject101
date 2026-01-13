@@ -21,7 +21,7 @@ router.post('/recommend', authMiddleware, async (req, res) => {
 
     // ✅ ใช้ Project Number โดยตรงในโค้ด AI เพื่อแก้ปัญหา 404
     const projectNumber = "466086429766"; 
-    const location = process.env.GCP_LOCATION;
+    const location = process.env.GCP_LOCATION || 'asia-southeast1';
 
     const vertex_ai = new VertexAI({
       project: projectNumber,

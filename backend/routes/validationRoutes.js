@@ -14,7 +14,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
 
     // ✅ ใช้ Project Number โดยตรง
     const projectNumber = "466086429766";
-    const location = process.env.GCP_LOCATION;
+    const location = process.env.GCP_LOCATION || 'asia-southeast1';
     const bucketName = process.env.GCS_BUCKET_NAME;
 
     const storage = new Storage();
