@@ -80,7 +80,7 @@ const vertex_ai = new VertexAI({
 
 // ✅ Use 'gemini-1.5-flash' for speed and cost efficiency
 const model = vertex_ai.preview.getGenerativeModel({
-  model: 'gemini-2.0-flash',
+  model: 'gemini-1.5-flash-001',
 });
 
 router.post('/check-completeness', authMiddleware, async (req, res) => {

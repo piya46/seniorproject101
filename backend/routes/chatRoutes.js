@@ -19,7 +19,7 @@ const vertex_ai = new VertexAI({
 });
 
 const model = vertex_ai.preview.getGenerativeModel({
-  model: 'gemini-2.0-flash',
+  model: 'gemini-1.5-flash-001',
 });
 
 const getFormsContext = () => {

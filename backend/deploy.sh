@@ -14,7 +14,7 @@ SERVICE_NAME="sci-request-system"
 BUCKET_NAME="sci-request-files-prod"
 
 # 4. Region (แนะนำ asia-southeast1 สิงคโปร์)
-REGION="asia-southeast1"
+REGION="us-central1"
 
 # 5. URL ของ Frontend (ถ้ายังไม่มีใส่ * ไปก่อน)
 FRONTEND_URL="*"
