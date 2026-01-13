@@ -75,12 +75,12 @@ const { getFormConfig } = require('../data/staticData');
 const storage = new Storage();
 const vertex_ai = new VertexAI({
   project: process.env.GCP_PROJECT_ID,
-  location: process.env.GCP_LOCATION
+  location: global
 });
 
 // ✅ Use 'gemini-1.5-flash' for speed and cost efficiency
 const model = vertex_ai.preview.getGenerativeModel({
-  model: 'gemini-1.5-flash-001',
+  model: 'gemini-3-flash-preview',
 });
 
 router.post('/check-completeness', authMiddleware, async (req, res) => {
