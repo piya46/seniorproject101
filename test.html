@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Request | Ultimate Tester</title>
+    <title>Sci-Request | QA Master Platform</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -15,7 +15,7 @@
             theme: {
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
-                    colors: { slate: { 850: '#151e2e', 950: '#020617' } },
+                    colors: { slate: { 850: '#151e2e', 900: '#0f172a', 950: '#020617' } },
                     animation: { 'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' }
                 }
             }
@@ -27,442 +27,435 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-        .code-preview { font-size: 10px; line-height: 1.4; }
+        
         .json-key { color: #93c5fd; } .json-string { color: #86efac; } 
         .json-number { color: #fca5a5; } .json-boolean { color: #f9a8d4; }
+        
+        .tab-btn[data-active="true"] { background-color: #2563eb; color: white; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); }
+        .tab-btn[data-active="true"][data-mode="security"] { background-color: #e11d48; }
+        .tab-btn[data-active="true"][data-mode="performance"] { background-color: #d97706; }
+        .tab-btn[data-active="true"][data-mode="usability"] { background-color: #059669; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 h-screen flex flex-col overflow-hidden font-sans">
 
     <nav class="h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex items-center justify-between px-4 z-20 shrink-0">
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-                <i class="fa-solid fa-bug text-sm"></i>
+            <div class="w-8 h-8 rounded bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-vial-circle-check text-sm"></i>
             </div>
-            <h1 class="font-bold text-slate-100 tracking-tight text-sm">Sci-Request <span class="text-indigo-400 font-mono">CyberConsole</span></h1>
+            <div>
+                <h1 class="font-bold text-slate-100 tracking-tight text-sm">Sci-Request <span class="text-indigo-400 font-mono">QA Console</span></h1>
+                <div class="text-[9px] text-slate-500">v3.2 Stable (Usability Fix)</div>
+            </div>
         </div>
         
-        <div class="flex items-center gap-2">
-            <div class="relative">
-                <i class="fa-solid fa-server absolute left-2.5 top-2 text-slate-500 text-xs"></i>
+        <div class="flex items-center gap-3">
+            <div class="relative group">
+                <i class="fa-solid fa-server absolute left-2.5 top-2 text-slate-500 text-xs group-focus-within:text-indigo-400"></i>
                 <input type="text" id="baseUrl" value="https://sci-request-system-466086429766.asia-southeast1.run.app" 
-                       class="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded pl-8 pr-3 py-1.5 w-64 font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" 
+                       class="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded pl-8 pr-3 py-1.5 w-72 font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all" 
                        placeholder="Target API URL">
             </div>
-            <div id="auth-badge" class="px-2 py-1.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-slate-400 flex items-center gap-1.5">
-                <div class="w-1.5 h-1.5 rounded-full bg-slate-600"></div> NO AUTH
+            <div id="session-badge" class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-slate-500 flex items-center gap-1.5">
+                <div class="w-1.5 h-1.5 rounded-full bg-slate-600"></div> No Session
             </div>
         </div>
     </nav>
 
     <div class="flex flex-1 overflow-hidden">
         
-        <aside class="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-10">
-            <div class="grid grid-cols-3 gap-0.5 p-1 bg-slate-850 border-b border-slate-800">
-                <button onclick="setMode('functional')" class="tab-btn active text-[10px] font-bold uppercase tracking-wider py-2 rounded hover:bg-slate-800 transition text-slate-400 data-[active=true]:bg-indigo-600 data-[active=true]:text-white" data-mode="functional">Functional</button>
-                <button onclick="setMode('security')" class="tab-btn text-[10px] font-bold uppercase tracking-wider py-2 rounded hover:bg-slate-800 transition text-slate-400 data-[active=true]:bg-rose-600 data-[active=true]:text-white" data-mode="security">Pentest</button>
-                <button onclick="setMode('load')" class="tab-btn text-[10px] font-bold uppercase tracking-wider py-2 rounded hover:bg-slate-800 transition text-slate-400 data-[active=true]:bg-amber-600 data-[active=true]:text-white" data-mode="load">Load Test</button>
+        <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-10">
+            <div class="grid grid-cols-2 gap-1 p-2 bg-slate-850 border-b border-slate-800">
+                <button onclick="setMode('functional')" class="tab-btn text-[10px] font-bold uppercase py-2 rounded text-slate-400 hover:bg-slate-800 transition" data-mode="functional"><i class="fa-solid fa-check-double mr-1"></i> Functional</button>
+                <button onclick="setMode('integration')" class="tab-btn text-[10px] font-bold uppercase py-2 rounded text-slate-400 hover:bg-slate-800 transition" data-mode="integration"><i class="fa-solid fa-diagram-project mr-1"></i> Integration</button>
+                <button onclick="setMode('security')" class="tab-btn text-[10px] font-bold uppercase py-2 rounded text-slate-400 hover:bg-slate-800 transition" data-mode="security"><i class="fa-solid fa-shield-halved mr-1"></i> Security</button>
+                <button onclick="setMode('performance')" class="tab-btn text-[10px] font-bold uppercase py-2 rounded text-slate-400 hover:bg-slate-800 transition" data-mode="performance"><i class="fa-solid fa-gauge-high mr-1"></i> Load/Stress</button>
+                <button onclick="setMode('usability')" class="tab-btn text-[10px] font-bold uppercase py-2 rounded text-slate-400 hover:bg-slate-800 transition" data-mode="usability"><i class="fa-regular fa-face-smile mr-1"></i> Usability</button>
+                <button onclick="setMode('regression')" class="tab-btn text-[10px] font-bold uppercase py-2 rounded text-slate-400 hover:bg-slate-800 transition" data-mode="regression"><i class="fa-solid fa-rotate-left mr-1"></i> Regression</button>
             </div>
 
-            <div id="config-panel" class="p-3 border-b border-slate-800 bg-slate-850 hidden">
-                <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Load Configuration</div>
-                <div class="grid grid-cols-2 gap-2 mb-2">
-                    <div>
-                        <label class="text-[9px] text-slate-400 block mb-1">Concurrent Users</label>
-                        <input type="number" id="load-users" value="50" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-center font-mono focus:border-amber-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="text-[9px] text-slate-400 block mb-1">Loop Count</label>
-                        <input type="number" id="load-loops" value="5" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-center font-mono focus:border-amber-500 outline-none">
-                    </div>
-                </div>
-                <div class="text-[9px] text-amber-500/70"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Browser limited. High values may freeze UI.</div>
-            </div>
+            <div id="config-area" class="p-3 border-b border-slate-800 bg-slate-850/50 hidden"></div>
 
-            <div id="test-list" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1"></div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1" id="test-list-container"></div>
 
             <div class="p-3 bg-slate-850 border-t border-slate-800">
-                <div class="flex justify-between text-[10px] font-mono mb-2 px-1">
-                    <span class="text-slate-400">PASSED: <b class="text-emerald-400 text-sm" id="stat-pass">0</b></span>
-                    <span class="text-slate-400">FAILED: <b class="text-rose-400 text-sm" id="stat-fail">0</b></span>
+                <div class="flex justify-between text-[10px] font-mono mb-2.5 px-1">
+                    <span class="text-slate-400">PASSED: <b class="text-emerald-400 text-sm" id="count-pass">0</b></span>
+                    <span class="text-slate-400">FAILED: <b class="text-rose-400 text-sm" id="count-fail">0</b></span>
                 </div>
-                <button onclick="runSuite()" id="action-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-900/20 transition-all active:scale-95 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-play"></i> Run Functional Tests
+                <button onclick="runCurrentSuite()" id="run-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-900/20 transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i> EXECUTE SUITE
                 </button>
             </div>
         </aside>
 
         <main class="flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
-            <div class="absolute inset-0 opacity-[0.02] pointer-events-none" style="background-image: linear-gradient(#475569 1px, transparent 1px), linear-gradient(90deg, #475569 1px, transparent 1px); background-size: 20px 20px;"></div>
+            <div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#64748b 1px, transparent 1px); background-size: 24px 24px;"></div>
 
-            <div class="h-9 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-4 shrink-0">
-                <div class="text-[10px] font-mono text-slate-500 flex items-center gap-2">
-                    <i class="fa-solid fa-terminal"></i> CONSOLE OUTPUT
-                </div>
+            <div class="h-9 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-4 shrink-0 z-10 backdrop-blur-sm">
+                <span class="text-[10px] font-mono text-slate-500 uppercase tracking-widest"><i class="fa-solid fa-terminal mr-2"></i>Live Console</span>
                 <div class="flex gap-3">
-                     <button onclick="toggleAutoScroll()" id="autoscroll-btn" class="text-[10px] text-indigo-400 hover:text-white transition"><i class="fa-solid fa-arrow-down-long"></i> Auto-Scroll: ON</button>
-                    <button onclick="clearConsole()" class="text-[10px] text-slate-500 hover:text-rose-400 transition"><i class="fa-solid fa-trash-can"></i> Clear</button>
+                    <button onclick="toggleScroll()" id="btn-autoscroll" class="text-[10px] text-indigo-400 hover:text-white transition"><i class="fa-solid fa-arrow-down-long"></i> Auto-Scroll: ON</button>
+                    <button onclick="clearLogs()" class="text-[10px] text-slate-500 hover:text-rose-400 transition"><i class="fa-solid fa-trash-can"></i> Clear</button>
                 </div>
             </div>
 
-            <div id="console-output" class="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-2 custom-scrollbar pb-10 z-10">
-                <div class="h-full flex flex-col items-center justify-center text-slate-700 space-y-3 opacity-30 select-none">
-                    <i class="fa-solid fa-microchip text-5xl"></i>
-                    <p>System Ready. Select a mode to begin.</p>
+            <div id="console-logs" class="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-2 custom-scrollbar pb-10 z-10 scroll-smooth">
+                <div class="h-full flex flex-col items-center justify-center text-slate-700 space-y-3 opacity-40 select-none">
+                    <i class="fa-solid fa-vial-circle-check text-5xl"></i>
+                    <p>Select a mode from the sidebar to begin.</p>
                 </div>
             </div>
 
-            <div class="h-7 bg-indigo-600 text-white text-[10px] font-mono flex items-center justify-between px-3 shrink-0 z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
-                <span id="status-msg" class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-white rounded-full animate-pulse hidden" id="status-dot"></div> IDLE</span>
+            <div class="h-7 bg-indigo-600 text-white text-[10px] font-mono flex items-center justify-between px-3 shrink-0 z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
+                <span id="status-text" class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-white rounded-full animate-pulse hidden" id="status-dot"></div> IDLE</span>
                 <span id="timer">00:00:00</span>
             </div>
         </main>
     </div>
 
     <script>
-        // --- Test Definitions ---
+        // --- 0. Global Constants ---
+        const VALID_PDF_CONTENT = `%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 24 >>\nstream\nBT /F1 24 Tf 100 700 Td (Test Document) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000010 00000 n\n0000000060 00000 n\n0000000117 00000 n\n0000000223 00000 n\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n297\n%%EOF`;
+
+        // --- 1. Test Suite Definitions ---
         const suites = {
             functional: [
-                { id: 'f_auth', name: 'Initialize Session', method: 'POST /session/init', icon: 'fa-key' },
-                { id: 'f_dept', name: 'Get Departments', method: 'GET /departments', icon: 'fa-building' },
-                { id: 'f_forms', name: 'Get Forms List', method: 'GET /forms', icon: 'fa-list-check' },
-                { id: 'f_chat', name: 'Chat Valid Request', method: 'POST /chat/recommend', icon: 'fa-robot' },
-                { id: 'f_up', name: 'Upload Flow', method: 'POST /upload...', icon: 'fa-cloud-arrow-up', special: 'upload_flow' },
-                // ✅ เพิ่มกลับมาแล้วครับ
-                { id: 'f_valid', name: 'AI Validation Check', method: 'POST /validation/check', icon: 'fa-clipboard-check', special: 'validation_flow' }
+                { id: 'f1', name: 'Auth: Init Session', method: 'POST /session/init', icon: 'fa-key' },
+                { id: 'f2', name: 'Meta: Get Departments', method: 'GET /departments', icon: 'fa-building' },
+                { id: 'f3', name: 'Form: Get List', method: 'GET /forms', icon: 'fa-list' },
+                { id: 'f4', name: 'Form: Get Detail (JT31)', method: 'GET /forms/JT31?degree_level=bachelor', icon: 'fa-file-invoice' },
+                { id: 'f5', name: 'Chat: Recommendation', method: 'POST /chat/recommend', icon: 'fa-robot' },
+                { id: 'f6', name: 'Upload: Signed URL & Put', method: 'POST /upload/signed-url', icon: 'fa-cloud-upload', special: 'upload_fix' },
+                { id: 'f7', name: 'Validation: AI Check', method: 'POST /validation/check-completeness', icon: 'fa-magnifying-glass' }
+            ],
+            integration: [
+                { id: 'i1', name: 'Scenario: Full User Journey', desc: 'Init -> Chat -> Upload -> Validate', action: 'full_flow' }
             ],
             security: [
-                // Injection
-                { id: 's_sql_1', name: 'SQL Injection (Basic)', desc: "' OR 1=1 --", icon: 'fa-database', type: 'injection', payload: "' OR 1=1 --" },
-                { id: 's_sql_2', name: 'SQL Injection (Union)', desc: "UNION SELECT 1,2,3", icon: 'fa-database', type: 'injection', payload: "' UNION SELECT 1, null, null --" },
-                { id: 's_xss_1', name: 'Reflected XSS', desc: "<script>alert(1)<\\/script>", icon: 'fa-code', type: 'injection', payload: "<script>alert('XSS')<\\/script>" },
-                { id: 's_cmd_1', name: 'Command Injection', desc: "; cat /etc/passwd", icon: 'fa-terminal', type: 'injection', payload: "; cat /etc/passwd" },
-                
-                // Auth & Access
-                { id: 's_auth_1', name: 'No Token Access', desc: 'Expect 401', icon: 'fa-lock', type: 'auth', expected: 401 },
-                { id: 's_auth_2', name: 'Fake Token Access', desc: 'Expect 403', icon: 'fa-user-ninja', type: 'auth', expected: 403 },
-                { id: 's_idor', name: 'IDOR / Path Traversal', desc: '../etc/passwd', icon: 'fa-folder-open', type: 'file', filename: '../../../etc/passwd' },
-
-                // Fuzzing
-                { id: 's_fuzz_1', name: 'Huge Payload (Buffer)', desc: '10KB String', icon: 'fa-weight-hanging', type: 'fuzz', size: 10000 },
-                { id: 's_fuzz_2', name: 'JSON Bomb', desc: 'Nested Objects', icon: 'fa-bomb', type: 'fuzz', special: 'json_bomb' },
-                { id: 's_method', name: 'Method Tampering', desc: 'DELETE /departments', icon: 'fa-ban', type: 'method', method: 'DELETE' },
-                { id: 's_file', name: 'Malicious File Type', desc: '.exe Upload', icon: 'fa-file-shield', type: 'file', ext: 'exe' }
+                { id: 's1', name: 'Auth: No Token', type: 'auth', expected: 401 },
+                { id: 's2', name: 'Auth: Invalid Token', type: 'auth', expected: 403 },
+                { id: 's3', name: 'Inj: SQL Injection', type: 'injection', payload: "' OR 1=1 --" },
+                { id: 's4', name: 'Inj: XSS Attack', type: 'injection', payload: "<script>alert(1)<\\/script>" },
+                { id: 's5', name: 'File: Malicious (.exe)', type: 'file', ext: 'exe' },
+                { id: 's6', name: 'Logic: No Dept ID', type: 'logic', action: 'merge_no_dept' }
             ],
-            load: [
-                { id: 'l_stress', name: 'Stress Test', desc: 'High Concurrency Session Init', icon: 'fa-gauge-high' }
+            performance: [
+                { id: 'p1', name: 'Load Test (Concurrent)', desc: 'Simulate multiple users', type: 'load' },
+                { id: 'p2', name: 'Latency Check', desc: 'Measure API Response Time', type: 'latency' }
+            ],
+            usability: [
+                { id: 'u1', name: 'Error Msg Clarity', desc: 'Check if errors are human-readable', type: 'usability_err' },
+                { id: 'u2', name: 'Response Structure', desc: 'Verify JSON standards', type: 'usability_json' }
+            ],
+            regression: [
+                { id: 'r1', name: 'Core Functionality', desc: 'Re-run critical path to ensure stability', type: 'regression' }
             ]
         };
 
-        // --- State ---
-        let state = { mode: 'functional', token: '', baseUrl: '', pass: 0, fail: 0, running: false, autoScroll: true, gcsPath: '' };
-        let abortController = null;
+        // --- 2. State Management ---
+        let state = {
+            mode: 'functional',
+            baseUrl: '',
+            token: null,
+            gcsPath: null,
+            stats: { pass: 0, fail: 0 },
+            isRunning: false,
+            autoScroll: true
+        };
 
-        // --- Initialization ---
+        // --- 3. UI Functions ---
         function init() {
             setMode('functional');
             setInterval(() => document.getElementById('timer').innerText = new Date().toLocaleTimeString(), 1000);
         }
 
-        // --- UI Logic ---
         function setMode(mode) {
             state.mode = mode;
-            
-            // Update Buttons
-            document.querySelectorAll('.tab-btn').forEach(b => {
-                b.setAttribute('data-active', b.dataset.mode === mode);
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.setAttribute('data-active', btn.dataset.mode === mode);
             });
-
-            // Config Panel
-            const configPanel = document.getElementById('config-panel');
-            configPanel.classList.toggle('hidden', mode !== 'load');
-
-            // Action Button Color
-            const btn = document.getElementById('action-btn');
-            const colors = { functional: 'bg-indigo-600', security: 'bg-rose-600', load: 'bg-amber-600' };
-            btn.className = btn.className.replace(/bg-\w+-600 hover:bg-\w+-500/, `${colors[mode]} hover:bg-opacity-80`);
-            btn.innerHTML = `<i class="fa-solid fa-play"></i> Run ${mode.charAt(0).toUpperCase() + mode.slice(1)} Tests`;
-
+            
+            const configArea = document.getElementById('config-area');
+            if(mode === 'performance') {
+                configArea.classList.remove('hidden');
+                configArea.innerHTML = `
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="text-[9px] text-slate-400">Users</label><input type="number" id="perf-users" value="20" class="w-full bg-slate-900 border border-slate-700 rounded text-xs px-2 py-1 text-center"></div>
+                        <div><label class="text-[9px] text-slate-400">Loops</label><input type="number" id="perf-loops" value="2" class="w-full bg-slate-900 border border-slate-700 rounded text-xs px-2 py-1 text-center"></div>
+                    </div>
+                `;
+            } else {
+                configArea.classList.add('hidden');
+            }
             renderList();
         }
 
         function renderList() {
-            const list = document.getElementById('test-list');
-            if(state.mode === 'load') {
-                list.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs font-mono border border-dashed border-slate-800 rounded">
-                    Load Test will execute requests based on the configuration above.<br>
-                    <i class="fa-solid fa-arrow-up mt-2"></i> Check Config
-                </div>`;
-                return;
-            }
-
+            const list = document.getElementById('test-list-container');
             list.innerHTML = suites[state.mode].map(t => `
-                <div id="card-${t.id}" class="group p-2.5 rounded border border-slate-800 bg-slate-900/50 hover:bg-slate-800 transition flex items-center justify-between mb-1">
+                <div id="card-${t.id}" class="log-item p-2.5 rounded border border-slate-800 bg-slate-900/50 hover:bg-slate-800 transition flex items-center justify-between mb-1 group">
                     <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-7 h-7 rounded bg-slate-800 flex items-center justify-center text-slate-500 text-xs shadow-inner group-hover:text-white transition">
-                            <i class="fa-solid ${t.icon}"></i>
+                        <div class="w-6 h-6 rounded bg-slate-800 flex items-center justify-center text-slate-500 text-[10px] shadow-inner group-hover:text-white transition">
+                            <i class="fa-solid ${t.icon || 'fa-circle-dot'}"></i>
                         </div>
                         <div class="min-w-0">
                             <div class="text-xs font-medium text-slate-300 truncate">${t.name}</div>
                             <div class="text-[10px] text-slate-500 font-mono truncate">${t.desc || t.method || ''}</div>
                         </div>
                     </div>
-                    <div class="status-indicator w-1.5 h-1.5 rounded-full bg-slate-700 transition-all"></div>
+                    <div class="status-dot w-2 h-2 rounded-full bg-slate-700 transition-all"></div>
                 </div>
             `).join('');
         }
 
-        function toggleAutoScroll() {
-            state.autoScroll = !state.autoScroll;
-            const btn = document.getElementById('autoscroll-btn');
-            btn.innerHTML = `<i class="fa-solid fa-arrow-down-long"></i> Auto-Scroll: ${state.autoScroll ? 'ON' : 'OFF'}`;
-            btn.className = state.autoScroll ? 'text-[10px] text-indigo-400 hover:text-white transition' : 'text-[10px] text-slate-600 hover:text-white transition';
-        }
-
-        function clearConsole() {
-            document.getElementById('console-output').innerHTML = '';
-        }
-
-        // --- Core Execution ---
-        async function runSuite() {
-            if(state.running) return;
-            state.running = true; state.pass = 0; state.fail = 0;
+        // --- 4. Execution Engine ---
+        async function runCurrentSuite() {
+            if(state.isRunning) return;
+            state.isRunning = true;
+            state.stats = { pass: 0, fail: 0 };
+            updateStats();
             state.baseUrl = document.getElementById('baseUrl').value.replace(/\/$/, '') + '/api/v1';
             
-            updateStats();
-            document.getElementById('console-output').innerHTML = '';
-            document.getElementById('status-dot').classList.remove('hidden');
-            const btn = document.getElementById('action-btn');
+            document.getElementById('console-logs').innerHTML = '';
+            const btn = document.getElementById('run-btn');
             const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Running...';
-            btn.classList.add('opacity-75', 'cursor-not-allowed');
-
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> RUNNING...';
+            btn.classList.add('opacity-75', 'pointer-events-none');
+            document.getElementById('status-dot').classList.remove('hidden');
+            
             log('system', `Starting ${state.mode.toUpperCase()} Suite`, { target: state.baseUrl });
 
-            // Ensure Token for non-auth tests
-            if (!state.token) await refreshAuth();
+            if(!state.token && state.mode !== 'security') await authenticate();
 
-            if (state.mode === 'load') {
-                await runLoadTest();
-            } else {
+            if(state.mode === 'performance') await runPerformanceTests();
+            else if (state.mode === 'integration') await runIntegrationTests();
+            else if (state.mode === 'regression') await runRegressionTests();
+            else {
                 for (const test of suites[state.mode]) {
                     await runSingleTest(test);
-                    await new Promise(r => setTimeout(r, 200)); // Pacing
+                    await new Promise(r => setTimeout(r, 300));
                 }
             }
 
-            // Finish
-            state.running = false;
+            state.isRunning = false;
             btn.innerHTML = originalText;
-            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            btn.classList.remove('opacity-75', 'pointer-events-none');
             document.getElementById('status-dot').classList.add('hidden');
-            document.getElementById('status-msg').innerHTML = `<i class="fa-solid fa-check-circle"></i> DONE`;
-            log('system', 'Execution Completed', { passed: state.pass, failed: state.fail });
+            log('system', 'Suite Finished', state.stats);
         }
 
-        async function refreshAuth() {
+        // --- 5. Test Modules ---
+
+        async function authenticate() {
             try {
                 const res = await axios.post(`${state.baseUrl}/session/init`);
                 state.token = res.data.session_token;
-                const badge = document.getElementById('auth-badge');
-                badge.className = 'px-2 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400 flex items-center gap-1.5';
-                badge.innerHTML = `<div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> AUTHENTICATED`;
-                log('info', 'Session Authenticated', { token: state.token.substring(0, 10) + '...' });
-            } catch (e) {
+                document.getElementById('session-badge').innerHTML = `<div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Active`;
+                document.getElementById('session-badge').className = 'px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400 flex items-center gap-1.5';
+                log('info', 'Session Authenticated', { token: state.token.substring(0, 10)+'...' });
+            } catch(e) {
                 log('error', 'Auth Failed', e.message);
+                throw e;
             }
         }
 
-        // --- Single Test Logic (Func & Sec) ---
         async function runSingleTest(test) {
             const card = document.getElementById(`card-${test.id}`);
-            const indicator = card.querySelector('.status-indicator');
-            indicator.className = 'status-indicator w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+            const dot = card.querySelector('.status-dot');
+            dot.className = 'status-dot w-2 h-2 rounded-full bg-amber-400 animate-pulse';
 
             try {
                 const headers = { Authorization: `Bearer ${state.token}` };
-                let response = { status: 0 };
+                let res = { status: 0 };
 
-                // >>>> Security Logic
-                if (state.mode === 'security') {
-                    if (test.type === 'auth') {
-                        // Auth Attacks
-                        const badHeader = test.expected === 401 ? {} : { Authorization: 'Bearer fake' };
-                        response = await axios.get(`${state.baseUrl}/departments`, { headers: badHeader, validateStatus: () => true });
-                    } 
-                    else if (test.type === 'injection' || test.special === 'json_bomb') {
-                        // Injection / Fuzzing
-                        let body = { message: test.payload || "test", degree_level: "bachelor" };
-                        if (test.special === 'json_bomb') {
-                             body = { a: { b: { c: { d: "A".repeat(5000) } } } }; // Mini bomb
-                        }
-                        response = await axios.post(`${state.baseUrl}/chat/recommend`, body, { headers, validateStatus: () => true });
+                // SECURITY
+                if(state.mode === 'security') {
+                    if(test.type === 'auth') {
+                        const h = test.expected === 401 ? {} : { Authorization: 'Bearer fake' };
+                        res = await axios.get(`${state.baseUrl}/departments`, { headers: h, validateStatus: ()=>true });
+                    } else if(test.type === 'injection') {
+                        res = await axios.post(`${state.baseUrl}/chat/recommend`, { message: test.payload, degree_level: 'bachelor' }, { headers, validateStatus: ()=>true });
+                    } else if(test.type === 'file') {
+                        const type = test.ext === 'exe' ? 'application/x-msdownload' : 'application/pdf';
+                        res = await axios.post(`${state.baseUrl}/upload/signed-url`, { file_type: type, file_key: 'hack', file_size: 1024 }, { headers, validateStatus: ()=>true });
+                    } else if(test.type === 'logic') {
+                        res = await axios.post(`${state.baseUrl}/documents/merge`, { form_code: 'JT31', gcs_paths: ['fake'] }, { headers, validateStatus: ()=>true });
                     }
-                    else if (test.type === 'method') {
-                        // Method Tampering
-                        response = await axios.delete(`${state.baseUrl}/departments`, { headers, validateStatus: () => true });
+                }
+                // USABILITY (FIXED)
+                else if(state.mode === 'usability') {
+                    if(test.type === 'usability_err') {
+                        // Expect 400 Bad Request
+                        res = await axios.post(`${state.baseUrl}/upload/signed-url`, {}, { headers, validateStatus: ()=>true });
+                        if(res.status !== 400) throw new Error(`Expected 400, got ${res.status}`);
+                        // Check Human-readable message
+                        const msg = res.data && (res.data.error || res.data.message);
+                        if(!msg) throw new Error("No readable error message found");
+                    } else if(test.type === 'usability_json') {
+                        res = await axios.get(`${state.baseUrl}/departments`, { headers });
+                        if(res.headers['content-type'].indexOf('application/json') === -1) throw new Error("Response is not JSON");
                     }
-                    else if (test.type === 'file') {
-                        // Malicious Upload
-                        const fileKey = test.filename || (test.ext === 'exe' ? 'virus.exe' : 'test.pdf');
-                        const fileType = test.ext === 'exe' ? 'application/x-msdownload' : 'application/pdf';
-                        response = await axios.post(`${state.baseUrl}/upload/signed-url`, {
-                            file_type: fileType, file_key: fileKey, file_size: 1024
-                        }, { headers, validateStatus: () => true });
-                    }
-                    else if (test.type === 'fuzz' && test.size) {
-                         // Buffer Overflow simul
-                         const payload = "A".repeat(test.size);
-                         response = await axios.post(`${state.baseUrl}/chat/recommend`, { message: payload }, { headers, validateStatus: () => true });
-                    }
-                } 
-                // >>>> Functional Logic
+                }
+                // FUNCTIONAL
                 else {
-                    if (test.id === 'f_auth') response = await axios.post(`${state.baseUrl}/session/init`);
-                    else if (test.id === 'f_dept') response = await axios.get(`${state.baseUrl}/departments`, { headers });
-                    else if (test.id === 'f_forms') response = await axios.get(`${state.baseUrl}/forms?degree_level=bachelor`, { headers });
-                    else if (test.id === 'f_chat') response = await axios.post(`${state.baseUrl}/chat/recommend`, { message: "ลาออก", degree_level: "bachelor" }, { headers });
-                    else if (test.special === 'upload_flow') {
-                        // Quick Upload Test
-                        const pdfContent = `%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 24 >>\nstream\nBT /F1 24 Tf 100 700 Td (Test) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000010 00000 n\n0000000060 00000 n\n0000000117 00000 n\n0000000223 00000 n\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n297\n%%EOF`;
-                        const blob = new Blob([pdfContent], { type: 'application/pdf' });
-                        const r1 = await axios.post(`${state.baseUrl}/upload/signed-url`, { file_type: 'application/pdf', file_key: 'test', file_size: blob.size }, { headers });
+                    const url = `${state.baseUrl}${test.method.split(' ')[1]}`;
+                    if(test.id === 'f1') res = await axios.post(url);
+                    else if(test.id === 'f5') res = await axios.post(url, { message: 'ลาออก', degree_level: 'bachelor' }, { headers });
+                    else if(test.id === 'f6') { 
+                        const blob = new Blob([VALID_PDF_CONTENT], { type: 'application/pdf' });
+                        const r1 = await axios.post(url, { file_type: 'application/pdf', file_key: 'test', file_size: blob.size }, { headers });
                         await axios.put(r1.data.upload_url, blob, { headers: { 'Content-Type': 'application/pdf' } });
-                        state.gcsPath = r1.data.gcs_path; // Store for Validation Step
-                        response = { status: 200, data: { path: r1.data.gcs_path } };
+                        state.gcsPath = r1.data.gcs_path;
+                        res = { status: 200, data: { path: state.gcsPath } };
                     }
-                    else if (test.special === 'validation_flow') {
-                        // AI Validation Step
-                        if (!state.gcsPath) throw new Error("Skipped: No file uploaded yet");
-                        response = await axios.post(`${state.baseUrl}/validation/check-completeness`, {
-                            form_code: 'JT31', student_level: 'bachelor',
-                            uploaded_files: [{ key: 'main_form', gcs_path: state.gcsPath }]
-                        }, { headers });
+                    else if(test.id === 'f7') {
+                        if(!state.gcsPath) throw new Error("No file uploaded (Run F6 first)");
+                        res = await axios.post(url, { form_code: 'JT31', student_level: 'bachelor', uploaded_files: [{ key: 'main_form', gcs_path: state.gcsPath }] }, { headers });
                     }
+                    else res = await axios.get(url, { headers });
                 }
 
-                // Check Results
-                const expected = test.expected || 200;
+                // VALIDATE RESULT
                 let passed = false;
+                const expected = test.expected || 200;
 
-                if (state.mode === 'security') {
-                    // Security Pass = Got Expected Error OR Got 200 but handled gracefully
-                    if (response.status === expected) passed = true;
-                    if (test.type === 'injection' && response.status === 200) passed = true; 
-                    if (test.type === 'fuzz' && response.status === 400) passed = true;
-                } else {
-                    // Functional Pass = 200-299
-                    passed = response.status >= 200 && response.status < 300;
+                if(state.mode === 'security') {
+                    if(res.status === expected) passed = true;
+                    if(test.type === 'injection' && res.status === 200) passed = true;
+                    if(test.type === 'file' && res.status === 400) passed = true;
+                    if(test.type === 'logic' && res.status >= 400) passed = true;
+                } 
+                else if (state.mode === 'usability') {
+                    // For Usability, if we didn't throw above, we passed
+                    passed = true;
+                }
+                else {
+                    passed = res.status >= 200 && res.status < 300;
                 }
 
-                if (passed) {
-                    indicator.className = 'status-indicator w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]';
-                    state.pass++;
-                    log('success', test.name, response.data || `Status: ${response.status}`);
+                if(passed) {
+                    dot.className = 'status-dot w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]';
+                    state.stats.pass++;
+                    log('success', test.name, res.data || `Status: ${res.status}`);
                 } else {
-                    throw new Error(`Status: ${response.status}`);
+                    throw new Error(`Unexpected Status: ${res.status}`);
                 }
 
-            } catch (err) {
-                indicator.className = 'status-indicator w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]';
-                state.fail++;
-                const msg = err.response ? `Status: ${err.response.status} - ${JSON.stringify(err.response.data)}` : err.message;
-                log('error', test.name, msg);
+            } catch(e) {
+                dot.className = 'status-dot w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]';
+                state.stats.fail++;
+                log('error', test.name, e.response ? e.response.data : e.message);
             }
             updateStats();
         }
 
-        // --- Load Test Logic ---
-        async function runLoadTest() {
-            const users = parseInt(document.getElementById('load-users').value) || 10;
-            const loops = parseInt(document.getElementById('load-loops').value) || 1;
-            
-            log('info', `Initializing Load Test`, { concurrent_users: users, loops: loops, total_reqs: users * loops });
+        // >>> Integration Runner
+        async function runIntegrationTests() {
+            const steps = [
+                { name: '1. Init Session', action: async() => { 
+                    const r = await axios.post(`${state.baseUrl}/session/init`); state.token = r.data.session_token; return r.data; 
+                }},
+                { name: '2. Chat Inquiry', action: async() => {
+                    return (await axios.post(`${state.baseUrl}/chat/recommend`, { message: "ลาออก", degree_level: "bachelor" }, { headers: { Authorization: `Bearer ${state.token}` } })).data;
+                }},
+                { name: '3. Upload PDF', action: async() => { 
+                    const blob = new Blob([VALID_PDF_CONTENT], { type: 'application/pdf' });
+                    const r1 = await axios.post(`${state.baseUrl}/upload/signed-url`, { file_type: 'application/pdf', file_key: 'main', file_size: blob.size }, { headers: { Authorization: `Bearer ${state.token}` } });
+                    await axios.put(r1.data.upload_url, blob, { headers: { 'Content-Type': 'application/pdf' } });
+                    state.gcsPath = r1.data.gcs_path;
+                    return { uploaded: true, path: state.gcsPath };
+                }},
+                { name: '4. Validate Doc', action: async() => {
+                    return (await axios.post(`${state.baseUrl}/validation/check-completeness`, { form_code: 'JT31', student_level: 'bachelor', uploaded_files: [{ key: 'main_form', gcs_path: state.gcsPath }] }, { headers: { Authorization: `Bearer ${state.token}` } })).data;
+                }}
+            ];
 
-            for (let i = 0; i < loops; i++) {
-                document.getElementById('status-msg').innerHTML = `<i class="fa-solid fa-bolt text-amber-500"></i> LOOP ${i+1}/${loops}`;
-                
-                const batchPromises = [];
-                const start = Date.now();
+            const card = document.getElementById('card-i1');
+            const dot = card.querySelector('.status-dot');
+            dot.className = 'status-dot w-2 h-2 rounded-full bg-purple-500 animate-pulse';
 
-                for (let u = 0; u < users; u++) {
-                    // Simulate Session Init (Most common operation)
-                    batchPromises.push(axios.post(`${state.baseUrl}/session/init`));
-                }
-
+            for(const step of steps) {
                 try {
-                    const results = await Promise.allSettled(batchPromises);
-                    const duration = Date.now() - start;
-                    const success = results.filter(r => r.status === 'fulfilled').length;
-                    const fail = results.filter(r => r.status === 'rejected').length;
-
-                    state.pass += success;
-                    state.fail += fail;
-                    
-                    const avgTime = duration / users;
-                    log(fail > 0 ? 'warning' : 'success', `Loop ${i+1} Completed`, { 
-                        success, fail, 
-                        total_time: `${duration}ms`, 
-                        avg_latency: `${avgTime.toFixed(2)}ms/req`,
-                        throughput: `${(users / (duration/1000)).toFixed(1)} req/sec`
-                    });
-
-                } catch (e) {
-                    log('error', 'Batch Failed', e.message);
+                    log('info', `Running: ${step.name}`);
+                    const res = await step.action();
+                    log('success', step.name, res);
+                } catch(e) {
+                    log('error', step.name, e.message);
+                    dot.className = 'status-dot w-2 h-2 rounded-full bg-rose-500';
+                    state.stats.fail++;
+                    return;
                 }
+                await new Promise(r => setTimeout(r, 500));
+            }
+            dot.className = 'status-dot w-2 h-2 rounded-full bg-emerald-500';
+            state.stats.pass++;
+            updateStats();
+        }
 
+        // >>> Performance Runner
+        async function runPerformanceTests() {
+            const users = parseInt(document.getElementById('perf-users').value) || 10;
+            const loops = parseInt(document.getElementById('perf-loops').value) || 2;
+            for(let i=0; i<loops; i++) {
+                log('system', `Batch ${i+1}/${loops} (${users} users)`);
+                const start = Date.now();
+                const reqs = [];
+                for(let u=0; u<users; u++) reqs.push(axios.post(`${state.baseUrl}/session/init`));
+                const results = await Promise.allSettled(reqs);
+                const duration = Date.now() - start;
+                const ok = results.filter(r => r.status === 'fulfilled').length;
+                state.stats.pass += ok;
+                state.stats.fail += (users - ok);
+                log(ok === users ? 'success' : 'warning', `Finished ${duration}ms`, { throughput: `${(users/(duration/1000)).toFixed(1)} req/s`, ok });
                 updateStats();
-                // Prevent browser freeze
-                await new Promise(r => setTimeout(r, 100)); 
+                await new Promise(r => setTimeout(r, 300));
+            }
+        }
+
+        // >>> Regression
+        async function runRegressionTests() {
+            log('info', 'Running Regression (Re-testing Functional Suite)');
+            for (const test of suites.functional) {
+                await runSingleTest(test);
+                await new Promise(r => setTimeout(r, 150));
             }
         }
 
         // --- Helpers ---
         function updateStats() {
-            document.getElementById('stat-pass').innerText = state.pass;
-            document.getElementById('stat-fail').innerText = state.fail;
+            document.getElementById('count-pass').innerText = state.stats.pass;
+            document.getElementById('count-fail').innerText = state.stats.fail;
         }
 
         function log(type, title, data) {
-            const box = document.getElementById('console-output');
-            
-            // Remove welcome
-            if(box.querySelector('.fa-microchip')) box.innerHTML = '';
+            const box = document.getElementById('console-logs');
+            if(box.querySelector('.fa-vial-circle-check')) box.innerHTML = '';
 
             const colors = {
-                success: 'border-emerald-500/50 bg-emerald-500/5 text-emerald-200',
-                error: 'border-rose-500/50 bg-rose-500/5 text-rose-200',
-                warning: 'border-amber-500/50 bg-amber-500/5 text-amber-200',
-                info: 'border-blue-500/50 bg-blue-500/5 text-blue-200',
-                system: 'border-slate-600 bg-slate-800 text-slate-300'
+                success: 'border-emerald-500/50 bg-emerald-900/20 text-emerald-300',
+                error: 'border-rose-500/50 bg-rose-900/20 text-rose-300',
+                info: 'border-blue-500/50 bg-blue-900/20 text-blue-300',
+                system: 'border-slate-600 bg-slate-800 text-slate-300',
+                warning: 'border-amber-500/50 bg-amber-900/20 text-amber-300'
             };
-            const icons = {
-                success: 'fa-check', error: 'fa-times', warning: 'fa-exclamation-triangle', info: 'fa-info', system: 'fa-cog'
-            };
+            const icons = { success: 'fa-check', error: 'fa-xmark', info: 'fa-info', system: 'fa-terminal', warning: 'fa-bolt' };
 
             const div = document.createElement('div');
-            div.className = `p-2.5 rounded border-l-2 ${colors[type] || colors.info} mb-1.5 animate-fade-in font-mono`;
-            
-            let dataHtml = '';
-            if (data) {
-                const str = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
-                dataHtml = `<pre class="mt-1.5 p-1.5 bg-slate-950/50 rounded text-[9px] overflow-x-auto custom-scrollbar code-preview">${syntaxHighlight(str)}</pre>`;
-            }
-
+            div.className = `p-2 rounded border-l-2 ${colors[type] || colors.system} mb-1 font-mono text-[10px] animate-[slideIn_0.2s_ease-out]`;
             div.innerHTML = `
-                <div class="flex items-center justify-between">
+                <div class="flex justify-between items-center mb-1">
                     <span class="font-bold flex items-center gap-2"><i class="fa-solid ${icons[type]} opacity-70"></i> ${title}</span>
-                    <span class="text-[9px] opacity-40">${new Date().toLocaleTimeString()}</span>
+                    <span class="opacity-40">${new Date().toLocaleTimeString()}</span>
                 </div>
-                ${dataHtml}
+                ${data ? `<pre class="bg-black/30 p-1.5 rounded overflow-x-auto custom-scrollbar">${syntaxHighlight(JSON.stringify(data, null, 2))}</pre>` : ''}
             `;
-            
             box.appendChild(div);
-            if (state.autoScroll) box.scrollTop = box.scrollHeight;
+            if(state.autoScroll) box.scrollTop = box.scrollHeight;
         }
 
         function syntaxHighlight(json) {
-            if (typeof json != 'string') json = JSON.stringify(json, undefined, 2);
             return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
                 let cls = 'text-amber-400';
                 if (/^"/.test(match)) {
@@ -473,6 +466,13 @@
                 return '<span class="' + cls + '">' + match + '</span>';
             });
         }
+
+        function toggleScroll() {
+            state.autoScroll = !state.autoScroll;
+            document.getElementById('btn-autoscroll').innerHTML = `<i class="fa-solid fa-arrow-down-long"></i> Auto-Scroll: ${state.autoScroll ? 'ON' : 'OFF'}`;
+        }
+
+        function clearLogs() { document.getElementById('console-logs').innerHTML = ''; }
 
         init();
     </script>
