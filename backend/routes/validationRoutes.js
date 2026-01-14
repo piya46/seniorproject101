@@ -12,22 +12,22 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
         return res.status(400).json({ status: 'error', message: 'No files uploaded' });
     }
 
-    // ✅ FIX 1: ใช้ Project Number
-    const projectNumber = "466086429766";
-    // ✅ FIX 2: บังคับ Region
-    const location = "asia-southeast1";
+    // ✅ รับค่าจาก Env Variable
+    const project = process.env.GCP_PROJECT_ID || "seniorproject101";
+    const location = process.env.GCP_LOCATION || "us-central1";
+    
     const bucketName = process.env.GCS_BUCKET_NAME;
 
     const storage = new Storage();
     const bucket = storage.bucket(bucketName);
     const vertex_ai = new VertexAI({ 
-        project: projectNumber, 
+        project: project, 
         location: location 
     });
 
-    // ✅ FIX 3: ใช้ gemini-1.5-flash
+
     const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash-001',
       generationConfig: {
         responseMimeType: "application/json"
       }

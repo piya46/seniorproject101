@@ -9,29 +9,27 @@ BUCKET_NAME="sci-request-files-prod"
 SECRET_NAME="JWT_SECRET"
 FRONTEND_URL="*"
 
-# ✅ 1. App Region (Cloud Run): รันที่สิงคโปร์
+# ✅ 1. App Region: รันที่สิงคโปร์เหมือนเดิม (User ไทยเข้าไว)
 REGION="asia-southeast1"
 
-# ✅ 2. AI Region (Vertex AI): ใช้สิงคโปร์เพื่อให้ Server กับ AI อยู่ที่เดียวกัน (Latency ต่ำ)
-AI_LOCATION="asia-southeast1"
+# ✅ 2. AI Region: ชี้ไปที่ US (เพื่อใช้ Gemini 2.0 Flash)
+AI_LOCATION="us-central1"
 
 echo "--------------------------------------------------"
 echo "🚀 Starting deployment for $SERVICE_NAME..."
-echo "📍 App Region: $REGION"
-echo "🧠 AI Region: $AI_LOCATION"
+echo "📍 App Region: $REGION (Singapore)"
+echo "🧠 AI Region: $AI_LOCATION (US)"
 echo "--------------------------------------------------"
 
-# ตรวจสอบ gcloud
 if ! command -v gcloud &> /dev/null
 then
     echo "❌ Error: gcloud CLI is not installed."
     exit 1
 fi
 
-# รันคำสั่ง Deploy
 echo "🚀 Deploying to Cloud Run..."
 
-# แก้ไข: ลบ --no-cache ออก และจัดระเบียบ \ ให้ถูกต้อง
+# ส่งตัวแปร GCP_LOCATION ไปให้โค้ดรู้ว่าต้องยิง AI ที่ไหน
 if gcloud run deploy "$SERVICE_NAME" \
   --project "$PROJECT_ID" \
   --source . \
