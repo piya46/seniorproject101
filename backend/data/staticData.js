@@ -1,9 +1,32 @@
+
 exports.departments = [
-  { id: "math_ug", name_th: "คณิตศาสตร์ (ระดับปริญญาตรี)", email: "supattra.ua@chula.ac.th" },
-  { id: "math_grad", name_th: "คณิตศาสตร์ (ระดับบัณฑิตศึกษา)", email: "supattra.u@chula.ac.th" },
-  { id: "bio", name_th: "ชีววิทยา", email: "biology.sc@chula.ac.th" }
+  // กลุ่มวิทยาศาสตร์กายภาพ
+  { id: "math_ug", name_th: "คณิตศาสตร์ (ป.ตรี)", email: "supattra.ua@chula.ac.th" },
+  { id: "math_grad", name_th: "คณิตศาสตร์ (บัณฑิตศึกษา)", email: "supattra.u@chula.ac.th" },
+  { id: "cs_all", name_th: "วิทยาการคอมพิวเตอร์ (ทุกระดับ)", email: "supattra.u@chula.ac.th" },
+  { id: "chem_ug", name_th: "เคมี (ป.ตรี)", email: "pakakrongp@chula.ac.th" },
+  { id: "chem_grad", name_th: "เคมี (บัณฑิตศึกษา)", email: "thitirat.ph@chula.ac.th" },
+  { id: "chem_bsac", name_th: "เคมี (นานาชาติ BSAC)", email: "bsac@chula.ac.th" },
+  
+  // กลุ่มวิทยาศาสตร์ชีวภาพ
+  { id: "bio", name_th: "ชีววิทยา/สัตววิทยา", email: "biology.sc@chula.ac.th" },
+  { id: "botany", name_th: "พฤกษศาสตร์/พันธุศาสตร์", email: "rawipha.p@chula.ac.th" },
+  { id: "biochem", name_th: "ชีวเคมี", email: "mitra2507@hotmail.com" },
+  { id: "microbio", name_th: "จุลชีววิทยา", email: "trada.o@chula.ac.th" },
+
+  // กลุ่มวิทยาศาสตร์ธรรมชาติ
+  { id: "marine", name_th: "วิทยาศาสตร์ทางทะเล", email: "suthinee.a@chula.ac.th" },
+  { id: "geo", name_th: "ธรณีวิทยา", email: "korgks2011@gmail.com" },
+  { id: "envi_ug", name_th: "วิทยาศาสตร์สิ่งแวดล้อม (ป.ตรี)", email: "requestenvisci@gmail.com" },
+
+  // กลุ่มวิทยาศาสตร์เทคโนโลยี
+  { id: "chemtech", name_th: "เคมีเทคนิค", email: "watcharachai.c@chula.ac.th" },
+  { id: "matsci", name_th: "วัสดุศาสตร์", email: "bhunditmee@gmail.com" },
+  { id: "photo", name_th: "เทคโนโลยีทางภาพและการพิมพ์", email: "eidiarin.k@chula.ac.th" },
+  { id: "food", name_th: "เทคโนโลยีทางอาหาร", email: "kamonwan.o@chula.ac.th" }
 ];
 
+// 2. รายชื่อฟอร์มทั้งหมด (อ้างอิงจากตาราง PDF หน้า 9-16)
 exports.forms = [
   { 
     form_code: "JT31", 
@@ -12,10 +35,58 @@ exports.forms = [
     degree_level: ["bachelor", "graduate"] 
   },
   { 
+    form_code: "JT32", 
+    name_th: "ขอรักษาสถานภาพการเป็นนิสิต (จท.32)", 
+    category: "Status", 
+    degree_level: ["graduate"] // เฉพาะ ป.โท-เอก
+  },
+  { 
+    form_code: "JT34", 
+    name_th: "ขอคืนสถานภาพการเป็นนิสิต (จท.34)", 
+    category: "Status", 
+    degree_level: ["graduate"] 
+  },
+  { 
+    form_code: "JT35", 
+    name_th: "ขอทักท้วงผลการศึกษา (จท.35)", 
+    category: "Academic", 
+    degree_level: ["bachelor", "graduate"] 
+  },
+  { 
+    form_code: "JT43", 
+    name_th: "ขอลงทะเบียนเรียนเพื่อขอผล S/U หรือ V/W (จท.43)", 
+    category: "Academic", 
+    degree_level: ["bachelor", "graduate"] 
+  },
+  { 
+    form_code: "JT44", 
+    name_th: "คำร้องขอลาป่วย (จท.44)", 
+    category: "Academic", 
+    degree_level: ["bachelor", "graduate"] 
+  },
+  { 
     form_code: "JT48", 
     name_th: "คำร้องขอถอนรายวิชา (จท.48 - W)", 
-    category: "Academic",
+    category: "Academic", 
     degree_level: ["bachelor", "graduate"]
+  },
+  { 
+    form_code: "JT49", 
+    name_th: "ลาพักการศึกษา (จท.49)", 
+    category: "Status", 
+    degree_level: ["bachelor", "graduate"]
+  },
+  { 
+    form_code: "JT66", 
+    name_th: "ขอยกเว้นรายวิชา (จท.66)", 
+    category: "Academic", 
+    degree_level: ["bachelor", "graduate"]
+  },
+  { 
+    form_code: "CF", 
+    name_th: "ขอ CF (Course Withdrawal with CF)", 
+    category: "Academic", 
+    degree_level: ["bachelor"]
   },
   {
     form_code: "JT41",
@@ -23,91 +94,206 @@ exports.forms = [
     category: "General",
     has_sub_types: true,
     sub_categories: [
+       { value: "tuition_installment", label: "ขอผ่อนผันค่าเล่าเรียน" },
+       { value: "keep_midterm_score", label: "ขอเก็บตัวสอบกลางภาค" },
        { value: "late_reg", label: "ขอลงทะเบียนเรียนหลังกำหนด" },
-       { value: "other", label: "กรณีอื่นๆ" }
+       { value: "missing_midterm", label: "ขอขาดสอบกลางภาค" },
+       { value: "review_midterm", label: "ขอทบทวนคะแนนสอบกลางภาค" },
+       { value: "sick_midterm", label: "ลาป่วยสำหรับกลางภาค" },
+       { value: "postpone_final", label: "ขอเลื่อนสอบปลายภาค" }
     ],
     degree_level: ["bachelor", "graduate"]
   }
 ];
 
-// ✅ Logic เงื่อนไขเอกสาร + กติกาการตรวจ (Validation Criteria)
+// 3. Logic การตรวจสอบเอกสาร (Validation Criteria)
 exports.getFormConfig = (formCode, degreeLevel, subType) => {
   
-  // กรณี 1: JT31 (ลาออก)
+  // --- JT31: ลาออก ---
   if (formCode === 'JT31') {
     const config = {
       form_code: "JT31",
       degree_level: degreeLevel,
-      conditions: [],
+      conditions: ["ไม่มีเงื่อนไขพิเศษสำหรับการยื่นคำร้อง"],
       required_documents: [
         { 
           key: "main_form", 
           label: "แบบฟอร์ม จท.31", 
           required: true,
-          // 👇 บอก AI ให้ตรวจ "รูปแบบฟอร์ม" (Visual Check)
-          validation_criteria: `
-            1. ตรวจสอบมุมขวาบนของกระดาษ ต้องมีรหัส "จท.31" หรือ "JT.31" พิมพ์อยู่ชัดเจน
-            2. ส่วนหัวกระดาษต้องมีตราพระเกี้ยว หรือโลโก้จุฬาฯ
-            3. ตรวจสอบช่องลายเซ็นนิสิต ต้องมีการลงนามเรียบร้อย
-          `
+          validation_criteria: `1. ตรวจสอบว่าเป็นฟอร์ม จท.31 2. มีลายเซ็นนิสิต 3. หากเป็น ป.บัณฑิต ต้องส่งที่ทะเบียนภาควิชา`
         }
       ]
     };
-
     if (degreeLevel === 'bachelor') {
       config.conditions.push("ต้องได้รับความยินยอมจากผู้ปกครอง");
       config.required_documents.push(
-        { 
-          key: "parent_consent", 
-          label: "หนังสือยินยอมจากผู้ปกครอง", 
-          required: true,
-          validation_criteria: "ต้องเป็นจดหมายที่มีใจความยินยอมให้ลาออก และมีลายเซ็นผู้ปกครอง"
-        },
-        { 
-          key: "parent_id_card", 
-          label: "สำเนาบัตรประชาชนผู้ปกครอง", 
-          required: true,
-          // 👇 บอก AI ให้ตรวจ "ขีดคร่อม" หรือรายละเอียดในบัตร
-          validation_criteria: "ต้องเป็นสำเนาบัตรประชาชนที่เห็นชื่อชัดเจน และควรมีการเซ็นรับรองสำเนาถูกต้อง"
-        }
+        { key: "parent_consent", label: "หนังสือยินยอมจากผู้ปกครอง", required: true, validation_criteria: "มีลายเซ็นผู้ปกครองชัดเจน" },
+        { key: "parent_id_card", label: "สำเนาบัตรประชาชนผู้ปกครอง", required: true, validation_criteria: "เห็นชื่อ-นามสกุลชัดเจน และควรมีการขีดคร่อมหรือเซ็นรับรองสำเนา" }
       );
     }
     return config;
   }
-  
-  // กรณี 2: JT41 (ทั่วไป)
+
+  // --- JT32: ขอรักษาสถานภาพ (เฉพาะ Grad) ---
+  if (formCode === 'JT32') {
+    return {
+      form_code: "JT32",
+      conditions: ["สำหรับนิสิตระดับบัณฑิตศึกษาเท่านั้น"],
+      required_documents: [
+        { 
+            key: "main_form", label: "แบบฟอร์ม จท.32", required: true, 
+            validation_criteria: "ตรวจสอบว่าเป็นฟอร์ม จท.32 และมีลายเซ็นนิสิตกับอาจารย์ที่ปรึกษา" 
+        },
+        {
+            key: "payment_slip", label: "หลักฐานการชำระเงินค่ารักษาสถานภาพ", required: true,
+            validation_criteria: "ตรวจสอบยอดเงิน (3,000 บาท สำหรับบัณฑิตศึกษา) และชื่อผู้ชำระต้องตรงกับนิสิต"
+        }
+      ]
+    };
+  }
+
+  // --- JT34: ขอคืนสถานภาพ (Grad Only) ---
+  if (formCode === 'JT34') {
+    return {
+      form_code: "JT34",
+      conditions: ["ส่งเล่มวิทยานิพนธ์ฉบับสมบูรณ์แล้ว", "ชำระค่ารักษาสถานภาพแล้ว"],
+      required_documents: [
+        { key: "main_form", label: "แบบฟอร์ม จท.34", required: true, validation_criteria: "ตรวจสอบลายเซ็นนิสิตและอาจารย์ที่ปรึกษา" },
+        { key: "thesis_proof", label: "หลักฐานการส่งเล่มวิทยานิพนธ์", required: true, validation_criteria: "เป็นภาพถ่ายอีเมลตอบรับ หรือใบรับรองการส่งเล่มที่ระบุว่าดำเนินการเรียบร้อยแล้ว" },
+        { key: "payment_proof", label: "หลักฐานการชำระเงินค่าคืนสถานภาพ", required: true, validation_criteria: "ต้องมียอดชำระค่าธรรมเนียมการขอคืนสถานภาพ และค่าปรับ (ถ้ามี)" }
+      ]
+    };
+  }
+
+  // --- JT35: ทักท้วงผลการศึกษา ---
+  if (formCode === 'JT35') {
+    return {
+      form_code: "JT35",
+      conditions: ["ยื่นภายใน 30 วันนับจากประกาศผล", "เฉพาะเกรดปลายภาคเท่านั้น"],
+      required_documents: [
+        { key: "main_form", label: "แบบฟอร์ม จท.35", required: true, validation_criteria: "ตรวจสอบว่าระบุรายวิชาและเกรดที่ต้องการทักท้วงชัดเจน" }
+      ]
+    };
+  }
+
+  // --- JT44: ลาป่วย ---
+  if (formCode === 'JT44') {
+    const config = {
+      form_code: "JT44",
+      conditions: ["ยื่นภายใน 5 วันทำการนับจากวันที่ขาดสอบ"],
+      required_documents: [
+        { key: "main_form", label: "แบบฟอร์ม จท.44", required: true, validation_criteria: "ตรวจสอบว่าเป็นฟอร์ม จท.44 และระบุรายวิชาที่ขาดสอบ" },
+        { 
+            key: "exam_schedule", label: "สำเนาตารางสอบ", required: true, 
+            validation_criteria: "ต้องไฮไลท์หรือระบุวิชาที่ขาดสอบ วันเวลาต้องชัดเจน" 
+        },
+        { 
+            key: "med_cert", label: "ใบรับรองแพทย์", required: true, 
+            validation_criteria: "สำคัญ: วันที่ที่ระบุในใบรับรองแพทย์ว่า 'ให้หยุดพัก' ต้องตรงหรือครอบคลุม 'วันที่ขาดสอบ' ในตารางสอบ" 
+        }
+      ]
+    };
+    return config;
+  }
+
+  // --- JT48: ถอนรายวิชา (W) ---
+  if (formCode === 'JT48') {
+    return {
+      form_code: "JT48",
+      conditions: ["ถอนหลังกำหนด (มีค่าปรับ 300 บาท/วิชา)", "ต้องให้ อ.ที่ปรึกษา และ อ.วิชา เซ็น"],
+      required_documents: [
+        { key: "main_form", label: "แบบฟอร์ม จท.48", required: true, validation_criteria: "ตรวจสอบลายเซ็นให้ครบ 3 จุด (นิสิต, อ.ที่ปรึกษา, อ.วิชา)" },
+        { key: "reason_memo", label: "เอกสารประกอบเหตุผลการถอน", required: true, validation_criteria: "ใบบันทึกข้อความอธิบายเหตุผลความจำเป็น" }
+      ]
+    };
+  }
+
+  // --- JT49: ลาพักการศึกษา ---
+  if (formCode === 'JT49') {
+    const config = {
+       form_code: "JT49",
+       conditions: ["ต้องชำระค่ารักษาสถานภาพ", "เหตุผลต้องเข้าเกณฑ์ (เกณฑ์ทหาร, ป่วย >20วัน, เหตุจำเป็น)"],
+       required_documents: [
+         { key: "main_form", label: "แบบฟอร์ม จท.49", required: true, validation_criteria: "ตรวจสอบว่าเป็นฟอร์ม จท.49" },
+         { key: "evidence", label: "หลักฐานประกอบ (ใบรับรองแพทย์/Transcript)", required: true, validation_criteria: "ถ้าป่วยต้องมีใบรับรองแพทย์ระบุว่าพักรักษาตัวเกิน 20 วัน, ถ้าเหตุส่วนตัวต้องแนบ Transcript" }
+       ]
+    };
+    if (degreeLevel === 'bachelor') {
+        config.required_documents.push({
+            key: "parent_consent", label: "หนังสือยินยอมจากผู้ปกครอง", required: true, validation_criteria: "ต้องมีลายเซ็นผู้ปกครอง"
+        });
+    }
+    return config;
+  }
+
+  // --- JT41: คำร้องทั่วไป (General Request) ---
   if (formCode === 'JT41') {
       const config = {
         form_code: "JT41",
+        sub_type: subType,
+        conditions: [],
         required_documents: [
             {
                 key: "main_form",
-                label: "คำร้องทั่วไป (จท.41)",
+                label: `คำร้องทั่วไป (จท.41) - ${subType}`,
                 required: true,
-                // 👇 บอก AI ให้ตรวจ "หัวข้อ" (Topic Check)
-                validation_criteria: `
-                  1. ตรวจสอบว่าเป็นฟอร์ม จท.41 จริง (มุมขวาบน)
-                  2. อ่านข้อความในช่อง "เรื่อง" (Subject): ต้องมีการระบุเรื่องที่ยื่นคำร้องชัดเจน (ห้ามเว้นว่าง หรือเขียนสั้นเกินไปว่า "คำร้อง")
-                  3. ช่อง "มีความประสงค์" (Intention): ต้องมีการอธิบายรายละเอียดความต้องการ
-                `
+                validation_criteria: `ตรวจสอบช่อง 'เรื่อง' ต้องระบุว่า '${subType}' หรือข้อความที่สื่อความหมายเดียวกัน`
             }
         ]
       };
       
-      // ถ้าเลือก "กรณีอื่นๆ" ต้องแนบเอกสารอธิบายเหตุผล
-      if (subType === 'other') {
-          config.required_documents.push({
-              key: "reason_memo",
-              label: "บันทึกข้อความชี้แจงเหตุผล",
-              required: true,
-              validation_criteria: "ต้องเป็นเอกสาร A4 ที่เขียน/พิมพ์ อธิบายเหตุผลประกอบคำร้องอย่างน้อย 3-4 บรรทัด"
-          });
+      // เพิ่มเอกสารตาม Sub-type (อ้างอิงจาก PDF หน้า 14-16)
+      switch (subType) {
+          case 'tuition_installment': // ขอผ่อนผันค่าเล่าเรียน
+              config.conditions.push("ยื่นภายใน 2 สัปดาห์แรกของภาคการศึกษา");
+              break;
+          
+          case 'keep_midterm_score': // ขอเก็บตัวสอบกลางภาค
+          case 'postpone_final': // ขอเลื่อนสอบปลายภาค
+              config.required_documents.push(
+                  { key: "reg_result", label: "ผลการลงทะเบียนเรียน (CR54)", required: true, validation_criteria: "แสดงรายวิชาที่ลงทะเบียน" },
+                  { key: "exam_schedule", label: "ตารางสอบรายบุคคล", required: true, validation_criteria: "ระบุวันสอบกลางภาค/ปลายภาคชัดเจน" },
+                  { key: "schedule_class", label: "ตารางเรียน", required: false, validation_criteria: "ตารางเรียนส่วนบุคคล" }
+              );
+              break;
+
+          case 'late_reg': // ขอลงทะเบียนเรียนหลังกำหนด
+              config.conditions.push("ภายใน 2 สัปดาห์แรก");
+              break;
+
+          case 'missing_midterm': // ขาดสอบกลางภาค
+          case 'sick_midterm': // ลาป่วยกลางภาค
+              config.required_documents.push(
+                  { key: "reg_result", label: "ผลการลงทะเบียนเรียน", required: true, validation_criteria: "CR54" },
+                  { key: "exam_schedule", label: "ตารางสอบ", required: true, validation_criteria: "ต้องระบุวันเวลาสอบที่ขาดไป" },
+                  { key: "evidence", label: "หลักฐานประกอบ (เช่น ใบรับรองแพทย์)", required: true, validation_criteria: "วันที่ในหลักฐานต้องตรงกับวันที่สอบ" }
+              );
+              break;
+          
+          default:
+               // กรณีอื่นๆ
+               config.required_documents.push({
+                  key: "memo", label: "บันทึกข้อความชี้แจง", required: true, validation_criteria: "อธิบายรายละเอียดความประสงค์"
+               });
       }
       
       return config;
   }
+  
+  // --- CF: ขอ CF ---
+  if (formCode === 'CF') {
+      return {
+          form_code: "CF",
+          conditions: ["ต้องเป็นวิชาที่ระบุเงื่อนไข CF ไว้ใน Reg Chula"],
+          required_documents: [
+              { key: "cf_form", label: "แบบฟอร์มขอ CF", required: true, validation_criteria: "แบบฟอร์มถูกต้อง" },
+              { key: "reg_page", label: "ภาพหน้าจอรายวิชาจากระบบ Reg", required: true, validation_criteria: "ต้องเห็นข้อความระบุเงื่อนไข CF ชัดเจน" },
+              { key: "reg_result", label: "ผลการลงทะเบียนเรียน", required: true, validation_criteria: "CR54" }
+          ]
+      };
+  }
 
-  // Default config
+  // Default fallback
   return { 
       form_code: formCode, 
       required_documents: [
@@ -115,7 +301,7 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
               key: "main_form", 
               label: "แบบฟอร์มหลัก", 
               required: true, 
-              validation_criteria: `ตรวจสอบว่าเป็นแบบฟอร์ม ${formCode} ที่ถูกต้อง มีตราสัญลักษณ์มหาวิทยาลัย และกรอกข้อมูลครบ` 
+              validation_criteria: "ตรวจสอบความครบถ้วนสมบูรณ์ทั่วไป" 
           }
       ] 
   };

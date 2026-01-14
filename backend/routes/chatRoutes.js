@@ -2,71 +2,90 @@ const express = require('express');
 const router = express.Router();
 const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
-const { forms } = require('../data/staticData'); 
+const { forms, getFormConfig } = require('../data/staticData'); // ✅ เพิ่ม getFormConfig
 
+// Initial Setup
+const project = process.env.GCP_PROJECT_ID || "seniorproject101";
+const location = process.env.GCP_LOCATION || "us-central1";
+const vertex_ai = new VertexAI({ project: project, location: location });
+
+const model = vertex_ai.getGenerativeModel({
+  model: 'gemini-2.0-flash-001'
+});
+
+// ✅ Helper: สร้าง Context ให้ AI รู้จักฟอร์มและเงื่อนไขทั้งหมด
 const getFormsContext = () => {
   return forms.map(f => {
     let desc = `- รหัส ${f.form_code}: ${f.name_th} (${f.category})`;
+    
+    // 💡 Logic ใหม่: ดึงเงื่อนไข (Conditions) ของฟอร์มมาใส่ใน Context
+    const levels = f.degree_level || ['bachelor'];
+    const conditionsSet = new Set();
+
+    // ลองดึง Config ของทั้ง ป.ตรี และ บัณฑิตศึกษา เพื่อรวบรวมเงื่อนไข
+    levels.forEach(level => {
+        const config = getFormConfig(f.form_code, level, null);
+        if (config && config.conditions) {
+            config.conditions.forEach(c => conditionsSet.add(c));
+        }
+    });
+
+    if (conditionsSet.size > 0) {
+        desc += `\n   ⚠️ เงื่อนไขสำคัญ: ${Array.from(conditionsSet).join(', ')}`;
+    }
+
     if (f.sub_categories) {
-      desc += `\n  ตัวเลือกย่อย: ${f.sub_categories.map(s => s.label).join(', ')}`;
+      desc += `\n   ตัวเลือกย่อย: ${f.sub_categories.map(s => s.label).join(', ')}`;
     }
     return desc;
   }).join('\n');
 };
 
+const formsInfo = getFormsContext();
+
 router.post('/recommend', authMiddleware, async (req, res) => {
   try {
     const { message, degree_level } = req.body;
-    if (!message) return res.status(400).json({ error: "Message is required" });
-
-    // ✅ รับค่าจาก Env Variable ที่ Deploy Script ส่งมา (จะเป็น us-central1)
-    const project = process.env.GCP_PROJECT_ID || "seniorproject101";
-    const location = process.env.GCP_LOCATION || "us-central1"; 
-
-    const vertex_ai = new VertexAI({
-      project: project,
-      location: location
+    
+    const chat = model.startChat({
+        history: [
+            {
+                role: "user",
+                parts: [{ text: `
+                คุณคือ "พี่ทะเบียนใจดี" (Registrar Assistant) ของคณะวิทยาศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย
+                หน้าที่ของคุณคือแนะนำการยื่นคำร้องให้นิสิต โดยใช้ข้อมูลด้านล่างนี้เท่านั้น:
+                
+                รายชื่อแบบฟอร์มและเงื่อนไข:
+                ${formsInfo}
+                
+                คำแนะนำ:
+                - หากนิสิตถามเรื่องปัญหา (เช่น ลงทะเบียนไม่ทัน, ป่วย, เกรดไม่ออก) ให้วิเคราะห์ว่าตรงกับฟอร์มไหน
+                - ต้องตอบ "รหัสฟอร์ม" (เช่น JT41, JT44) ให้ชัดเจนเสมอ
+                - หากมีเงื่อนไขเรื่องเวลา (เช่น ต้องยื่นภายใน 30 วัน) ให้แจ้งเตือนนิสิตด้วย
+                - ตอบสั้นๆ กระชับ และเป็นกันเอง
+                ` }]
+            }
+        ]
     });
 
-    // ✅ ใช้ Gemini 2.0 Flash (ตัวใหม่)
-    const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-2.0-flash-001',
-      generationConfig: {
-        responseMimeType: "application/json"
-      }
-    });
-
-    const formsInfo = getFormsContext();
-    const prompt = `
-      คุณคือ "พี่ทะเบียนใจดี" ของคณะวิทยาศาสตร์ จุฬาฯ
-      หน้าที่: แนะนำแบบฟอร์มคำร้องให้นิสิต
-      ข้อมูลฟอร์ม: ${formsInfo}
-      ข้อมูลนิสิต: ${degree_level || 'ไม่ระบุ'}
-      คำถาม: "${message}"
-      ตอบเป็น JSON เท่านั้น:
-      {
-        "recommended_form": "รหัสฟอร์ม หรือ null",
-        "reply_message": "คำตอบที่สุภาพและเป็นประโยชน์",
-        "confidence": "high/medium/low"
-      }
-    `;
-
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
-    });
-
+    const result = await chat.sendMessage(message);
     const response = await result.response;
-    let aiText = response.candidates[0].content.parts[0].text;
-    aiText = aiText.replace(/```json|```/g, '').trim(); 
+    const text = response.candidates[0].content.parts[0].text;
 
-    res.json({ data: JSON.parse(aiText) });
+    // พยายามหา Form Code จากคำตอบ (Simple Regex)
+    const match = text.match(/(JT\d{2}|CF)/);
+    const recommended_form = match ? match[0] : null;
+
+    res.json({
+        data: {
+            recommended_form: recommended_form,
+            reply_message: text
+        }
+    });
 
   } catch (error) {
-    console.error('Chat AI Error:', error);
-    res.status(500).json({ 
-        error: 'Failed to process chat request',
-        details: error.message 
-    });
+    console.error('Chat Error:', error);
+    res.status(500).json({ error: 'Chat processing failed' });
   }
 });
 

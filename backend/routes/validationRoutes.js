@@ -8,37 +8,33 @@ const { getFormConfig } = require('../data/staticData');
 router.post('/check-completeness', authMiddleware, async (req, res) => {
   try {
     const { form_code, uploaded_files, student_level, sub_type } = req.body;
+    
     if (!uploaded_files || uploaded_files.length === 0) {
         return res.status(400).json({ status: 'error', message: 'No files uploaded' });
     }
 
-    // ✅ Config Project/Region
+    // Config Google Cloud
     const project = process.env.GCP_PROJECT_ID || "seniorproject101";
-    const location = process.env.GCP_LOCATION || "us-central1"; // ใช้ US ตามที่ตกลงกัน
-    
+    const location = process.env.GCP_LOCATION || "us-central1";
     const bucketName = process.env.GCS_BUCKET_NAME;
 
     const storage = new Storage();
     const bucket = storage.bucket(bucketName);
-    const vertex_ai = new VertexAI({ 
-        project: project, 
-        location: location 
-    });
+    const vertex_ai = new VertexAI({ project: project, location: location });
 
-    // ✅ Model Config
     const model = vertex_ai.getGenerativeModel({
       model: 'gemini-2.0-flash-001',
-      generationConfig: {
-        responseMimeType: "application/json"
-      }
+      generationConfig: { responseMimeType: "application/json" }
     });
 
-    // 1. เตรียมกฎการตรวจสอบ (Rules)
+    // 1. ดึงกฎการตรวจสอบ (Validation Criteria) จาก Static Data
     const formConfig = getFormConfig(form_code, student_level, sub_type);
     const criteriaMap = {};
+    
     if (formConfig && formConfig.required_documents) {
         formConfig.required_documents.forEach(doc => {
-            criteriaMap[doc.key] = doc.validation_criteria || "ตรวจสอบว่าเป็นเอกสารที่ถูกต้อง ชัดเจน อ่านออก";
+            // ใช้เกณฑ์ที่ละเอียดที่ระบุไว้ใน staticData
+            criteriaMap[doc.key] = doc.validation_criteria || "ตรวจสอบว่าเป็นเอกสารที่ถูกต้อง ชัดเจน";
         });
     }
 
@@ -46,7 +42,9 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
     const fileProcessingPromises = uploaded_files.map(async (file) => {
         const gcsFile = bucket.file(file.gcs_path);
         const [metadata] = await gcsFile.getMetadata();
-        const rule = criteriaMap[file.key] || "ตรวจสอบความถูกต้องทั่วไป";
+        
+        // Match กฎให้ตรงกับไฟล์ (ถ้าไม่เจอกฎ ให้ใช้ค่า Default)
+        const specificRule = criteriaMap[file.key] || "ตรวจสอบความถูกต้องสมบูรณ์ทั่วไปของเอกสาร";
 
         return {
             inlinePart: {
@@ -55,43 +53,39 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
                     fileUri: `gs://${bucketName}/${file.gcs_path}`
                 }
             },
-            // Mapping ชื่อไฟล์ไว้ใน Prompt เพื่อให้ AI รู้ว่ารูปไหนคือกฎข้อไหน
-            ruleDescription: `ไฟล์ลำดับที่ ${uploaded_files.indexOf(file) + 1} (Key: "${file.key}"): ต้องตรวจสอบเงื่อนไขดังนี้ -> ${rule}`
+            // Mapping ชื่อไฟล์กับกฎ เพื่อใส่ใน Prompt
+            ruleDescription: `[ไฟล์ที่ ${uploaded_files.indexOf(file) + 1} - Key: "${file.key}"] \n   -> กฎการตรวจ: "${specificRule}"`
         };
     });
 
     const processedFiles = await Promise.all(fileProcessingPromises);
     const fileParts = processedFiles.map(f => f.inlinePart);
-    const promptRules = processedFiles.map(f => f.ruleDescription).join('\n');
+    const promptRules = processedFiles.map(f => f.ruleDescription).join('\n\n');
     
-    // 🔥 3. (จุดสำคัญ) ปรับ Prompt สั่งงานให้ละเอียด และกำหนด Format JSON
+    // 3. สร้าง Prompt ที่เน้นการ Cross-check และความละเอียด
     const promptText = `
-    คุณคือเจ้าหน้าที่ตรวจสอบเอกสาร (Document Validator) ของคณะวิทยาศาสตร์
+    คุณคือเจ้าหน้าที่ตรวจสอบเอกสาร (Document Validator) ของคณะวิทยาศาสตร์ จุฬาฯ ที่มีความเข้มงวด
     
-    งานของคุณคือ: ตรวจสอบความถูกต้องของไฟล์เอกสารที่แนบมา ทีละไฟล์ ตามเงื่อนไขด้านล่างนี้:
+    ภารกิจ: ตรวจสอบความสมบูรณ์ของเอกสารแนบ (Attachments) สำหรับคำร้องรหัส ${form_code}
+    
+    เงื่อนไขและกฎการตรวจสอบของแต่ละไฟล์ (Strict Criteria):
     --------------------------------------------------
     ${promptRules}
     --------------------------------------------------
     
-    คำสั่ง:
-    1. วิเคราะห์ไฟล์ทีละไฟล์อย่างละเอียด
-    2. ถ้าเอกสารไม่ชัดเจน, ผิดประเภท, หรือขาดองค์ประกอบสำคัญตามเงื่อนไข ให้ถือว่า "invalid"
-    3. ให้ตอบกลับเป็น JSON Object โดยใช้ Key เป็นชื่อไฟล์ ("file.key") และมีโครงสร้างดังนี้:
-
-    Format การตอบ (JSON):
+    คำสั่งสำคัญ (Important Instructions):
+    1. ตรวจสอบไฟล์ทีละไฟล์ตาม "กฎการตรวจ" ที่ระบุไว้ด้านบนอย่างเคร่งครัด
+    2. **Cross-Check:** หากกฎระบุให้ตรวจสอบความสอดคล้อง (เช่น "วันที่ในใบรับรองแพทย์ ต้องตรงกับตารางสอบ") ให้คุณเปรียบเทียบข้อมูลระหว่างไฟล์ภาพต่างๆ ให้แน่ใจ
+    3. หากเอกสาร "อ่านไม่ออก", "เบลอ", "ผิดประเภท", หรือ "ไม่ทำตามกฎ" ให้ระบุ status: "invalid" ทันที
+    
+    ให้ตอบกลับเป็น JSON เท่านั้น โดยมี Format ดังนี้:
     {
       "ชื่อ_key_ของไฟล์": {
          "status": "valid" หรือ "invalid",
-         "reason": "อธิบายเหตุผลอย่างละเอียดเป็นภาษาไทย ถ้าไม่ผ่านต้องบอกว่าขาดอะไร หรือผิดตรงไหน (เช่น 'ไม่พบลายเซ็นนิสิต', 'หัวกระดาษไม่ใช่ จท.31')",
-         "confidence": "high" หรือ "medium" หรือ "low"
+         "reason": "อธิบายเหตุผลภาษาไทย ถ้าไม่ผ่านให้บอกจุดที่ผิดให้ชัดเจน (เช่น 'วันที่ในใบรับรองแพทย์ (12 ต.ค.) ไม่ตรงกับวันสอบในตาราง (14 ต.ค.)')",
+         "confidence": "high"
       },
-      ... (ทำซ้ำให้ครบทุกไฟล์)
-    }
-    
-    ตัวอย่าง Output:
-    {
-       "main_form": { "status": "invalid", "reason": "ไม่พบตราพระเกี้ยวที่หัวกระดาษ และภาพเบลอมาก", "confidence": "high" },
-       "parent_consent": { "status": "valid", "reason": "เอกสารถูกต้อง มีลายเซ็นผู้ปกครองครบถ้วน", "confidence": "high" }
+      ...
     }
     `;
 
@@ -100,20 +94,20 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
         parts: [{ text: promptText }, ...fileParts]
     }];
 
-    // 4. เรียกใช้งาน Gemini
+    // 4. เรียก AI ประมวลผล
     const result = await model.generateContent({ contents });
     const response = await result.response;
     let aiText = response.candidates[0].content.parts[0].text;
     
-    // Clean JSON String (เผื่อ AI เผลอใส่ Markdown มา)
+    // Clean Output
     aiText = aiText.replace(/```json|```/g, '').trim();
 
     res.json(JSON.parse(aiText));
 
   } catch (error) {
-    console.error('Vertex AI Error:', error);
+    console.error('AI Validation Error:', error);
     res.status(500).json({ 
-        error: 'AI Validation Failed', 
+        error: 'Validation Process Failed', 
         details: error.message 
     });
   }
