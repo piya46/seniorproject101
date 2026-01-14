@@ -19,17 +19,20 @@ router.post('/recommend', authMiddleware, async (req, res) => {
     const { message, degree_level } = req.body;
     if (!message) return res.status(400).json({ error: "Message is required" });
 
-    // ✅ ใช้ Project Number โดยตรงในโค้ด AI เพื่อแก้ปัญหา 404
-    const projectNumber = "seniorproject101"; 
-    const location = process.env.GCP_LOCATION || 'asia-southeast1';
+    // ✅ FIX 1: ต้องใช้ Project Number (ตัวเลข) เท่านั้นสำหรับ Region asia-southeast1
+    const projectNumber = "466086429766"; 
+    
+    // ✅ FIX 2: บังคับใช้ asia-southeast1
+    const location = "asia-southeast1"; 
 
     const vertex_ai = new VertexAI({
       project: projectNumber,
       location: location
     });
 
+    // ✅ FIX 3: ใช้ gemini-1.5-flash (2.0 ยังไม่มาสิงคโปร์)
     const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-2.0-flash-001',
+      model: 'gemini-1.5-flash',
       generationConfig: {
         responseMimeType: "application/json"
       }

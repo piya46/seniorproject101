@@ -9,16 +9,16 @@ BUCKET_NAME="sci-request-files-prod"
 SECRET_NAME="JWT_SECRET"
 FRONTEND_URL="*"
 
-# ✅ 1. App Region (Cloud Run): รันที่สิงคโปร์เพื่อให้ใกล้ไทย
+# ✅ 1. App Region (Cloud Run): รันที่สิงคโปร์
 REGION="asia-southeast1"
 
-# ✅ 2. AI Region (Vertex AI): ใช้ asia-southeast1 ให้ตรงกัน
+# ✅ 2. AI Region (Vertex AI): ใช้สิงคโปร์เพื่อให้ Server กับ AI อยู่ที่เดียวกัน (Latency ต่ำ)
 AI_LOCATION="asia-southeast1"
 
 echo "--------------------------------------------------"
 echo "🚀 Starting deployment for $SERVICE_NAME..."
 echo "📍 App Region: $REGION"
-echo "🧠 AI Region: $AI_LOCATION (Gemini 3 Gateway)"
+echo "🧠 AI Region: $AI_LOCATION"
 echo "--------------------------------------------------"
 
 # ตรวจสอบ gcloud
@@ -31,7 +31,7 @@ fi
 # รันคำสั่ง Deploy
 echo "🚀 Deploying to Cloud Run..."
 
-# แก้ไข: ลบ --no-cache ออก และจัดระเบียบ \ ให้ไม่มี Comment ต่อท้าย
+# แก้ไข: ลบ --no-cache ออก และจัดระเบียบ \ ให้ถูกต้อง
 if gcloud run deploy "$SERVICE_NAME" \
   --project "$PROJECT_ID" \
   --source . \
