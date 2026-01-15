@@ -43,8 +43,8 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
         const gcsFile = bucket.file(file.gcs_path);
         const [metadata] = await gcsFile.getMetadata();
         
-        // Match กฎให้ตรงกับไฟล์ (ถ้าไม่เจอกฎ ให้ใช้ค่า Default)
-        const specificRule = criteriaMap[file.key] || "ตรวจสอบความถูกต้องสมบูรณ์ทั่วไปของเอกสาร";
+
+        const specificRule = criteriaMap[file.key] || "ตรวจสอบว่าเป็นเอกสารราชการที่มีตราประทับชัดเจน และเนื้อหาต้องอ่านออกได้ 100% เท่านั้น";
 
         return {
             inlinePart: {
