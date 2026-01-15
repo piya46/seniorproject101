@@ -4,3 +4,14 @@
 node_modules/
 npm-debug.log
 .env
+.env.*
+Dockerfile
+README.md
+
+# ⚠️ สำคัญ: ห้ามอัปโหลด Key ที่สร้างไว้บนเครื่อง
+keys/
+*.key
+*.pem
+
+# ไม่จำเป็นต้องเอา Scripts ขึ้นไป (เพราะใช้แค่ตอน Dev)
+scripts/

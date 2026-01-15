@@ -1,53 +1,49 @@
+// backend/app.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const securityMiddleware = require('./middlewares/securityMiddleware'); // ✅ เพิ่ม
+const authRoutes = require('./routes/authRoutes'); // ✅ เพิ่ม
+
 const app = express();
 
-// --- 🔐 Security Check: Validate Secrets ---
-const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME'];
+// --- Security Check ---
+const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME', 'Gb_PRIVATE_KEY_BASE64', 'Gb_PUBLIC_KEY_BASE64']; // ✅ เพิ่ม Key เข้าไปใน Check list
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
-
 if (missingEnv.length > 0) {
-  console.error(`❌ CRITICAL ERROR: Missing required secrets: ${missingEnv.join(', ')}`);
-  console.error('👉 On Local: Check your .env file');
-  console.error('👉 On Cloud Run: Check "Variables & Secrets" mapping from Secret Manager');
+  console.error(`❌ CRITICAL ERROR: Missing secrets: ${missingEnv.join(', ')}`);
   process.exit(1);
 }
-// ------------------------------------------
 
-// Middlewares
-// ✅ FIX: ปรับ CORS ให้ปลอดภัยขึ้นสำหรับ Production
-// (ใน Local อาจจะยอมให้ทุก Origin แต่บน Cloud ควรระบุ Domain)
+// Config CORS
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || '*', // ควรตั้งค่า FRONTEND_URL ใน Env
+    origin: process.env.FRONTEND_URL || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 };
 app.use(cors(corsOptions));
 
-app.use(express.json());
+// ✅ เพิ่ม limit รองรับ Payload ที่เข้ารหัสแล้วขนาดจะใหญ่ขึ้น
+app.use(express.json({ limit: '20mb' }));
 
-// Import Routes
-const sessionRoutes = require('./routes/sessionRoutes');
-const metaRoutes = require('./routes/metaRoutes');
-const formRoutes = require('./routes/formRoutes');
-const uploadRoutes = require('./routes/uploadRoutes');
-const validationRoutes = require('./routes/validationRoutes');
-const documentRoutes = require('./routes/documentRoutes');
-const chatRoutes = require('./routes/chatRoutes');
+// ✅ เปิดใช้งาน Security Middleware (ก่อน Route ทั้งหมด)
+app.use(securityMiddleware);
 
-// API Versioning Base URL: /api/v1
 const BASE_URL = '/api/v1';
 
-app.use(`${BASE_URL}/session`, sessionRoutes);
-app.use(`${BASE_URL}/departments`, metaRoutes);
-app.use(`${BASE_URL}/forms`, formRoutes);
-app.use(`${BASE_URL}/upload`, uploadRoutes);
-app.use(`${BASE_URL}/validation`, validationRoutes);
-app.use(`${BASE_URL}/documents`, documentRoutes);
-app.use(`${BASE_URL}/chat`, chatRoutes);
+// ✅ เพิ่ม Route Auth
+app.use(`${BASE_URL}/auth`, authRoutes);
 
-// ✅ Add: Global Error Handler (ดัก Error ที่หลุดรอดมา)
+// Routes เดิม
+app.use(`${BASE_URL}/session`, require('./routes/sessionRoutes'));
+app.use(`${BASE_URL}/departments`, require('./routes/metaRoutes'));
+app.use(`${BASE_URL}/forms`, require('./routes/formRoutes'));
+app.use(`${BASE_URL}/upload`, require('./routes/uploadRoutes'));
+app.use(`${BASE_URL}/validation`, require('./routes/validationRoutes'));
+app.use(`${BASE_URL}/documents`, require('./routes/documentRoutes'));
+app.use(`${BASE_URL}/chat`, require('./routes/chatRoutes'));
+
+// Error Handler
 app.use((err, req, res, next) => {
     console.error('🔥 Unhandled Error:', err);
     res.status(500).json({
@@ -58,6 +54,6 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`🚀 Student Request System API running on port ${PORT}`);
-  console.log(`🔒 Security Mode: ${process.env.NODE_ENV === 'production' ? 'Production (Secret Manager)' : 'Development (.env)'}`);
+  console.log(`🚀 API running on port ${PORT}`);
+  console.log(`🔒 E2EE Security: ACTIVE`);
 });
