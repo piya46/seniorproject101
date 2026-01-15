@@ -9,11 +9,33 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
   try {
     const { form_code, uploaded_files, student_level, sub_type } = req.body;
     
+    // 1. Validate Input: ตรวจสอบว่ามีการส่งไฟล์มาจริง
     if (!uploaded_files || uploaded_files.length === 0) {
         return res.status(400).json({ status: 'error', message: 'No files uploaded' });
     }
 
-    // Config Google Cloud
+    // 2. ดึง Config ของแบบฟอร์ม
+    const formConfig = getFormConfig(form_code, student_level, sub_type);
+
+    // 🛑 [NEW] เช็คว่า Form Code มีอยู่จริงหรือไม่
+    // ถ้าไม่มีให้แจ้ง Error ทันที (Fail Fast) ประหยัดค่า AI และป้องกันการมั่วรหัส
+    if (!formConfig) {
+        console.warn(`[Validation] Invalid Form Code received: ${form_code}`);
+        return res.status(404).json({ 
+            status: 'error', 
+            message: `Form Code "${form_code}" not found in system configuration. Please check your request.` 
+        });
+    }
+
+    // 3. เตรียมเกณฑ์การตรวจ (Validation Criteria)
+    const criteriaMap = {};
+    if (formConfig.required_documents) {
+        formConfig.required_documents.forEach(doc => {
+            criteriaMap[doc.key] = doc.validation_criteria || "ตรวจสอบว่าเป็นเอกสารที่ถูกต้อง ชัดเจน";
+        });
+    }
+
+    // Config Google Cloud Services
     const project = process.env.GCP_PROJECT_ID || "seniorproject101";
     const location = process.env.GCP_LOCATION || "us-central1";
     const bucketName = process.env.GCS_BUCKET_NAME;
@@ -27,24 +49,21 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    // 1. ดึงกฎการตรวจสอบ (Validation Criteria) จาก Static Data
-    const formConfig = getFormConfig(form_code, student_level, sub_type);
-    const criteriaMap = {};
-    
-    if (formConfig && formConfig.required_documents) {
-        formConfig.required_documents.forEach(doc => {
-            // ใช้เกณฑ์ที่ละเอียดที่ระบุไว้ใน staticData
-            criteriaMap[doc.key] = doc.validation_criteria || "ตรวจสอบว่าเป็นเอกสารที่ถูกต้อง ชัดเจน";
-        });
-    }
-
-    // 2. เตรียมไฟล์ส่งให้ AI
+    // 4. เตรียมไฟล์ส่งให้ AI (Multimodal)
     const fileProcessingPromises = uploaded_files.map(async (file) => {
         const gcsFile = bucket.file(file.gcs_path);
+        
+        // เช็คว่าไฟล์มีอยู่จริงใน Bucket ก่อน (กัน Error)
+        const [exists] = await gcsFile.exists();
+        if (!exists) {
+            throw new Error(`File not found in GCS: ${file.gcs_path}`);
+        }
+
         const [metadata] = await gcsFile.getMetadata();
         
-
-        const specificRule = criteriaMap[file.key] || "ตรวจสอบว่าเป็นเอกสารราชการที่มีตราประทับชัดเจน และเนื้อหาต้องอ่านออกได้ 100% เท่านั้น";
+        // [STRICT RULE] กฎสำรองที่เข้มงวดขึ้น
+        // ถ้าหา key ไม่เจอ จะบังคับให้ AI เช็คว่าเป็นเอกสารราชการเท่านั้น
+        const specificRule = criteriaMap[file.key] || "ตรวจสอบว่าเป็นเอกสารราชการที่มีตราประทับชัดเจน และเนื้อหาต้องอ่านออกได้ 100% เท่านั้น หากเป็นภาพวาดหรือภาพถ่ายทั่วไปให้ตอบ invalid";
 
         return {
             inlinePart: {
@@ -53,7 +72,6 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
                     fileUri: `gs://${bucketName}/${file.gcs_path}`
                 }
             },
-            // Mapping ชื่อไฟล์กับกฎ เพื่อใส่ใน Prompt
             ruleDescription: `[ไฟล์ที่ ${uploaded_files.indexOf(file) + 1} - Key: "${file.key}"] \n   -> กฎการตรวจ: "${specificRule}"`
         };
     });
@@ -62,30 +80,29 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
     const fileParts = processedFiles.map(f => f.inlinePart);
     const promptRules = processedFiles.map(f => f.ruleDescription).join('\n\n');
     
-    // 3. สร้าง Prompt ที่เน้นการ Cross-check และความละเอียด
+    // 5. สร้าง Prompt
     const promptText = `
-    คุณคือเจ้าหน้าที่ตรวจสอบเอกสาร (Document Validator) ของคณะวิทยาศาสตร์ จุฬาฯ ที่มีความเข้มงวด
+    คุณคือเจ้าหน้าที่ตรวจสอบเอกสาร (Document Validator) ของคณะวิทยาศาสตร์ จุฬาฯ ที่มีความเข้มงวดสูงสุด
     
-    ภารกิจ: ตรวจสอบความสมบูรณ์ของเอกสารแนบ (Attachments) สำหรับคำร้องรหัส ${form_code}
+    ภารกิจ: ตรวจสอบความสมบูรณ์ของเอกสารแนบสำหรับคำร้องรหัส: "${form_code}"
     
-    เงื่อนไขและกฎการตรวจสอบของแต่ละไฟล์ (Strict Criteria):
+    เงื่อนไขและกฎการตรวจสอบ:
     --------------------------------------------------
     ${promptRules}
     --------------------------------------------------
     
-    คำสั่งสำคัญ (Important Instructions):
+    คำสั่งสำคัญ (Instructions):
     1. ตรวจสอบไฟล์ทีละไฟล์ตาม "กฎการตรวจ" ที่ระบุไว้ด้านบนอย่างเคร่งครัด
-    2. **Cross-Check:** หากกฎระบุให้ตรวจสอบความสอดคล้อง (เช่น "วันที่ในใบรับรองแพทย์ ต้องตรงกับตารางสอบ") ให้คุณเปรียบเทียบข้อมูลระหว่างไฟล์ภาพต่างๆ ให้แน่ใจ
-    3. หากเอกสาร "อ่านไม่ออก", "เบลอ", "ผิดประเภท", หรือ "ไม่ทำตามกฎ" ให้ระบุ status: "invalid" ทันที
+    2. **Cross-Check:** หากมีเอกสารหลายฉบับ ให้ตรวจสอบความสอดคล้องของข้อมูล (เช่น วันที่, ชื่อ-นามสกุล)
+    3. หากเอกสาร "อ่านไม่ออก", "เบลอ", "ผิดประเภท", "ไม่มีลายเซ็น(ถ้าจำเป็น)" หรือ "ไม่ทำตามกฎ" ให้ระบุ status: "invalid" ทันที
     
-    ให้ตอบกลับเป็น JSON เท่านั้น โดยมี Format ดังนี้:
+    ให้ตอบกลับเป็น JSON Format เท่านั้น:
     {
       "ชื่อ_key_ของไฟล์": {
          "status": "valid" หรือ "invalid",
-         "reason": "อธิบายเหตุผลภาษาไทย ถ้าไม่ผ่านให้บอกจุดที่ผิดให้ชัดเจน (เช่น 'วันที่ในใบรับรองแพทย์ (12 ต.ค.) ไม่ตรงกับวันสอบในตาราง (14 ต.ค.)')",
+         "reason": "เหตุผลภาษาไทย (ถ้า invalid ต้องบอกจุดที่ผิดชัดเจน)",
          "confidence": "high"
-      },
-      ...
+      }
     }
     `;
 
@@ -94,7 +111,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
         parts: [{ text: promptText }, ...fileParts]
     }];
 
-    // 4. เรียก AI ประมวลผล
+    // 6. เรียก AI
     const result = await model.generateContent({ contents });
     const response = await result.response;
     let aiText = response.candidates[0].content.parts[0].text;
@@ -106,6 +123,12 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
 
   } catch (error) {
     console.error('AI Validation Error:', error);
+    
+
+    if (error.message.includes('not found')) {
+        return res.status(404).json({ error: 'Resource Not Found', details: error.message });
+    }
+
     res.status(500).json({ 
         error: 'Validation Process Failed', 
         details: error.message 
