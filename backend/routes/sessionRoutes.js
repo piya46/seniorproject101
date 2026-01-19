@@ -18,7 +18,7 @@ const { v4: uuidv4 } = require('uuid');
  * tags: [Session]
  * security: [] 
  * description: >
- * สร้าง Session ID และ Token สำหรับใช้งาน
+ * สร้าง Session ID และ Token สำหรับใช้งาน.
  * **⚠️ E2EE Required:** Payload ขาเข้าต้องว่างเปล่า (Empty Object) แต่ต้องผ่านการเข้ารหัส
  * requestBody:
  * content:

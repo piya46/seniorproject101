@@ -60,10 +60,8 @@ router.post('/merge', authMiddleware, async (req, res) => {
     const { form_code, department_id, gcs_paths } = req.body;
     const sessionId = req.session.session_id;
 
-    // 1. Create new PDF
     const mergedPdf = await PDFDocument.create();
 
-    // 2. Loop & Merge
     for (const path of gcs_paths) {
       const fileRef = bucket.file(path);
       const [fileBuffer] = await fileRef.download();
@@ -96,7 +94,6 @@ router.post('/merge', authMiddleware, async (req, res) => {
       }
     }
 
-    // 3. Save & Upload
     const mergedPdfBytes = await mergedPdf.save();
     const mergedFileName = `${sessionId}/merged_${form_code}.pdf`;
     const mergedFile = bucket.file(mergedFileName);
@@ -106,7 +103,6 @@ router.post('/merge', authMiddleware, async (req, res) => {
       resumable: false
     });
 
-    // 4. Generate Signed URL
     const [downloadUrl] = await mergedFile.getSignedUrl({
       version: 'v4',
       action: 'read',

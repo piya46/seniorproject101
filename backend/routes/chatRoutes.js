@@ -4,7 +4,6 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { forms, getFormConfig } = require('../data/staticData');
 
-// Initial Setup
 const project = process.env.GCP_PROJECT_ID || "seniorproject101";
 const location = process.env.GCP_LOCATION || "us-central1";
 const vertex_ai = new VertexAI({ project: project, location: location });
