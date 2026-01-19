@@ -36,7 +36,7 @@ module.exports = (req, res, next) => {
 
             return res.status(403).json({ 
                 error: 'Access Denied', 
-                message: 'This API requires End-to-End Encryption. Please encrypt your payload.' 
+                message: 'This API requires Encryption. Please encrypt your payload.' 
             });
         }
     }

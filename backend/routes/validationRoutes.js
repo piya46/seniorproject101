@@ -17,8 +17,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
     // 2. ดึง Config ของแบบฟอร์ม
     const formConfig = getFormConfig(form_code, student_level, sub_type);
 
-    // 🛑 [NEW] เช็คว่า Form Code มีอยู่จริงหรือไม่
-    // ถ้าไม่มีให้แจ้ง Error ทันที (Fail Fast) ประหยัดค่า AI และป้องกันการมั่วรหัส
+    
     if (!formConfig) {
         console.warn(`[Validation] Invalid Form Code received: ${form_code}`);
         return res.status(404).json({ 

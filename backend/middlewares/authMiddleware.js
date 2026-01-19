@@ -8,7 +8,6 @@ module.exports = (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    // JWT_SECRET จะถูกดึงมาจาก Env Var (ซึ่ง Cloud Run จะ Inject มาจาก Secret Manager)
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.session = decoded; // { session_id: '...', iat: ... }
     next();
