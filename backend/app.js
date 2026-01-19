@@ -1,14 +1,18 @@
-// backend/app.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const securityMiddleware = require('./middlewares/securityMiddleware'); // ✅ เพิ่ม
-const authRoutes = require('./routes/authRoutes'); // ✅ เพิ่ม
+const securityMiddleware = require('./middlewares/securityMiddleware');
+const authRoutes = require('./routes/authRoutes');
+
+// 📄 Swagger Imports
+const swaggerUi = require('swagger-ui-express');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 
 // --- Security Check ---
-const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME', 'Gb_PRIVATE_KEY_BASE64', 'Gb_PUBLIC_KEY_BASE64']; // ✅ เพิ่ม Key เข้าไปใน Check list
+const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME', 'Gb_PRIVATE_KEY_BASE64', 'Gb_PUBLIC_KEY_BASE64'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length > 0) {
   console.error(`❌ CRITICAL ERROR: Missing secrets: ${missingEnv.join(', ')}`);
@@ -23,18 +27,31 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// ✅ เพิ่ม limit รองรับ Payload ที่เข้ารหัสแล้วขนาดจะใหญ่ขึ้น
+// รองรับ Payload ขนาดใหญ่ (เพราะ E2EE จะทำให้ string ยาวขึ้น)
 app.use(express.json({ limit: '20mb' }));
 
-// ✅ เปิดใช้งาน Security Middleware (ก่อน Route ทั้งหมด)
+// -------------------------------------------------------
+// 📄 1. SWAGGER SETUP (STATIC MODE)
+// วางไว้ *ก่อน* securityMiddleware เพื่อให้เข้าถึงได้โดยไม่ต้องเข้ารหัส
+// -------------------------------------------------------
+const swaggerFile = path.join(__dirname, 'swagger.json');
+
+if (fs.existsSync(swaggerFile)) {
+    const swaggerDocument = require(swaggerFile);
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+    console.log('📄 Swagger UI available at /api-docs');
+} else {
+    console.warn('⚠️ Swagger file not found. Please run "npm run docs:build"');
+}
+// -------------------------------------------------------
+
+// ✅ เปิดใช้งาน Security Middleware (หลังจาก Swagger)
 app.use(securityMiddleware);
 
 const BASE_URL = '/api/v1';
 
 // ✅ เพิ่ม Route Auth
 app.use(`${BASE_URL}/auth`, authRoutes);
-
-// Routes เดิม
 app.use(`${BASE_URL}/session`, require('./routes/sessionRoutes'));
 app.use(`${BASE_URL}/departments`, require('./routes/metaRoutes'));
 app.use(`${BASE_URL}/forms`, require('./routes/formRoutes'));

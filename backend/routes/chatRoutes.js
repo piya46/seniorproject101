@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
-const { forms, getFormConfig } = require('../data/staticData'); // ✅ เพิ่ม getFormConfig
+const { forms, getFormConfig } = require('../data/staticData');
 
 // Initial Setup
 const project = process.env.GCP_PROJECT_ID || "seniorproject101";
@@ -13,27 +13,20 @@ const model = vertex_ai.getGenerativeModel({
   model: 'gemini-2.0-flash-001'
 });
 
-// ✅ Helper: สร้าง Context ให้ AI รู้จักฟอร์มและเงื่อนไขทั้งหมด
 const getFormsContext = () => {
   return forms.map(f => {
     let desc = `- รหัส ${f.form_code}: ${f.name_th} (${f.category})`;
-    
-    // 💡 Logic ใหม่: ดึงเงื่อนไข (Conditions) ของฟอร์มมาใส่ใน Context
     const levels = f.degree_level || ['bachelor'];
     const conditionsSet = new Set();
-
-    // ลองดึง Config ของทั้ง ป.ตรี และ บัณฑิตศึกษา เพื่อรวบรวมเงื่อนไข
     levels.forEach(level => {
         const config = getFormConfig(f.form_code, level, null);
         if (config && config.conditions) {
             config.conditions.forEach(c => conditionsSet.add(c));
         }
     });
-
     if (conditionsSet.size > 0) {
         desc += `\n   ⚠️ เงื่อนไขสำคัญ: ${Array.from(conditionsSet).join(', ')}`;
     }
-
     if (f.sub_categories) {
       desc += `\n   ตัวเลือกย่อย: ${f.sub_categories.map(s => s.label).join(', ')}`;
     }
@@ -43,6 +36,64 @@ const getFormsContext = () => {
 
 const formsInfo = getFormsContext();
 
+/**
+ * @swagger
+ * tags:
+ * - name: Chat
+ * description: AI Assistant (พี่ทะเบียนใจดี)
+ */
+
+/**
+ * @swagger
+ * /chat/recommend:
+ * post:
+ * summary: ปรึกษา AI เพื่อแนะนำแบบฟอร์ม
+ * tags: [Chat]
+ * description: "**⚠️ E2EE Required**"
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * required:
+ * - message
+ * properties:
+ * message:
+ * type: string
+ * example: "ผมป่วยต้องทำไงครับ"
+ * degree_level:
+ * type: string
+ * enum: [bachelor, graduate]
+ * responses:
+ * 200:
+ * description: คำตอบจาก AI
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * properties:
+ * data:
+ * type: object
+ * properties:
+ * recommended_form:
+ * type: string
+ * example: "JT44"
+ * reply_message:
+ * type: string
+ * 401:
+ * description: Unauthorized
+ * content:
+ * application/json:
+ * schema:
+ * $ref: '#/components/schemas/Error'
+ * 500:
+ * description: AI Service Error
+ * content:
+ * application/json:
+ * schema:
+ * $ref: '#/components/schemas/Error'
+ */
 router.post('/recommend', authMiddleware, async (req, res) => {
   try {
     const { message, degree_level } = req.body;
@@ -72,7 +123,6 @@ router.post('/recommend', authMiddleware, async (req, res) => {
     const response = await result.response;
     const text = response.candidates[0].content.parts[0].text;
 
-    // พยายามหา Form Code จากคำตอบ (Simple Regex)
     const match = text.match(/(JT\d{2}|CF)/);
     const recommended_form = match ? match[0] : null;
 
