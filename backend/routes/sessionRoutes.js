@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const { initSessionRecord } = require('../utils/dbUtils'); // ✅ Import DB Utils
+const { initSessionRecord } = require('../utils/dbUtils');
 
 router.post('/init', async (req, res) => {
   try {
@@ -11,7 +11,7 @@ router.post('/init', async (req, res) => {
 
       const token = jwt.sign({ session_id: sessionId }, process.env.JWT_SECRET, { expiresIn });
 
-      
+
       await initSessionRecord(sessionId);
 
       res.json({
