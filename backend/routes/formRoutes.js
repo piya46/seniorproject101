@@ -1,3 +1,5 @@
+// backend/routes/formRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const { forms, getFormConfig } = require('../data/staticData');
@@ -21,13 +23,18 @@ router.get('/:form_code', authMiddleware, (req, res) => {
     return res.status(404).json({ error: "Form not found" });
   }
 
-  const publicDocuments = fullConfig.required_documents.map(doc => {
-      const { validation_criteria, ...publicInfo } = doc; 
-      return publicInfo;
+  // แยก conditions ออกมาเพื่อไม่ให้ส่งไป Frontend
+  const { conditions, required_documents, ...publicInfo } = fullConfig;
+
+  // แยก validation_criteria ออกจากเอกสารแต่ละตัว
+  const publicDocuments = required_documents.map(doc => {
+      const { validation_criteria, ...safeDoc } = doc; 
+      return safeDoc;
   });
 
+  // ประกอบ Object ใหม่ที่จะส่งกลับไป
   const publicConfig = {
-      ...fullConfig,
+      ...publicInfo,
       required_documents: publicDocuments
   };
 

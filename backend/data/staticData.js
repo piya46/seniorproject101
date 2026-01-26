@@ -1,4 +1,6 @@
+// backend/data/staticData.js
 
+// 1. รายชื่อภาควิชาและอีเมลติดต่อ (ใช้สำหรับส่ง Notification)
 exports.departments = [
   // กลุ่มวิทยาศาสตร์กายภาพ
   { id: "math_ug", name_th: "คณิตศาสตร์ (ป.ตรี)", email: "supattra.ua@chula.ac.th" },
@@ -115,6 +117,24 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
       form_code: "JT31",
       degree_level: degreeLevel,
       conditions: ["ไม่มีเงื่อนไขพิเศษสำหรับการยื่นคำร้อง"],
+      
+      // Location & Steps
+      submission_location: degreeLevel === 'bachelor' 
+          ? "ฝ่ายกิจการนิสิต คณะวิทยาศาสตร์ (ตึกแถบฯ ชั้น 1)" 
+          : "สำนักงานบัณฑิตวิทยาลัย",
+      submission_steps: degreeLevel === 'bachelor' ? [
+          "1. กรอกแบบฟอร์ม จท.31 พร้อมติดรูปถ่าย",
+          "2. ให้ผู้ปกครองลงนามยินยอม",
+          "3. ให้อาจารย์ที่ปรึกษาลงนาม",
+          "4. นำส่งที่ภาควิชาเพื่อให้อาจารย์หัวหน้าภาคลงนาม",
+          "5. ยื่นที่ฝ่ายกิจการนิสิต คณะวิทยาศาสตร์"
+      ] : [
+          "1. กรอกแบบฟอร์ม จท.31",
+          "2. ให้อาจารย์ที่ปรึกษาลงนาม",
+          "3. นำส่งที่ภาควิชา",
+          "4. ภาควิชานำส่งบัณฑิตวิทยาลัย"
+      ],
+
       required_documents: [
         { 
           key: "main_form", 
@@ -139,6 +159,15 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
     return {
       form_code: "JT32",
       conditions: ["สำหรับนิสิตระดับบัณฑิตศึกษาเท่านั้น"],
+      
+      submission_location: "สำนักงานการทะเบียน (ผ่านภาควิชา)",
+      submission_steps: [
+          "1. นิสิตชำระเงินค่ารักษาสถานภาพผ่าน CUNEX หรือธนาคาร",
+          "2. กรอก จท.32 และแนบหลักฐานการโอนเงิน",
+          "3. ให้อาจารย์ที่ปรึกษาลงนาม",
+          "4. นำส่งเจ้าหน้าที่ภาควิชาเพื่อดำเนินการต่อ"
+      ],
+
       required_documents: [
         { 
             key: "main_form", label: "แบบฟอร์ม จท.32", required: true, 
@@ -157,6 +186,15 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
     return {
       form_code: "JT34",
       conditions: ["ส่งเล่มวิทยานิพนธ์ฉบับสมบูรณ์แล้ว", "ชำระค่ารักษาสถานภาพแล้ว"],
+      
+      submission_location: "บัณฑิตวิทยาลัย",
+      submission_steps: [
+          "1. ตรวจสอบสถานะการส่งเล่มวิทยานิพนธ์",
+          "2. ชำระค่าธรรมเนียมคืนสถานภาพ + ค่าปรับ",
+          "3. ยื่นคำร้องผ่านภาควิชา",
+          "4. ภาควิชาเสนอเรื่องไปยังบัณฑิตวิทยาลัย"
+      ],
+
       required_documents: [
         { key: "main_form", label: "แบบฟอร์ม จท.34", required: true, validation_criteria: "ตรวจสอบลายเซ็นนิสิตและอาจารย์ที่ปรึกษา" },
         { key: "thesis_proof", label: "หลักฐานการส่งเล่มวิทยานิพนธ์", required: true, validation_criteria: "เป็นภาพถ่ายอีเมลตอบรับ หรือใบรับรองการส่งเล่มที่ระบุว่าดำเนินการเรียบร้อยแล้ว" },
@@ -170,6 +208,14 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
     return {
       form_code: "JT35",
       conditions: ["ยื่นภายใน 30 วันนับจากประกาศผล", "เฉพาะเกรดปลายภาคเท่านั้น"],
+      
+      submission_location: "ฝ่ายวิชาการ คณะวิทยาศาสตร์ (ตึกแถบฯ ชั้น 1)",
+      submission_steps: [
+          "1. นิสิตกรอกคำร้อง จท.35",
+          "2. ยื่นคำร้องที่ฝ่ายวิชาการ คณะวิทยาศาสตร์ (ไม่ต้องผ่านอาจารย์)",
+          "3. คณะฯ จะทำบันทึกข้อความสอบถามไปยังภาควิชาเจ้าของรายวิชา"
+      ],
+
       required_documents: [
         { key: "main_form", label: "แบบฟอร์ม จท.35", required: true, validation_criteria: "ตรวจสอบว่าระบุรายวิชาและเกรดที่ต้องการทักท้วงชัดเจน" }
       ]
@@ -178,9 +224,18 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
 
   // --- JT44: ลาป่วย ---
   if (formCode === 'JT44') {
-    const config = {
+    return {
       form_code: "JT44",
       conditions: ["ยื่นภายใน 5 วันทำการนับจากวันที่ขาดสอบ"],
+      
+      submission_location: "ฝ่ายวิชาการ คณะวิทยาศาสตร์",
+      submission_steps: [
+          "1. ขอใบรับรองแพทย์จากสถานพยาบาล (ระบุให้พักในวันสอบ)",
+          "2. กรอก จท.44 และแนบใบรับรองแพทย์",
+          "3. ยื่นที่ฝ่ายวิชาการ คณะวิทยาศาสตร์ (เร็วที่สุดหลังหายป่วย)",
+          "4. รอประกาศผลการพิจารณาจากคณะฯ"
+      ],
+
       required_documents: [
         { key: "main_form", label: "แบบฟอร์ม จท.44", required: true, validation_criteria: "ตรวจสอบว่าเป็นฟอร์ม จท.44 และระบุรายวิชาที่ขาดสอบ" },
         { 
@@ -193,7 +248,6 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
         }
       ]
     };
-    return config;
   }
 
   // --- JT48: ถอนรายวิชา (W) ---
@@ -201,6 +255,16 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
     return {
       form_code: "JT48",
       conditions: ["ถอนหลังกำหนด (มีค่าปรับ 300 บาท/วิชา)", "ต้องให้ อ.ที่ปรึกษา และ อ.วิชา เซ็น"],
+      
+      submission_location: "สำนักงานการทะเบียน (Reg Chula)",
+      submission_steps: [
+          "1. พิมพ์คำร้อง จท.48 จากระบบ Reg Chula (เมนูผลการลงทะเบียน)",
+          "2. นำไปให้ อาจารย์ผู้สอนรายวิชา ลงนามอนุมัติ",
+          "3. นำไปให้ อาจารย์ที่ปรึกษา ลงนามอนุมัติ",
+          "4. ชำระค่าธรรมเนียม (ถ้ามี) ที่สำนักงานการทะเบียน",
+          "5. ยื่นเอกสารที่สำนักงานการทะเบียน จามจุรี 5"
+      ],
+
       required_documents: [
         { key: "main_form", label: "แบบฟอร์ม จท.48", required: true, validation_criteria: "ตรวจสอบลายเซ็นให้ครบ 3 จุด (นิสิต, อ.ที่ปรึกษา, อ.วิชา)" },
         { key: "reason_memo", label: "เอกสารประกอบเหตุผลการถอน", required: true, validation_criteria: "ใบบันทึกข้อความอธิบายเหตุผลความจำเป็น" }
@@ -213,6 +277,16 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
     const config = {
        form_code: "JT49",
        conditions: ["ต้องชำระค่ารักษาสถานภาพ", "เหตุผลต้องเข้าเกณฑ์ (เกณฑ์ทหาร, ป่วย >20วัน, เหตุจำเป็น)"],
+       
+       submission_location: "ฝ่ายวิชาการ คณะวิทยาศาสตร์",
+       submission_steps: [
+           "1. กรอก จท.49 และแนบหลักฐาน (เช่น ใบรับรองแพทย์)",
+           "2. ให้อาจารย์ที่ปรึกษาลงนาม",
+           "3. ให้หัวหน้าภาควิชาลงนาม",
+           "4. นำส่งที่ฝ่ายวิชาการ คณะวิทยาศาสตร์",
+           "5. เมื่ออนุมัติแล้ว ต้องชำระค่ารักษาสถานภาพที่ Reg Chula"
+       ],
+
        required_documents: [
          { key: "main_form", label: "แบบฟอร์ม จท.49", required: true, validation_criteria: "ตรวจสอบว่าเป็นฟอร์ม จท.49" },
          { key: "evidence", label: "หลักฐานประกอบ (ใบรับรองแพทย์/Transcript)", required: true, validation_criteria: "ถ้าป่วยต้องมีใบรับรองแพทย์ระบุว่าพักรักษาตัวเกิน 20 วัน, ถ้าเหตุส่วนตัวต้องแนบ Transcript" }
@@ -232,6 +306,15 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
         form_code: "JT41",
         sub_type: subType,
         conditions: [],
+        
+        submission_location: "ฝ่ายวิชาการ คณะวิทยาศาสตร์",
+        submission_steps: [
+            "1. กรอก จท.41 ระบุความประสงค์ให้ชัดเจน",
+            "2. แนบเอกสารหลักฐานที่เกี่ยวข้อง",
+            "3. ให้อาจารย์ที่ปรึกษาลงนามรับทราบ/มีความเห็น",
+            "4. ยื่นที่ฝ่ายวิชาการ คณะวิทยาศาสตร์ (หรือภาควิชา แล้วแต่กรณี)"
+        ],
+
         required_documents: [
             {
                 key: "main_form",
@@ -245,6 +328,13 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
       // เพิ่มเอกสารตาม Sub-type (อ้างอิงจาก PDF หน้า 14-16)
       switch (subType) {
           case 'tuition_installment': // ขอผ่อนผันค่าเล่าเรียน
+              config.submission_location = "กิจการนิสิต คณะวิทยาศาสตร์";
+              config.submission_steps = [
+                  "1. ดาวน์โหลดแบบฟอร์มผ่อนผันค่าเล่าเรียน",
+                  "2. ให้ผู้ปกครองลงนาม",
+                  "3. สัมภาษณ์กับอาจารย์ที่ปรึกษา/รองคณบดีกิจการนิสิต",
+                  "4. ยื่นที่ฝ่ายกิจการนิสิต ภายใน 2 สัปดาห์แรก"
+              ];
               config.conditions.push("ยื่นภายใน 2 สัปดาห์แรกของภาคการศึกษา");
               break;
           
@@ -285,6 +375,15 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
       return {
           form_code: "CF",
           conditions: ["ต้องเป็นวิชาที่ระบุเงื่อนไข CF ไว้ใน Reg Chula"],
+          
+          submission_location: "ภาควิชาเจ้าของรายวิชา",
+          submission_steps: [
+              "1. ตรวจสอบเงื่อนไขรายวิชาใน Reg Chula ว่ามี CF หรือไม่",
+              "2. กรอกแบบฟอร์มขอ CF (ขอที่ภาควิชา)",
+              "3. ยื่นคำร้องต่ออาจารย์ผู้สอนรายวิชา เพื่อพิจารณา",
+              "4. ภาควิชาจะรวบรวมส่งทะเบียนคณะฯ"
+          ],
+
           required_documents: [
               { key: "cf_form", label: "แบบฟอร์มขอ CF", required: true, validation_criteria: "แบบฟอร์มถูกต้อง" },
               { key: "reg_page", label: "ภาพหน้าจอรายวิชาจากระบบ Reg", required: true, validation_criteria: "ต้องเห็นข้อความระบุเงื่อนไข CF ชัดเจน" },
@@ -293,6 +392,6 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
       };
   }
 
-  // Default fallback
+  // Fallback: ถ้าหาไม่เจอ ให้คืนค่า null (เพื่อให้ Route ตอบ 404)
   return null;
 };
