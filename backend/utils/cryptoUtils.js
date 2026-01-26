@@ -3,7 +3,6 @@ const crypto = require('crypto');
 
 let PRIVATE_KEY, PUBLIC_KEY;
 
-// 1. โหลด Key จาก Environment Variable (ซึ่งมาจาก Secret Manager)
 if (process.env.Gb_PRIVATE_KEY_BASE64 && process.env.Gb_PUBLIC_KEY_BASE64) {
     try {
         PRIVATE_KEY = Buffer.from(process.env.Gb_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
