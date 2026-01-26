@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { Storage } = require('@google-cloud/storage');
+const { v4: uuidv4 } = require('uuid');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { addFileToSession } = require('../utils/dbUtils');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -20,13 +22,14 @@ router.post('/signed-url', authMiddleware, async (req, res) => {
     }
 
     // 2. Validate File Size
-    const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    const MAX_SIZE = 5 * 1024 * 1024;
     if (file_size && file_size > MAX_SIZE) {
       return res.status(400).json({ 
         error: `File size exceeds limit. Maximum allowed is 5MB.` 
       });
     }
 
+    // 3. Generate Secure Path
     const extensionMap = {
       'application/pdf': 'pdf',
       'image/jpeg': 'jpg',
@@ -34,7 +37,10 @@ router.post('/signed-url', authMiddleware, async (req, res) => {
       'image/webp': 'webp'
     };
     const extension = extensionMap[file_type] || 'bin';
-    const gcsPath = `${sessionId}/${file_key}.${extension}`;
+    
+    // ✅ ใช้ UUID ตั้งชื่อไฟล์เพื่อความปลอดภัย (เดา Path ไม่ได้)
+    const uniqueFileName = `${uuidv4()}.${extension}`;
+    const gcsPath = `${sessionId}/${uniqueFileName}`;
     const file = bucket.file(gcsPath);
 
     const options = {
@@ -52,9 +58,17 @@ router.post('/signed-url', authMiddleware, async (req, res) => {
 
     const [url] = await file.getSignedUrl(options);
 
+    await addFileToSession(sessionId, {
+        file_key: file_key || 'unknown',
+        gcs_path: gcsPath,
+        file_type: file_type
+    });
+
     res.json({
       upload_url: url,
-      gcs_path: gcsPath
+      file_key: file_key,
+
+      gcs_path: gcsPath 
     });
 
   } catch (error) {

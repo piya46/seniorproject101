@@ -4,13 +4,17 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const { Storage } = require('@google-cloud/storage');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { getFormConfig } = require('../data/staticData'); 
+const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 
 router.post('/check-completeness', authMiddleware, async (req, res) => {
   try {
-    const { form_code, uploaded_files, student_level, sub_type } = req.body;
+    const { form_code, student_level, sub_type } = req.body;
+    const sessionId = req.session.session_id;
+
+    const userFiles = await getDecryptedSessionFiles(sessionId);
     
-    if (!uploaded_files || uploaded_files.length === 0) {
-        return res.status(400).json({ status: 'error', message: 'No files uploaded' });
+    if (!userFiles || userFiles.length === 0) {
+        return res.status(400).json({ status: 'error', message: 'No files found in session. Please upload documents first.' });
     }
 
     const formConfig = getFormConfig(form_code, student_level, sub_type);
@@ -42,28 +46,40 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    const fileProcessingPromises = uploaded_files.map(async (file) => {
+    // ✅ 2. เตรียมข้อมูลส่ง AI (ใช้ Path จริงที่ Decrypt มาได้)
+    const fileProcessingPromises = userFiles.map(async (file) => {
         const gcsFile = bucket.file(file.gcs_path);
-        const [exists] = await gcsFile.exists();
-        if (!exists) throw new Error(`File not found in GCS: ${file.gcs_path}`);
-        const [metadata] = await gcsFile.getMetadata();
         
-        const specificRule = criteriaMap[file.key] || "ตรวจสอบว่าเป็นเอกสารราชการที่มีตราประทับชัดเจน และเนื้อหาต้องอ่านออกได้ 100% เท่านั้น";
+        // ตรวจสอบว่าไฟล์มีอยู่จริงบน Cloud Storage หรือไม่
+        const [exists] = await gcsFile.exists();
+        if (!exists) {
+            console.warn(`File missing in GCS: ${file.gcs_path}`);
+            return null;
+        }
+        
+        const [metadata] = await gcsFile.getMetadata();
+        const specificRule = criteriaMap[file.file_key] || "ตรวจสอบว่าเป็นเอกสารราชการที่มีตราประทับชัดเจน และเนื้อหาต้องอ่านออกได้ 100% เท่านั้น";
 
         return {
             inlinePart: {
                 fileData: {
                     mimeType: metadata.contentType,
-                    fileUri: `gs://${bucketName}/${file.gcs_path}`
+                    fileUri: `gs://${bucketName}/${file.gcs_path}` // ส่ง URI จริงให้ AI
                 }
             },
-            ruleDescription: `[ไฟล์ที่ ${uploaded_files.indexOf(file) + 1} - Key: "${file.key}"] \n   -> กฎการตรวจ: "${specificRule}"`
+            ruleDescription: `[ไฟล์: "${file.file_key}"] \n   -> กฎการตรวจ: "${specificRule}"`
         };
     });
 
-    const processedFiles = await Promise.all(fileProcessingPromises);
-    const fileParts = processedFiles.map(f => f.inlinePart);
-    const promptRules = processedFiles.map(f => f.ruleDescription).join('\n\n');
+    const processedResults = await Promise.all(fileProcessingPromises);
+    const validFiles = processedResults.filter(f => f !== null); // ตัดไฟล์ที่มีปัญหาออก
+
+    if (validFiles.length === 0) {
+        return res.status(400).json({ status: 'error', message: 'No valid files available for validation.' });
+    }
+
+    const fileParts = validFiles.map(f => f.inlinePart);
+    const promptRules = validFiles.map(f => f.ruleDescription).join('\n\n');
     
     const promptText = `
     คุณคือเจ้าหน้าที่ตรวจสอบเอกสาร (Document Validator) ของคณะวิทยาศาสตร์ จุฬาฯ

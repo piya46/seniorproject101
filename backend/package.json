@@ -8,15 +8,17 @@
     "docs:build": "node scripts/buildDocs.js"
   },
   "dependencies": {
+    "@google-cloud/firestore": "^7.0.0",
     "@google-cloud/storage": "^6.9.5",
     "@google-cloud/vertexai": "^1.10.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
+    "i": "^0.3.7",
     "jsonwebtoken": "^9.0.0",
     "pdf-lib": "^1.17.1",
-    "uuid": "^9.0.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.0"
+    "swagger-ui-express": "^5.0.0",
+    "uuid": "^9.0.0"
   }
 }

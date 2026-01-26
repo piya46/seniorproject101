@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # ==========================================
 # ⚙️ CONFIGURATION
 # ==========================================
@@ -9,15 +7,15 @@ BUCKET_NAME="sci-request-files-prod"
 SECRET_NAME="JWT_SECRET"
 FRONTEND_URL="*"
 
-# ✅ 1. เพิ่มชื่อ Secret ของ Key ที่เราสร้างไว้ใน Google Cloud Secret Manager
-# (ต้องตรงกับชื่อที่คุณตั้งตอนสร้าง Secret)
+# ✅ 1. ชื่อ Secret ของ Key ต่างๆ
 PRIV_KEY_SECRET="Gb_PRIVATE_KEY_BASE64"
 PUB_KEY_SECRET="Gb_PUBLIC_KEY_BASE64"
+DB_KEY_SECRET="DB_ENCRYPTION_KEY" # 👈 เพิ่มใหม่
 
-# ✅ 2. App Region: รันที่สิงคโปร์เหมือนเดิม
+# ✅ 2. App Region
 REGION="asia-southeast1"
 
-# ✅ 3. AI Region: ชี้ไปที่ US
+# ✅ 3. AI Region
 AI_LOCATION="us-central1"
 
 echo "--------------------------------------------------"
@@ -35,7 +33,7 @@ fi
 
 echo "🚀 Deploying to Cloud Run..."
 
-# ✅ 4. เพิ่ม --set-secrets เพื่อดึง Key มา inject เป็น Env Vars
+
 if gcloud run deploy "$SERVICE_NAME" \
   --project "$PROJECT_ID" \
   --source . \
@@ -47,7 +45,8 @@ if gcloud run deploy "$SERVICE_NAME" \
   --set-env-vars FRONTEND_URL="$FRONTEND_URL" \
   --set-secrets JWT_SECRET="$SECRET_NAME:latest" \
   --set-secrets Gb_PRIVATE_KEY_BASE64="$PRIV_KEY_SECRET:latest" \
-  --set-secrets Gb_PUBLIC_KEY_BASE64="$PUB_KEY_SECRET:latest"; then
+  --set-secrets Gb_PUBLIC_KEY_BASE64="$PUB_KEY_SECRET:latest" \
+  --set-secrets DB_ENCRYPTION_KEY="$DB_KEY_SECRET:latest"; then
   
   echo "--------------------------------------------------"
   echo "✅ Deployment Successful!"
