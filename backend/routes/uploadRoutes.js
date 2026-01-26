@@ -3,12 +3,15 @@ const router = express.Router();
 const { Storage } = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 const authMiddleware = require('../middlewares/authMiddleware');
+// ✅ 1. เพิ่ม Rate Limiter
+const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { addFileToSession } = require('../utils/dbUtils');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
-router.post('/signed-url', authMiddleware, async (req, res) => {
+// ✅ 2. ใส่ strictLimiter ใน Route
+router.post('/signed-url', authMiddleware, strictLimiter, async (req, res) => {
   try {
     const { file_type, file_key, file_size } = req.body;
     const sessionId = req.session.session_id;
@@ -58,6 +61,7 @@ router.post('/signed-url', authMiddleware, async (req, res) => {
 
     const [url] = await file.getSignedUrl(options);
 
+    // บันทึกลง Firestore (Server รู้ Path คนเดียว)
     await addFileToSession(sessionId, {
         file_key: file_key || 'unknown',
         gcs_path: gcsPath,
@@ -66,9 +70,8 @@ router.post('/signed-url', authMiddleware, async (req, res) => {
 
     res.json({
       upload_url: url,
-      file_key: file_key,
+      file_key: file_key
 
-      gcs_path: gcsPath 
     });
 
   } catch (error) {

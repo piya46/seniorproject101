@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const securityMiddleware = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
+const { generalLimiter } = require('./middlewares/rateLimitMiddleware'); // ✅ Import
 
 // 📄 Swagger Imports
 const swaggerUi = require('swagger-ui-express');
@@ -29,6 +30,7 @@ app.use(cors(corsOptions));
 
 // รองรับ Payload ขนาดใหญ่ (เพราะ E2EE จะทำให้ string ยาวขึ้น)
 app.use(express.json({ limit: '20mb' }));
+app.use(generalLimiter);
 
 // -------------------------------------------------------
 // 📄 1. SWAGGER SETUP (STATIC MODE)

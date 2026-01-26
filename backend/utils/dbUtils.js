@@ -3,23 +3,36 @@ const crypto = require('crypto');
 
 const firestore = new Firestore();
 const COLLECTION_NAME = 'user_sessions';
+const SUB_COLLECTION_NAME = 'files';
 
-// ⚠️ Key ต้องเป็น Hex String ขนาด 64 ตัวอักษร (32 bytes)
-const DB_KEY = process.env.DB_ENCRYPTION_KEY 
-    ? Buffer.from(process.env.DB_ENCRYPTION_KEY, 'hex') 
-    : crypto.randomBytes(32); 
+// Helper: ดึง Key จาก Argument (สำหรับ Rotation) หรือ Env
+const getDbKey = (keyBuffer) => {
+    if (keyBuffer) return keyBuffer;
+    
+    // Default จาก Env
+    const hex = process.env.DB_ENCRYPTION_KEY;
+    if (!hex) {
+        // Fallback (ไม่ควรเกิดขึ้นใน Prod)
+        return crypto.randomBytes(32);
+    }
+    return Buffer.from(hex, 'hex');
+};
 
 // --- Encryption (AES-256-GCM) ---
-const encryptData = (text) => {
+// GCM มี Integrity Check ป้องกันการแอบแก้ไขข้อมูลใน DB
+const encryptData = (text, keyBuffer = null) => {
     if (!text) return text;
     try {
+        const key = getDbKey(keyBuffer);
         const plainText = typeof text === 'object' ? JSON.stringify(text) : String(text);
-        const iv = crypto.randomBytes(12); // GCM แนะนำ IV 12 bytes
-        const cipher = crypto.createCipheriv('aes-256-gcm', DB_KEY, iv);
+        
+        // IV 12 bytes สำหรับ GCM
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
         
         let encrypted = cipher.update(plainText, 'utf8', 'hex');
         encrypted += cipher.final('hex');
-        const tag = cipher.getAuthTag().toString('hex'); // Auth Tag สำคัญสำหรับ GCM
+        const tag = cipher.getAuthTag().toString('hex'); // Auth Tag สำคัญมาก
         
         // Format: IV:EncryptedData:AuthTag
         return `${iv.toString('hex')}:${encrypted}:${tag}`;
@@ -29,15 +42,17 @@ const encryptData = (text) => {
     }
 };
 
-const decryptData = (text) => {
+const decryptData = (text, keyBuffer = null) => {
     if (!text || typeof text !== 'string' || !text.includes(':')) return text;
     try {
+        const key = getDbKey(keyBuffer);
         const parts = text.split(':');
-        if (parts.length !== 3) return text; // ถ้า format ไม่ตรง (อาจเป็นข้อมูลเก่า)
+        
+        // ต้องมี 3 ส่วน: IV, Data, Tag
+        if (parts.length !== 3) return text; 
         
         const [ivHex, encryptedHex, tagHex] = parts;
-        
-        const decipher = crypto.createDecipheriv('aes-256-gcm', DB_KEY, Buffer.from(ivHex, 'hex'));
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
         decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
         
         let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
@@ -45,7 +60,7 @@ const decryptData = (text) => {
         
         try { return JSON.parse(decrypted); } catch { return decrypted; }
     } catch (err) {
-        console.error('❌ DB Decryption Error (Data might be tampered):', err.message);
+        // ถ้า Key ผิด หรือข้อมูลถูกแก้ไข (Tag mismatch) จะเข้า catch นี้
         return null; 
     }
 };
@@ -54,10 +69,10 @@ const decryptData = (text) => {
 
 exports.initSessionRecord = async (sessionId) => {
     try {
+        // สร้าง Parent Document
         await firestore.collection(COLLECTION_NAME).doc(sessionId).set({
             created_at: new Date().toISOString(),
-            last_active: new Date().toISOString(),
-            files: [] 
+            last_active: new Date().toISOString()
         }, { merge: true });
         console.log(`✅ Firestore: Session initialized [${sessionId}]`);
     } catch (error) {
@@ -67,7 +82,8 @@ exports.initSessionRecord = async (sessionId) => {
 
 exports.addFileToSession = async (sessionId, fileMeta) => {
     try {
-        const docRef = firestore.collection(COLLECTION_NAME).doc(sessionId);
+        // ✅ เก็บลง Subcollection 'files' แทน Array เพื่อรองรับไฟล์จำนวนมาก
+        const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
         
         const encryptedFile = {
             file_key: encryptData(fileMeta.file_key),
@@ -76,10 +92,13 @@ exports.addFileToSession = async (sessionId, fileMeta) => {
             uploaded_at: new Date().toISOString()
         };
 
-        await docRef.update({
-            files: Firestore.FieldValue.arrayUnion(encryptedFile),
+        await filesCollRef.add(encryptedFile);
+        
+        // Update last_active ที่ตัวแม่
+        await firestore.collection(COLLECTION_NAME).doc(sessionId).update({
             last_active: new Date().toISOString()
         });
+
     } catch (error) {
         console.error('❌ Firestore Add File Error:', error);
         throw error;
@@ -88,22 +107,35 @@ exports.addFileToSession = async (sessionId, fileMeta) => {
 
 exports.getDecryptedSessionFiles = async (sessionId) => {
     try {
-        const docRef = firestore.collection(COLLECTION_NAME).doc(sessionId);
-        const doc = await docRef.get();
+        // ✅ Query จาก Subcollection
+        const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
+        const snapshot = await filesCollRef.get();
 
-        if (!doc.exists) return [];
-        const data = doc.data();
+        if (snapshot.empty) return [];
 
-        if (!data.files || !Array.isArray(data.files)) return [];
+        const files = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            files.push({
+                id: doc.id, 
+                file_key: decryptData(data.file_key),
+                gcs_path: decryptData(data.gcs_path),
+                file_type: decryptData(data.file_type),
+                uploaded_at: data.uploaded_at
+            });
+        });
 
-        return data.files.map(f => ({
-            file_key: decryptData(f.file_key),
-            gcs_path: decryptData(f.gcs_path),
-            file_type: decryptData(f.file_type),
-            uploaded_at: f.uploaded_at
-        })).filter(f => f.gcs_path !== null); // กรองไฟล์ที่ถอดรหัสไม่ได้ออก
+        // กรองเอาเฉพาะไฟล์ที่ถอดรหัสได้สำเร็จ (เผื่อ Key เก่าหลงเหลือ)
+        return files.filter(f => f.gcs_path !== null);
     } catch (error) {
         console.error('❌ Firestore Get Files Error:', error);
         return [];
     }
 };
+
+// Export objects for Rotation Script
+exports.firestore = firestore;
+exports.COLLECTION_NAME = COLLECTION_NAME;
+exports.SUB_COLLECTION_NAME = SUB_COLLECTION_NAME;
+exports.encryptData = encryptData;
+exports.decryptData = decryptData;

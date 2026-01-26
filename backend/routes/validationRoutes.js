@@ -3,18 +3,47 @@ const router = express.Router();
 const { VertexAI } = require('@google-cloud/vertexai');
 const { Storage } = require('@google-cloud/storage');
 const authMiddleware = require('../middlewares/authMiddleware');
+// ✅ เพิ่ม Rate Limiter ป้องกันการยิงถล่ม
+const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { getFormConfig } = require('../data/staticData'); 
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 
-router.post('/check-completeness', authMiddleware, async (req, res) => {
+// ✅ Helper: ตรวจสอบ Magic Bytes (File Signature)
+// ป้องกันการปลอมนามสกุลไฟล์ (เช่นเปลี่ยน .exe เป็น .pdf)
+const isValidFileSignature = async (fileBucket, filePath, mimeType) => {
+    try {
+        // โหลด 262 bytes แรกเพื่อเช็ค Header
+        const [buffer] = await fileBucket.file(filePath).download({ start: 0, end: 261 });
+        
+        // ใช้ dynamic import เพราะ file-type v16+ เป็น ESM
+        const { fileTypeFromBuffer } = await import('file-type');
+        const type = await fileTypeFromBuffer(buffer);
+
+        if (!type) return false;
+
+        // ตรวจสอบความสอดคล้อง
+        if (mimeType === 'application/pdf' && type.ext === 'pdf') return true;
+        if (mimeType.startsWith('image/') && ['jpg', 'png', 'webp', 'tif'].includes(type.ext)) return true;
+
+        console.warn(`⚠️ Signature Mismatch: Claimed ${mimeType}, Found ${type.mime}`);
+        return false;
+    } catch (error) {
+        console.error('Signature Check Error:', error);
+        return false; 
+    }
+};
+
+// ✅ เพิ่ม strictLimiter ใน Route
+router.post('/check-completeness', authMiddleware, strictLimiter, async (req, res) => {
   try {
     const { form_code, student_level, sub_type } = req.body;
     const sessionId = req.session.session_id;
 
+    // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติ)
     const userFiles = await getDecryptedSessionFiles(sessionId);
     
     if (!userFiles || userFiles.length === 0) {
-        return res.status(400).json({ status: 'error', message: 'No files found in session. Please upload documents first.' });
+        return res.status(400).json({ status: 'error', message: 'No uploaded files found.' });
     }
 
     const formConfig = getFormConfig(form_code, student_level, sub_type);
@@ -46,15 +75,22 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    // ✅ 2. เตรียมข้อมูลส่ง AI (ใช้ Path จริงที่ Decrypt มาได้)
+    // 2. เตรียมข้อมูลส่ง AI (พร้อมการตรวจสอบความปลอดภัยไฟล์)
     const fileProcessingPromises = userFiles.map(async (file) => {
         const gcsFile = bucket.file(file.gcs_path);
         
-        // ตรวจสอบว่าไฟล์มีอยู่จริงบน Cloud Storage หรือไม่
+        // ตรวจสอบว่าไฟล์มีอยู่จริง
         const [exists] = await gcsFile.exists();
         if (!exists) {
             console.warn(`File missing in GCS: ${file.gcs_path}`);
             return null;
+        }
+
+        // 🛡️ SECURITY: เช็คว่าเป็นไฟล์ประเภทนั้นจริงหรือไม่ (Magic Bytes)
+        const isSafe = await isValidFileSignature(bucket, file.gcs_path, file.file_type);
+        if (!isSafe) {
+            console.warn(`🚫 Blocked malicious/invalid file: ${file.gcs_path}`);
+            return null; // ข้ามไฟล์ต้องสงสัย ไม่ส่งให้ AI
         }
         
         const [metadata] = await gcsFile.getMetadata();
@@ -75,7 +111,7 @@ router.post('/check-completeness', authMiddleware, async (req, res) => {
     const validFiles = processedResults.filter(f => f !== null); // ตัดไฟล์ที่มีปัญหาออก
 
     if (validFiles.length === 0) {
-        return res.status(400).json({ status: 'error', message: 'No valid files available for validation.' });
+        return res.status(400).json({ status: 'error', message: 'No valid files available for validation (Files might be missing or failed security checks).' });
     }
 
     const fileParts = validFiles.map(f => f.inlinePart);
