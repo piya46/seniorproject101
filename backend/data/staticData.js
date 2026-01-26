@@ -294,15 +294,5 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
   }
 
   // Default fallback
-  return { 
-      form_code: formCode, 
-      required_documents: [
-          { 
-              key: "main_form", 
-              label: "แบบฟอร์มหลัก", 
-              required: true, 
-              validation_criteria: "ตรวจสอบความครบถ้วนสมบูรณ์ทั่วไป" 
-          }
-      ] 
-  };
+  return null;
 };
