@@ -8,30 +8,7 @@ const { strictLimiter } = require('../middlewares/rateLimitMiddleware');
 const { getFormConfig } = require('../data/staticData'); 
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 
-// ✅ Helper: ตรวจสอบ Magic Bytes (File Signature)
-// ป้องกันการปลอมนามสกุลไฟล์ (เช่นเปลี่ยน .exe เป็น .pdf)
-const isValidFileSignature = async (fileBucket, filePath, mimeType) => {
-    try {
-        // โหลด 262 bytes แรกเพื่อเช็ค Header
-        const [buffer] = await fileBucket.file(filePath).download({ start: 0, end: 261 });
-        
-        // ใช้ dynamic import เพราะ file-type v16+ เป็น ESM
-        const { fileTypeFromBuffer } = await import('file-type');
-        const type = await fileTypeFromBuffer(buffer);
-
-        if (!type) return false;
-
-        // ตรวจสอบความสอดคล้อง
-        if (mimeType === 'application/pdf' && type.ext === 'pdf') return true;
-        if (mimeType.startsWith('image/') && ['jpg', 'png', 'webp', 'tif'].includes(type.ext)) return true;
-
-        console.warn(`⚠️ Signature Mismatch: Claimed ${mimeType}, Found ${type.mime}`);
-        return false;
-    } catch (error) {
-        console.error('Signature Check Error:', error);
-        return false; 
-    }
-};
+// ❌ เอา isValidFileSignature ออกแล้ว (ย้ายไปตรวจสอบที่ AI แทน เพื่อความยืดหยุ่น)
 
 // ✅ เพิ่ม strictLimiter ใน Route
 router.post('/check-completeness', authMiddleware, strictLimiter, async (req, res) => {
@@ -39,13 +16,14 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     const { form_code, student_level, sub_type } = req.body;
     const sessionId = req.session.session_id;
 
-    // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติ)
+    // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติจาก Utility)
     const userFiles = await getDecryptedSessionFiles(sessionId);
     
     if (!userFiles || userFiles.length === 0) {
         return res.status(400).json({ status: 'error', message: 'No uploaded files found.' });
     }
 
+    // ดึง Config ของฟอร์มเพื่อดูว่าต้องตรวจอะไรบ้าง
     const formConfig = getFormConfig(form_code, student_level, sub_type);
     
     if (!formConfig) {
@@ -55,10 +33,11 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
         });
     }
 
+    // สร้าง Map เกณฑ์การตรวจรายไฟล์
     const criteriaMap = {};
     if (formConfig.required_documents) {
         formConfig.required_documents.forEach(doc => {
-            criteriaMap[doc.key] = doc.validation_criteria || "ตรวจสอบว่าเป็นเอกสารที่ถูกต้อง ชัดเจน";
+            criteriaMap[doc.key] = doc.validation_criteria || "ตรวจสอบว่าเป็นเอกสารที่ถูกต้อง ชัดเจน และสมบูรณ์";
         });
     }
 
@@ -70,67 +49,85 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     const bucket = storage.bucket(bucketName);
     const vertex_ai = new VertexAI({ project: project, location: location });
 
+    // ✅ เลือกใช้ 'gemini-1.5-pro' : เก่งที่สุดในการอ่านลายมือ, ตาราง และการ Cross-Check ข้อมูลข้ามเอกสาร
     const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-2.0-flash-001',
+      model: 'gemini-2.5-pro', 
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    // 2. เตรียมข้อมูลส่ง AI (พร้อมการตรวจสอบความปลอดภัยไฟล์)
+    // 2. เตรียมข้อมูลไฟล์ส่งให้ AI
     const fileProcessingPromises = userFiles.map(async (file) => {
         const gcsFile = bucket.file(file.gcs_path);
         
-        // ตรวจสอบว่าไฟล์มีอยู่จริง
+        // ตรวจสอบว่าไฟล์มีอยู่จริงใน Storage
         const [exists] = await gcsFile.exists();
         if (!exists) {
             console.warn(`File missing in GCS: ${file.gcs_path}`);
             return null;
         }
-
-        // 🛡️ SECURITY: เช็คว่าเป็นไฟล์ประเภทนั้นจริงหรือไม่ (Magic Bytes)
-        const isSafe = await isValidFileSignature(bucket, file.gcs_path, file.file_type);
-        if (!isSafe) {
-            console.warn(`🚫 Blocked malicious/invalid file: ${file.gcs_path}`);
-            return null; // ข้ามไฟล์ต้องสงสัย ไม่ส่งให้ AI
-        }
         
         const [metadata] = await gcsFile.getMetadata();
-        const specificRule = criteriaMap[file.file_key] || "ตรวจสอบว่าเป็นเอกสารราชการที่มีตราประทับชัดเจน และเนื้อหาต้องอ่านออกได้ 100% เท่านั้น";
+        // ดึงกฎเฉพาะของไฟล์นั้นๆ มาใส่ใน Prompt
+        const specificRule = criteriaMap[file.file_key] || "ตรวจสอบความถูกต้องสมบูรณ์ตามมาตรฐานราชการ";
 
         return {
             inlinePart: {
                 fileData: {
                     mimeType: metadata.contentType,
-                    fileUri: `gs://${bucketName}/${file.gcs_path}` // ส่ง URI จริงให้ AI
+                    fileUri: `gs://${bucketName}/${file.gcs_path}` // ส่ง URI จริงให้ AI อ่าน
                 }
             },
-            ruleDescription: `[ไฟล์: "${file.file_key}"] \n   -> กฎการตรวจ: "${specificRule}"`
+            // Label ให้ AI รู้ว่าไฟล์นี้คืออะไร และต้องตรวจอะไร
+            ruleDescription: `[เอกสารรหัส: "${file.file_key}"] \n   -> เกณฑ์การตรวจ: "${specificRule}"`
         };
     });
 
     const processedResults = await Promise.all(fileProcessingPromises);
-    const validFiles = processedResults.filter(f => f !== null); // ตัดไฟล์ที่มีปัญหาออก
+    const validFiles = processedResults.filter(f => f !== null);
 
     if (validFiles.length === 0) {
-        return res.status(400).json({ status: 'error', message: 'No valid files available for validation (Files might be missing or failed security checks).' });
+        return res.status(400).json({ status: 'error', message: 'No valid files available for validation (Files might be missing).' });
     }
 
     const fileParts = validFiles.map(f => f.inlinePart);
     const promptRules = validFiles.map(f => f.ruleDescription).join('\n\n');
     
+    // ✅ PROMPT ฉบับสมบูรณ์: เพิ่ม Cross-Check, Persona และแนวทางการตอบ
     const promptText = `
-    คุณคือเจ้าหน้าที่ตรวจสอบเอกสาร (Document Validator) ของคณะวิทยาศาสตร์ จุฬาฯ
-    ภารกิจ: ตรวจสอบความสมบูรณ์ของเอกสารแนบสำหรับคำร้องรหัส: "${form_code}"
-    
-    เงื่อนไขและกฎการตรวจสอบ:
+    คุณคือ "เจ้าหน้าที่ทะเบียนผู้เชี่ยวชาญ" (Senior Registrar Officer) ของคณะวิทยาศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย
+    หน้าที่ของคุณคือ: ตรวจสอบความถูกต้องและสอดคล้องของเอกสารประกอบคำร้องรหัส "${form_code}" อย่างละเอียดที่สุด
+
+    รายการเอกสารที่ได้รับและเกณฑ์การตรวจ:
     ${promptRules}
     
-    คำสั่งสำคัญ:
-    1. ตรวจสอบไฟล์ทีละไฟล์ตาม "กฎการตรวจ" ที่ระบุ
-    2. Cross-Check ข้อมูลระหว่างเอกสาร
-    3. หากเอกสาร อ่านไม่ออก, ผิดประเภท, ไม่มีลายเซ็น ให้ตอบ invalid
+    🛑 ขั้นตอนการตรวจสอบ (Think Step-by-Step):
     
-    ให้ตอบกลับเป็น JSON Format เท่านั้น:
-    { "key_ของไฟล์": { "status": "valid/invalid", "reason": "...", "confidence": "high" } }
+    1. **Individual Check (ตรวจความสมบูรณ์รายใบ):**
+       - **Visual Scan:** ภาพชัดเจนไหม? เอกสารเอียงหรือตัดขอบจนข้อความหายหรือไม่?
+       - **Validity Check:** เป็นเอกสารประเภทที่ถูกต้องหรือไม่ (เช่น ให้ส่งสำเนาบัตรประชาชน แต่ส่งรูปเซลฟี่มาถือว่าผิด)
+       - **Completeness:** มีลายเซ็นครบถ้วนหรือไม่? (โดยเฉพาะลายเซ็นผู้ปกครองและนิสิต)
+
+    2. **Cross-Check (ตรวจความสอดคล้องข้ามเอกสาร):** **(สำคัญมาก!)**
+       - **ชื่อ-นามสกุล:** ต้องสะกดตรงกันทุกใบ (เทียบชื่อในแบบฟอร์ม กับ บัตรประชาชน/บัตรนิสิต/ใบรับรองแพทย์)
+       - **รหัสนิสิต:** ตัวเลขต้องตรงกันทุกจุด
+       - **วันที่:** หากเป็นใบรับรองแพทย์ วันที่ต้องสอดคล้องกับวันที่ระบุขอลาป่วยในแบบฟอร์ม
+       - **ความสมเหตุสมผล:** หากคำร้องระบุสาเหตุ A แต่หลักฐานระบุสาเหตุ B ถือว่าขัดแย้ง
+
+    รูปแบบการตอบกลับ (JSON Format เท่านั้น):
+    {
+      "key_ของไฟล์": {
+        "status": "valid" หรือ "invalid",
+        "reason": "อธิบายเหตุผลภาษาไทยอย่างสุภาพ ทางการ และชัดเจน (สามารถอธิบายยาวได้หากจำเป็น)",
+        "confidence": "high" หรือ "medium" หรือ "low"
+      }
+    }
+
+    แนวทางการเขียนเหตุผล (Reasoning Guidelines):
+    - **กรณีผ่าน:** "เอกสารครบถ้วนสมบูรณ์ (พบลายเซ็นครบถ้วน และชื่อ-นามสกุลตรงกับฐานข้อมูล)"
+    - **กรณีไม่ผ่าน (เอกสารไม่สมบูรณ์):** ระบุจุดที่ขาดให้ชัด เช่น "ไม่พบส่วนลายเซ็นของผู้ปกครองที่มุมขวาล่าง กรุณาตรวจสอบว่าอัปโหลดไฟล์ฉบับที่มีลายเซ็นแล้วหรือไม่"
+    - **กรณีไม่ผ่าน (ข้อมูลขัดแย้ง):** "ชื่อผู้ยื่นคำร้องในแบบฟอร์ม (นาย ก.) ไม่ตรงกับชื่อในใบรับรองแพทย์ (นาย ข.) กรุณาตรวจสอบเอกสารอีกครั้ง"
+    - **กรณีไม่ผ่าน (ภาพไม่ชัด):** "ภาพถ่ายเอกสารมืดหรือเบลอจนไม่สามารถอ่านรายละเอียดสำคัญ (เช่น รหัสนิสิต) ได้ กรุณาถ่ายใหม่"
+    - ใช้ภาษาไทยแบบกึ่งทางการที่เข้าใจง่าย และเป็นมิตรแต่เด็ดขาดในความถูกต้อง
     `;
 
     const contents = [{
@@ -141,16 +138,25 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     const result = await model.generateContent({ contents });
     const response = await result.response;
     let aiText = response.candidates[0].content.parts[0].text;
+    
+    // Clean JSON String (เผื่อ AI เผลอใส่ Markdown backticks มา)
     aiText = aiText.replace(/```json|```/g, '').trim();
 
     res.json(JSON.parse(aiText));
 
   } catch (error) {
     console.error('AI Validation Error:', error);
+    
+    // จัดการ Error ให้ Frontend เข้าใจง่าย
     if (error.message.includes('not found')) {
         return res.status(404).json({ error: 'Resource Not Found', details: error.message });
     }
-    res.status(500).json({ error: 'Validation Process Failed', details: error.message });
+    
+    // กรณี Gemini มีปัญหา หรือ Quota เต็ม
+    res.status(500).json({ 
+        error: 'Validation Process Failed', 
+        details: process.env.NODE_ENV === 'development' ? error.message : 'AI Service is temporarily unavailable. Please try again later.' 
+    });
   }
 });
 

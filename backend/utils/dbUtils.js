@@ -133,6 +133,38 @@ exports.getDecryptedSessionFiles = async (sessionId) => {
     }
 };
 
+// ✅ เพิ่มฟังก์ชัน: บันทึกข้อความแชทลง Firestore
+exports.saveChatMessage = async (sessionId, role, message) => {
+    try {
+        const chatRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection('chat_history');
+        await chatRef.add({
+            role: role, 
+            parts: [{ text: message }],
+            timestamp: Firestore.FieldValue.serverTimestamp()
+        });
+    } catch (error) {
+        console.error('Save Chat Error:', error);
+    }
+};
+
+// ✅ เพิ่มฟังก์ชัน: ดึงประวัติการแชท (เรียงตามเวลา)
+exports.getChatHistory = async (sessionId) => {
+    try {
+        const chatRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection('chat_history');
+        const snapshot = await chatRef.orderBy('timestamp', 'asc').get();
+        
+        if (snapshot.empty) return [];
+
+        return snapshot.docs.map(doc => ({
+            role: doc.data().role,
+            parts: doc.data().parts
+        }));
+    } catch (error) {
+        console.error('Get History Error:', error);
+        return [];
+    }
+};
+
 // Export objects for Rotation Script
 exports.firestore = firestore;
 exports.COLLECTION_NAME = COLLECTION_NAME;
