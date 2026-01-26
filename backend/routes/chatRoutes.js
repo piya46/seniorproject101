@@ -35,64 +35,6 @@ const getFormsContext = () => {
 
 const formsInfo = getFormsContext();
 
-/**
- * @swagger
- * tags:
- * - name: Chat
- * description: AI Assistant (พี่ทะเบียนใจดี)
- */
-
-/**
- * @swagger
- * /chat/recommend:
- * post:
- * summary: ปรึกษา AI เพื่อแนะนำแบบฟอร์ม
- * tags: [Chat]
- * description: "**⚠️ E2EE Required**"
- * requestBody:
- * required: true
- * content:
- * application/json:
- * schema:
- * type: object
- * required:
- * - message
- * properties:
- * message:
- * type: string
- * example: "ผมป่วยต้องทำไงครับ"
- * degree_level:
- * type: string
- * enum: [bachelor, graduate]
- * responses:
- * 200:
- * description: คำตอบจาก AI
- * content:
- * application/json:
- * schema:
- * type: object
- * properties:
- * data:
- * type: object
- * properties:
- * recommended_form:
- * type: string
- * example: "JT44"
- * reply_message:
- * type: string
- * 401:
- * description: Unauthorized
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/Error'
- * 500:
- * description: AI Service Error
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/Error'
- */
 router.post('/recommend', authMiddleware, async (req, res) => {
   try {
     const { message, degree_level } = req.body;

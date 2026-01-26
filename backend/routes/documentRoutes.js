@@ -8,53 +8,6 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
-/**
- * @swagger
- * tags:
- * - name: Documents
- * description: การรวมไฟล์ PDF (Merge)
- */
-
-/**
- * @swagger
- * /documents/merge:
- * post:
- * summary: รวมไฟล์ PDF เป็นไฟล์เดียว
- * tags: [Documents]
- * description: "**⚠️ E2EE Required**"
- * requestBody:
- * required: true
- * content:
- * application/json:
- * schema:
- * type: object
- * required: [form_code, department_id, gcs_paths]
- * properties:
- * form_code:
- * type: string
- * department_id:
- * type: string
- * gcs_paths:
- * type: array
- * items:
- * type: string
- * description: GCS path ของไฟล์ที่จะรวม
- * responses:
- * 200:
- * description: สำเร็จ พร้อมลิงก์ดาวน์โหลด
- * 401:
- * description: Unauthorized
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/Error'
- * 500:
- * description: Merge Failed
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/Error'
- */
 router.post('/merge', authMiddleware, async (req, res) => {
   try {
     const { form_code, department_id, gcs_paths } = req.body;

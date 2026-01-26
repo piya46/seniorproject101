@@ -5,63 +5,6 @@ const { Storage } = require('@google-cloud/storage');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { getFormConfig } = require('../data/staticData'); 
 
-/**
- * @swagger
- * tags:
- * - name: Validation
- * description: AI ตรวจสอบเอกสาร
- */
-
-/**
- * @swagger
- * /validation/check-completeness:
- * post:
- * summary: ให้ AI ตรวจสอบความถูกต้องของเอกสาร
- * tags: [Validation]
- * description: "**⚠️ E2EE Required**"
- * requestBody:
- * required: true
- * content:
- * application/json:
- * schema:
- * type: object
- * required: [form_code, uploaded_files]
- * properties:
- * form_code:
- * type: string
- * uploaded_files:
- * type: array
- * items:
- * type: object
- * properties:
- * key:
- * type: string
- * gcs_path:
- * type: string
- * responses:
- * 200:
- * description: ผลการตรวจสอบ (JSON)
- * 400:
- * description: ส่งข้อมูลไม่ครบ (เช่น ไม่มีไฟล์)
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/Error'
- * 404:
- * description: ไม่พบฟอร์ม หรือไฟล์ใน GCS
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/Error'
- * 401:
- * description: Unauthorized
- * 500:
- * description: AI Service / GCS Error
- * content:
- * application/json:
- * schema:
- * $ref: '#/components/schemas/Error'
- */
 router.post('/check-completeness', authMiddleware, async (req, res) => {
   try {
     const { form_code, uploaded_files, student_level, sub_type } = req.body;
