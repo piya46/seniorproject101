@@ -1,7 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const cookieParser = require('cookie-parser'); // ✅ เพิ่ม
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet'); 
 const securityMiddleware = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
@@ -21,27 +22,44 @@ if (missingEnv.length > 0) {
   process.exit(1);
 }
 
-// Config CORS (สำคัญมากสำหรับการรับ Cookie ข้ามโดเมน หรือ Localhost)
+
+app.set('trust proxy', 1);
+
+// ✅ 3. Helmet (เพิ่มความปลอดภัย HTTP Headers)
+app.use(helmet());
+
+// ✅ 4. CORS Setup (Robust Version)
+// รองรับทั้ง Comma (,) และ Pipe (|) เพื่อแก้ปัญหา Deploy Script
+const rawOrigins = process.env.FRONTEND_URL || "http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500";
+const allowedOrigins = rawOrigins.split(/[,|]/).map(url => url.trim());
+
 const corsOptions = {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000', // ⚠️ ต้องระบุ Origin ให้ชัดเจน (ใช้ * ไม่ได้เมื่อใช้ credentials)
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            console.warn(`⛔ Blocked CORS for: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true // ✅ อนุญาตให้รับ/ส่ง Cookie
+    credentials: true 
 };
 app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '20mb' }));
-app.use(cookieParser()); // ✅ ใช้งาน Cookie Parser
+app.use(cookieParser()); 
 app.use(generalLimiter);
 
 // -------------------------------------------------------
-// 📄 1. SWAGGER SETUP
+// 📄 SWAGGER SETUP
 // -------------------------------------------------------
 const swaggerFile = path.join(__dirname, 'swagger.json');
 if (fs.existsSync(swaggerFile)) {
     const swaggerDocument = require(swaggerFile);
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-    console.log('📄 Swagger UI available at /api-docs');
 }
 
 // ✅ Security Middleware
@@ -70,5 +88,6 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 API running on port ${PORT}`);
+  console.log(`🌍 Allowed Origins: ${allowedOrigins.join(', ')}`);
   console.log(`🔒 E2EE Security: ACTIVE`);
 });

@@ -5,8 +5,7 @@ PROJECT_ID="seniorproject101"
 SERVICE_NAME="sci-request-system"
 BUCKET_NAME="sci-request-files-prod"
 SECRET_NAME="JWT_SECRET"
-FRONTEND_URL="*"
-
+FRONTEND_URL="http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500"
 # ✅ 1. ชื่อ Secret ของ Key ต่างๆ
 PRIV_KEY_SECRET="Gb_PRIVATE_KEY_BASE64"
 PUB_KEY_SECRET="Gb_PUBLIC_KEY_BASE64"

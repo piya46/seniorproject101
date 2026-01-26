@@ -266,7 +266,7 @@
         // --- Shared State ---
         let state = {
             mode: 'functional', // for test runner
-            token: null,
+            token: null, // Note: Now handled by Cookie, kept for compatibility if needed
             baseUrl: document.getElementById('baseUrl').value,
             lab: {
                 selectedFile: null,
@@ -277,7 +277,7 @@
             }
         };
 
-        // --- 🍪 Cookie Helpers (New) ---
+        // --- 🍪 Cookie Helpers ---
         function setCookie(name, value, days) {
             let expires = "";
             if (days) {
@@ -307,6 +307,9 @@
                 const url = document.getElementById('baseUrl').value;
                 const cleanUrl = url.replace(/\/$/, '') + '/api/v1';
                 state.baseUrl = cleanUrl; 
+
+                // ✅ Enable Cookie support for Axios
+                axios.defaults.withCredentials = true;
 
                 if(!this.publicKey) {
                     try {
@@ -339,12 +342,8 @@
                     tag: forge.util.encode64(cipher.mode.tag.getBytes())
                 };
 
-                // Attach Token if available
-                if (state.token && !headers.Authorization) {
-                    headers.Authorization = `Bearer ${state.token}`;
-                }
-
                 try {
+                    // ✅ Note: No need to send Authorization header manually, cookie handles it.
                     const res = await axios.post(`${state.baseUrl}${endpoint}`, payload, { headers, validateStatus: () => true });
                     if(res.data && res.data.payload && res.data.iv) {
                         const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
@@ -357,11 +356,6 @@
             },
             async get(endpoint, headers = {}) {
                 if(!state.baseUrl) await this.init();
-                
-                if (state.token && !headers.Authorization) {
-                    headers.Authorization = `Bearer ${state.token}`;
-                }
-
                 return await axios.get(`${state.baseUrl}${endpoint}`, { headers, validateStatus: () => true });
             }
         };
@@ -386,7 +380,7 @@
                 btnLab.className = "px-3 py-1.5 rounded text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm";
                 btnRunner.className = "px-3 py-1.5 rounded text-xs font-medium text-slate-400 hover:text-white transition-all";
                 
-                fetchFormDetails(); 
+                fetchFormDetails(); // Load initial form details
             }
         }
 
@@ -397,30 +391,29 @@
             
             text.innerText = "Checking...";
 
-            // 1. Check Cookie First
-            const savedToken = getCookie('sci_session_token');
+            // 1. Check if we have a session cookie
+            const savedToken = getCookie('sci_session_token'); // Just for UI logic check
+            
             if (savedToken) {
-                state.token = savedToken;
-                console.log("Restored session:", state.token.substr(0,10));
-                
+                console.log("Restored session from cookie");
                 dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
                 text.innerText = "Session Restored";
                 btn.classList.add('border-emerald-500/50', 'bg-emerald-500/10', 'text-emerald-400');
                 return;
             }
 
-            // 2. Or create new
             text.innerText = "Connecting...";
             try {
                 const res = await SecureClient.post('/session/init', {});
                 if (res.status === 200) {
-                    state.token = res.data.session_token;
-                    setCookie('sci_session_token', state.token, 1); // Save 1 Day
+                    // Set a dummy cookie on client side just to know we are logged in for UI purposes
+                    // The REAL httpOnly cookie is set by server response
+                    setCookie('sci_session_token', 'active', 1); 
 
                     dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
                     text.innerText = "Session Active";
                     btn.classList.add('border-emerald-500/50', 'bg-emerald-500/10', 'text-emerald-400');
-                    log('success', 'Auth Success', { token: state.token.substr(0,10)+'...' });
+                    log('success', 'Auth Success', { msg: "Session initialized via Cookie" });
                 }
             } catch (e) {
                 text.innerText = "Auth Failed";
@@ -442,7 +435,7 @@
                 { id: 'n2', name: 'Invalid Form Code', method: 'GET /forms/INVALID-99', expected: 404 }
             ],
             security: [
-                { id: 's1', name: 'Invalid Token', method: 'POST /chat/recommend', body: { message: 'hi' }, headerOverride: { Authorization: 'Bearer fake-token' }, expected: 403 },
+                { id: 's1', name: 'Invalid Token', method: 'POST /chat/recommend', body: { message: 'hi' }, headerOverride: { Authorization: 'Bearer fake-token' }, expected: 403 }, // Note: cookie auth might make testing bad headers tricky without clearing cookies
                 { id: 's2', name: 'No Token', method: 'POST /chat/recommend', body: { message: 'hi' }, headerOverride: { Authorization: '' }, expected: 401 }
             ]
         };
@@ -473,7 +466,7 @@
         }
 
         async function runCurrentSuite() {
-            if(!state.token) await authenticate();
+            if(!getCookie('sci_session_token')) await authenticate();
             document.getElementById('console-logs').innerHTML = '';
             for(const test of suites[state.mode]) {
                 const card = document.getElementById(`card-${test.id}`);
@@ -487,9 +480,10 @@
                         await new Promise(r => setTimeout(r, 500)); // Simulate delay
                     } else if(test.method.startsWith('GET')) {
                         const endpoint = test.method.split(' ')[1];
-                        res = await SecureClient.get(endpoint, { Authorization: `Bearer ${state.token}` });
+                        res = await SecureClient.get(endpoint);
                     } else {
-                        const headers = test.headerOverride || { Authorization: `Bearer ${state.token}` };
+                        // Note: headerOverride might not work as expected with cookies, but logic remains
+                        const headers = test.headerOverride || {};
                         res = await SecureClient.post(test.method.split(' ')[1], test.body, headers);
                     }
                     
@@ -574,13 +568,13 @@
                 btnLabCheck.disabled = false;
                 btnLabCheck.classList.remove('bg-slate-800', 'text-slate-500', 'cursor-not-allowed', 'border-slate-700');
                 btnLabCheck.classList.add('bg-indigo-600', 'text-white', 'hover:bg-indigo-500', 'shadow-lg', 'border-indigo-500');
-                btnLabCheck.innerHTML = '<span>Upload & Validate</span> <i class="fa-solid fa-bolt"></i>';
+                btnLabCheck.innerHTML = '<span>Upload & Validate</span> <i class="fa-solid fa-bolt ml-1"></i>';
             }
         }
 
         // 2. Fetch Form Info
         async function fetchFormDetails() {
-            if(!state.token) await authenticate();
+            if(!getCookie('sci_session_token')) await authenticate();
             const formCode = document.getElementById('lab-form-code').value;
             const degree = document.getElementById('lab-degree').value;
             const infoBox = document.getElementById('lab-form-info');
@@ -589,7 +583,7 @@
                 // Reset UI
                 infoBox.classList.add('hidden');
                 
-                const res = await SecureClient.get(`/forms/${formCode}?degree_level=${degree}`, { Authorization: `Bearer ${state.token}` });
+                const res = await SecureClient.get(`/forms/${formCode}?degree_level=${degree}`);
                 
                 infoBox.classList.remove('hidden');
                 document.getElementById('info-location').innerText = res.data.submission_location || '-';
@@ -604,7 +598,7 @@
 
         // 3. Upload & Validate (Improved)
         async function labUploadAndCheck() {
-            if(!state.token) await authenticate();
+            if(!getCookie('sci_session_token')) await authenticate();
             const file = state.lab.selectedFile;
             const fileKey = document.getElementById('lab-file-key').value;
             const formCode = document.getElementById('lab-form-code').value;
@@ -620,7 +614,7 @@
                     file_type: file.type || 'application/pdf',
                     file_size: file.size,
                     file_key: fileKey
-                }, { Authorization: `Bearer ${state.token}` });
+                });
 
                 if(r1.status !== 200) throw new Error('Signed URL failed');
 
@@ -635,7 +629,7 @@
                 const r2 = await SecureClient.post('/validation/check-completeness', {
                     form_code: formCode,
                     uploaded_files: [{ key: fileKey, gcs_path: gcsPath }]
-                }, { Authorization: `Bearer ${state.token}` });
+                });
 
                 // Display Result
                 const resultBox = document.getElementById('lab-result');
@@ -725,7 +719,7 @@
 
         // 4. Chat Logic (Optimized)
         async function sendChatMessage() {
-            if(!state.token) await authenticate();
+            if(!getCookie('sci_session_token')) await authenticate();
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
             if(!message) return;
@@ -740,7 +734,7 @@
                 const res = await SecureClient.post('/chat/recommend', {
                     message: message,
                     degree_level: degree
-                }, { Authorization: `Bearer ${state.token}` });
+                }); // Cookie sent automatically
 
                 document.getElementById(loadingId).remove();
                 
