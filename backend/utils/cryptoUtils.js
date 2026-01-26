@@ -20,7 +20,7 @@ if (process.env.Gb_PRIVATE_KEY_BASE64 && process.env.Gb_PUBLIC_KEY_BASE64) {
 
 exports.getPublicKey = () => PUBLIC_KEY;
 
-// 2. ถอดรหัส (Hybrid Decrypt: RSA Unwrap Key -> AES Decrypt Data)
+
 exports.decryptHybridPayload = (encryptedPackage) => {
     try {
         const { encKey, iv, tag, payload } = encryptedPackage;
@@ -44,7 +44,7 @@ exports.decryptHybridPayload = (encryptedPackage) => {
 
         return {
             data: JSON.parse(decrypted),
-            aesKey: aesKeyBuffer // ส่งคืนเพื่อใช้เข้ารหัสขากลับ (Session Key)
+            aesKey: aesKeyBuffer 
         };
 
     } catch (error) {
