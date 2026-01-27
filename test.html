@@ -23,7 +23,7 @@
                         slate: { 850: '#151e2e', 900: '#0f172a', 950: '#020617' },
                         primary: { 500: '#6366f1', 600: '#4f46e5', 900: '#312e81' }
                     },
-                    animation: { 'fade-in': 'fadeIn 0.3s ease-out', 'slide-up': 'slideUp 0.3s ease-out', 'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite' },
+                    animation: { 'fade-in': 'fadeIn 0.3s ease-out', 'slide-up': 'slideUp 0.3s ease-out' },
                     keyframes: { 
                         fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
                         slideUp: { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } }
@@ -38,160 +38,93 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
         .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .json-key { color: #94a3b8; }
-        .json-string { color: #a5b4fc; }
-        .json-number { color: #fca5a5; }
-        .json-boolean { color: #6ee7b7; }
-        
-        /* Markdown Styles */
         .prose p { margin-bottom: 0.5em; }
         .prose ul { list-style-type: disc; padding-left: 1.2em; margin-bottom: 0.5em; }
-        .prose strong { color: #e2e8f0; font-weight: 700; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-200 h-screen flex flex-col overflow-hidden font-sans selection:bg-indigo-500/30">
 
     <nav class="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur flex items-center justify-between px-6 z-30 shrink-0 shadow-md">
         <div class="flex items-center gap-4">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 ring-1 ring-white/10">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
                 <i class="fa-solid fa-flask text-lg"></i>
             </div>
             <div>
                 <h1 class="font-bold text-slate-100 text-lg tracking-tight">Sci-Request <span class="text-indigo-400 font-mono text-xs ml-2 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-500/20">PROTOTYPE</span></h1>
-                <p class="text-[10px] text-slate-500 font-mono uppercase tracking-wider">QA & Interaction Lab</p>
             </div>
         </div>
         
         <div class="flex items-center gap-4">
-            <div class="bg-slate-900 p-1 rounded-lg border border-slate-800 flex gap-1 shadow-inner">
-                <button onclick="switchView('lab')" id="btn-view-lab" class="px-3 py-1.5 rounded text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm">
-                    <i class="fa-solid fa-microscope mr-1.5"></i> Interactive Lab
-                </button>
-                <button onclick="switchView('runner')" id="btn-view-runner" class="px-3 py-1.5 rounded text-xs font-medium text-slate-400 hover:text-white transition-all">
-                    <i class="fa-solid fa-vial mr-1.5"></i> Test Runner
-                </button>
-            </div>
-
-            <div class="h-8 w-px bg-slate-800 mx-2"></div>
-
             <div class="relative group">
                 <i class="fa-solid fa-server absolute left-3 top-2.5 text-slate-500 text-xs transition-colors group-focus-within:text-indigo-400"></i>
                 <input type="text" id="baseUrl" value="https://sci-request-system-466086429766.asia-southeast1.run.app" 
-                       class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg pl-9 pr-3 py-2 w-64 font-mono focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600 shadow-sm focus:ring-1 focus:ring-indigo-500/50" 
-                       placeholder="API URL">
+                       class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg pl-9 pr-3 py-2 w-64 font-mono focus:border-indigo-500 outline-none transition-all shadow-sm">
             </div>
-
-            <button onclick="authenticate()" id="session-btn" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-slate-600 transition text-xs font-medium text-slate-300 group shadow-sm">
-                <div id="session-dot" class="w-2 h-2 rounded-full bg-slate-500 group-hover:bg-slate-400 transition-colors"></div>
+            <button onclick="authenticate()" id="session-btn" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 transition text-xs font-medium text-slate-300">
+                <div id="session-dot" class="w-2 h-2 rounded-full bg-slate-500"></div>
                 <span id="session-text">Connect Session</span>
             </button>
         </div>
     </nav>
 
     <div class="flex-1 overflow-hidden relative">
-        
         <div id="view-lab" class="absolute inset-0 flex transition-opacity duration-300 z-10 bg-slate-950">
             
             <div class="w-7/12 border-r border-slate-800 flex flex-col p-6 overflow-y-auto custom-scrollbar">
                 
-                <div class="flex items-center justify-between mb-6">
-                     <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                        <span class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm ring-1 ring-indigo-500/30"><i class="fa-solid fa-file-contract"></i></span>
-                        Step 1: Form Selection
-                    </h2>
-                    <span class="text-[10px] text-slate-500 uppercase font-mono tracking-wider">Configure Parameters</span>
-                </div>
-
                 <div class="glass rounded-xl p-5 mb-8 shadow-lg">
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1.5 font-medium ml-1">Form Type</label>
-                            <div class="relative">
-                                <select id="lab-form-code" onchange="fetchFormDetails()" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg p-2.5 pl-3 outline-none focus:border-indigo-500 transition appearance-none cursor-pointer hover:bg-slate-700/80">
-                                    <option value="JT31">JT31 - ลาออก</option>
-                                    <option value="JT35" selected>JT35 - ทักท้วงผลการเรียน</option>
-                                    <option value="JT44">JT44 - ลาป่วย</option>
-                                    <option value="JT48">JT48 - ถอนรายวิชา (W)</option>
-                                    <option value="JT49">JT49 - ลาพักการศึกษา</option>
-                                </select>
-                                <i class="fa-solid fa-chevron-down absolute right-3 top-3 text-xs text-slate-500 pointer-events-none"></i>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs text-slate-400 mb-1.5 font-medium ml-1">Degree Level</label>
-                            <div class="relative">
-                                <select id="lab-degree" onchange="fetchFormDetails()" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg p-2.5 pl-3 outline-none focus:border-indigo-500 transition appearance-none cursor-pointer hover:bg-slate-700/80">
-                                    <option value="bachelor">Bachelor (ป.ตรี)</option>
-                                    <option value="graduate">Graduate (บัณฑิตศึกษา)</option>
-                                </select>
-                                <i class="fa-solid fa-chevron-down absolute right-3 top-3 text-xs text-slate-500 pointer-events-none"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="lab-form-info" class="text-xs text-slate-400 bg-slate-900/80 rounded-lg p-4 border border-slate-800 hidden animate-fade-in relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
-                        <div class="mb-3 flex items-start gap-3">
-                            <div class="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0 border border-slate-700 text-indigo-400"><i class="fa-solid fa-location-dot"></i></div>
-                            <div>
-                                <span class="font-bold text-slate-200 text-[11px] uppercase tracking-wide">Submission Location</span> 
-                                <span id="info-location" class="text-slate-400 block mt-1 leading-relaxed">...</span>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                             <div class="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0 border border-slate-700 text-indigo-400"><i class="fa-solid fa-list-ol"></i></div>
-                            <div>
-                                <span class="font-bold text-slate-200 text-[11px] uppercase tracking-wide">Procedures</span>
-                                <ul id="info-steps" class="list-disc list-outside mt-1 ml-4 space-y-1 text-slate-500"></ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-between mb-6 pt-2">
-                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                        <span class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm ring-1 ring-emerald-500/30"><i class="fa-solid fa-cloud-arrow-up"></i></span>
-                        Step 2: Upload & Validate
+                    <h2 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-file-contract text-indigo-400"></i> Step 1: Form Selection
                     </h2>
-                     <span class="text-[10px] text-slate-500 uppercase font-mono tracking-wider">AI Powered</span>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] text-slate-500 uppercase mb-1 font-bold">Form Type</label>
+                            <select id="lab-form-code" onchange="fetchFormDetails()" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 outline-none focus:border-indigo-500">
+                                <option value="JT35" selected>JT35 - ทักท้วงผลการเรียน</option>
+                                <option value="JT44">JT44 - ลาป่วย</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 uppercase mb-1 font-bold">Degree Level</label>
+                            <select id="lab-degree" onchange="fetchFormDetails()" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 outline-none focus:border-indigo-500">
+                                <option value="bachelor">Bachelor (ป.ตรี)</option>
+                                <option value="graduate">Graduate (บัณฑิตศึกษา)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="lab-form-info" class="mt-4 text-xs text-slate-400 bg-slate-850/50 rounded-lg p-4 border border-slate-800 hidden animate-fade-in">
+                        <p class="mb-2"><strong class="text-indigo-400">📍 Location:</strong> <span id="info-location">...</span></p>
+                        <div><strong class="text-indigo-400">📝 Steps:</strong> <ul id="info-steps" class="list-disc ml-4 mt-1"></ul></div>
+                    </div>
                 </div>
 
                 <div class="glass rounded-xl p-5 mb-6 flex-1 shadow-lg relative">
-                    
+                    <h2 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> Step 2: Upload & Validate
+                    </h2>
                     <div class="mb-4">
-                        <label class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 block ml-1 font-bold">Document Type (Key)</label>
-                        <div class="relative">
-                            <select id="lab-file-key" class="w-full bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg p-2.5 focus:border-indigo-500 outline-none appearance-none hover:bg-slate-800 transition">
-                                <option value="main_form">Main Form (แบบฟอร์มหลัก)</option>
-                                <option value="med_cert">Medical Certificate (ใบรับรองแพทย์)</option>
-                                <option value="parent_consent">Parent Consent (ใบยินยอมผู้ปกครอง)</option>
-                                <option value="payment_slip">Payment Slip (หลักฐานการโอนเงิน)</option>
-                            </select>
-                             <i class="fa-solid fa-chevron-down absolute right-3 top-3 text-xs text-slate-500 pointer-events-none"></i>
-                        </div>
+                        <label class="text-[10px] text-slate-500 uppercase mb-1 block font-bold">Document Type</label>
+                        <select id="lab-file-key" class="w-full bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg p-2.5 outline-none focus:border-indigo-500">
+                            <option value="main_form">Main Form (แบบฟอร์มหลัก)</option>
+                            <option value="med_cert">Medical Certificate (ใบรับรองแพทย์)</option>
+                            <option value="payment_slip">Payment Slip (หลักฐานการโอนเงิน)</option>
+                        </select>
                     </div>
 
-                    <div id="drop-zone" class="border-2 border-dashed border-slate-700 rounded-xl h-48 flex flex-col items-center justify-center text-slate-500 hover:border-indigo-500 hover:bg-indigo-500/5 transition-all cursor-pointer relative group bg-slate-900/30">
+                    <div id="drop-zone" class="border-2 border-dashed border-slate-700 rounded-xl h-40 flex flex-col items-center justify-center text-slate-500 hover:border-indigo-500 hover:bg-indigo-500/5 transition-all cursor-pointer relative bg-slate-900/30">
                         <input type="file" id="lab-file-input" class="absolute inset-0 opacity-0 cursor-pointer z-20">
-                        <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-md border border-slate-700">
-                            <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 group-hover:text-indigo-400 transition-colors"></i>
-                        </div>
-                        <p class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Click to upload or drag and drop</p>
-                        <p class="text-[10px] text-slate-500 mt-1">Supported: PDF, JPG, PNG (Max 10MB)</p>
-                        
-                        <div id="file-name-display" class="hidden absolute bottom-4 px-4 py-1.5 bg-slate-800 rounded-full border border-indigo-500/50 text-indigo-300 text-xs font-mono shadow-lg flex items-center gap-2 animate-fade-in z-10">
-                            <i class="fa-solid fa-file"></i> <span id="file-name-text">filename.pdf</span>
+                        <i class="fa-solid fa-file-pdf text-2xl mb-2"></i>
+                        <p class="text-xs">Click to upload or drag & drop</p>
+                        <div id="file-name-display" class="hidden absolute bottom-4 px-3 py-1 bg-indigo-500/20 rounded-full border border-indigo-500/50 text-indigo-300 text-[10px] animate-fade-in">
+                             <i class="fa-solid fa-check mr-1"></i> <span id="file-name-text">filename.pdf</span>
                         </div>
                     </div>
 
-                    <button onclick="labUploadAndCheck()" id="btn-lab-check" class="w-full mt-6 bg-slate-800 text-slate-500 font-bold py-3 rounded-lg text-sm transition-all cursor-not-allowed flex items-center justify-center gap-2 shadow-sm border border-slate-700" disabled>
-                        <span>Select File First</span>
+                    <button onclick="labUploadAndCheck()" id="btn-lab-check" class="w-full mt-6 bg-slate-800 text-slate-500 font-bold py-3 rounded-lg text-xs transition-all border border-slate-700 cursor-not-allowed" disabled>
+                        Select File First
                     </button>
                     
                     <div id="lab-result" class="mt-6 hidden animate-slide-up">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Analysis Result</div>
-                            <div id="result-timestamp" class="text-[9px] font-mono text-slate-600"></div>
-                        </div>
                         <div id="lab-result-content" class="rounded-lg bg-slate-900 border border-slate-800 overflow-hidden shadow-inner"></div>
                     </div>
                 </div>
@@ -202,79 +135,32 @@
                     <h2 class="text-sm font-bold text-white flex items-center gap-2">
                         <i class="fa-solid fa-robot text-indigo-400"></i> AI Assistant
                     </h2>
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span class="text-[10px] text-slate-500 font-mono">ONLINE</span>
-                    </div>
                 </div>
-                
                 <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-950/50">
-                    <div class="flex gap-3 animate-fade-in">
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/20 ring-2 ring-slate-800"><i class="fa-solid fa-robot text-xs"></i></div>
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg"><i class="fa-solid fa-robot text-xs"></i></div>
                         <div class="bg-slate-800 p-3.5 rounded-2xl rounded-tl-none text-sm text-slate-300 max-w-[90%] border border-slate-700 shadow-sm">
-                            <p class="font-bold text-white mb-1">สวัสดีครับ 👋 ผมคือ AI ผู้ช่วยประจำคณะวิทยาศาสตร์</p>
-                            <p class="mb-2">มีข้อสงสัยเกี่ยวกับการยื่นคำร้องถามได้เลยครับ เช่น:</p>
-                            <ul class="list-disc list-inside text-slate-400 text-xs space-y-1 bg-slate-900/50 p-2 rounded-lg border border-slate-800/50">
-                                <li class="hover:text-indigo-400 cursor-pointer transition-colors">"จะลาออกต้องทำอย่างไร"</li>
-                                <li class="hover:text-indigo-400 cursor-pointer transition-colors">"JT35 คืออะไร"</li>
-                                <li class="hover:text-indigo-400 cursor-pointer transition-colors">"ขอผ่อนผันค่าเทอมได้ไหม"</li>
-                            </ul>
+                            สวัสดีครับ 👋 ผมคือ AI ผู้ช่วย มีอะไรให้ช่วยสอบถามได้เลยครับ
                         </div>
                     </div>
                 </div>
-
-                <div class="p-4 bg-slate-900 border-t border-slate-800 z-10">
+                <div class="p-4 bg-slate-900 border-t border-slate-800">
                     <div class="relative group">
-                        <input type="text" id="chat-input" placeholder="Type your question here..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-4 pr-12 py-3.5 text-sm text-white focus:border-indigo-500 outline-none shadow-inner transition-colors group-hover:border-slate-600" onkeypress="if(event.key === 'Enter') sendChatMessage()">
-                        <button onclick="sendChatMessage()" class="absolute right-2 top-2.5 w-9 h-9 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center justify-center transition shadow-lg shadow-indigo-600/20 active:scale-95">
+                        <input type="text" id="chat-input" placeholder="Type your message..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-4 pr-12 py-3.5 text-sm text-white focus:border-indigo-500 outline-none" onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                        <button onclick="sendChatMessage()" class="absolute right-2 top-2.5 w-9 h-9 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center justify-center transition shadow-lg active:scale-95">
                             <i class="fa-solid fa-paper-plane text-xs"></i>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div id="view-runner" class="absolute inset-0 flex opacity-0 pointer-events-none transition-opacity duration-300 z-0">
-            <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0">
-                <div class="p-4 border-b border-slate-800">
-                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Test Suite</div>
-                    <div class="grid grid-cols-3 gap-1 bg-slate-850 p-1 rounded-lg">
-                        <button onclick="setTestMode('functional')" class="test-tab-btn active px-2 py-1.5 rounded text-[10px] font-bold text-center transition" data-mode="functional">Functional</button>
-                        <button onclick="setTestMode('negative')" class="test-tab-btn px-2 py-1.5 rounded text-[10px] font-bold text-center transition" data-mode="negative">Negative</button>
-                        <button onclick="setTestMode('security')" class="test-tab-btn px-2 py-1.5 rounded text-[10px] font-bold text-center transition" data-mode="security">Security</button>
-                    </div>
-                </div>
-                <div class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2" id="test-list-container"></div>
-                <div class="p-4 bg-slate-900 border-t border-slate-800">
-                    <button onclick="runCurrentSuite()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-lg text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-900/30 transition-all active:scale-[0.98]">
-                        <i class="fa-solid fa-play mr-2"></i> Run Suite
-                    </button>
-                </div>
-            </aside>
-            <main class="flex-1 bg-slate-950 flex flex-col">
-                <div class="h-10 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-4">
-                    <span class="text-[10px] font-mono text-slate-500 uppercase flex items-center gap-2"><i class="fa-solid fa-terminal"></i> Execution Logs</span>
-                    <button onclick="clearLogs()" class="text-[10px] text-slate-500 hover:text-white"><i class="fa-solid fa-trash-can mr-1"></i> Clear</button>
-                </div>
-                <div id="console-logs" class="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar font-mono text-xs"></div>
-            </main>
-        </div>
-
     </div>
 
     <script>
         // --- Shared State ---
         let state = {
-            mode: 'functional', // for test runner
-            token: null, // Note: Now handled by Cookie, kept for compatibility if needed
             baseUrl: document.getElementById('baseUrl').value,
-            lab: {
-                selectedFile: null,
-                uploadedPath: null
-            },
-            runner: {
-                pass: 0, fail: 0, isRunning: false
-            }
+            lab: { selectedFile: null }
         };
 
         // --- 🍪 Cookie Helpers ---
@@ -302,28 +188,19 @@
         // --- 🔐 Secure Client ---
         const SecureClient = {
             publicKey: null,
-            
             async init() {
                 const url = document.getElementById('baseUrl').value;
-                const cleanUrl = url.replace(/\/$/, '') + '/api/v1';
-                state.baseUrl = cleanUrl; 
-
-                // ✅ Enable Cookie support for Axios
+                state.baseUrl = url.replace(/\/$/, '') + '/api/v1';
+                // ✅ สำคัญ: เปิดใช้งาน credentials สำหรับระบบหลัก
                 axios.defaults.withCredentials = true;
 
                 if(!this.publicKey) {
                     try {
-                        const res = await axios.get(`${cleanUrl}/auth/public-key`);
+                        const res = await axios.get(`${state.baseUrl}/auth/public-key`);
                         this.publicKey = res.data.publicKey;
-                        document.getElementById('encryption-status')?.classList.remove('hidden');
-                    } catch(e) {
-                        console.error('Handshake error', e);
-                        alert("Failed to connect to server. Check URL.");
-                        throw e;
-                    }
+                    } catch(e) { console.error('Handshake error', e); alert("Connection Failed."); }
                 }
             },
-
             async post(endpoint, data, headers = {}) {
                 if(!this.publicKey) await this.init();
                 const aesKey = forge.random.getBytesSync(32);
@@ -342,466 +219,161 @@
                     tag: forge.util.encode64(cipher.mode.tag.getBytes())
                 };
 
-                try {
-                    // ✅ Note: No need to send Authorization header manually, cookie handles it.
-                    const res = await axios.post(`${state.baseUrl}${endpoint}`, payload, { headers, validateStatus: () => true });
-                    if(res.data && res.data.payload && res.data.iv) {
-                        const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
-                        decipher.start({ iv: forge.util.decode64(res.data.iv), tag: forge.util.decode64(res.data.tag) });
-                        decipher.update(forge.util.createBuffer(forge.util.decode64(res.data.payload)));
-                        if(decipher.finish()) res.data = JSON.parse(decipher.output.toString());
-                    }
-                    return res;
-                } catch(e) { throw e; }
+                const res = await axios.post(`${state.baseUrl}${endpoint}`, payload, { headers, validateStatus: () => true });
+                if(res.data && res.data.payload) {
+                    const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
+                    decipher.start({ iv: forge.util.decode64(res.data.iv), tag: forge.util.decode64(res.data.tag) });
+                    decipher.update(forge.util.createBuffer(forge.util.decode64(res.data.payload)));
+                    if(decipher.finish()) res.data = JSON.parse(decipher.output.toString());
+                }
+                return res;
             },
-            async get(endpoint, headers = {}) {
+            async get(endpoint) {
                 if(!state.baseUrl) await this.init();
-                return await axios.get(`${state.baseUrl}${endpoint}`, { headers, validateStatus: () => true });
+                return await axios.get(`${state.baseUrl}${endpoint}`, { validateStatus: () => true });
             }
         };
 
         // --- 🌐 Global Functions ---
-        function switchView(viewName) {
-            const runner = document.getElementById('view-runner');
-            const lab = document.getElementById('view-lab');
-            const btnRunner = document.getElementById('btn-view-runner');
-            const btnLab = document.getElementById('btn-view-lab');
-
-            if(viewName === 'runner') {
-                runner.style.opacity = '1'; runner.style.pointerEvents = 'auto'; runner.style.zIndex = '10';
-                lab.style.opacity = '0'; lab.style.pointerEvents = 'none'; lab.style.zIndex = '0';
-                
-                btnRunner.className = "px-3 py-1.5 rounded text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm";
-                btnLab.className = "px-3 py-1.5 rounded text-xs font-medium text-slate-400 hover:text-white transition-all";
-            } else {
-                runner.style.opacity = '0'; runner.style.pointerEvents = 'none'; runner.style.zIndex = '0';
-                lab.style.opacity = '1'; lab.style.pointerEvents = 'auto'; lab.style.zIndex = '10';
-
-                btnLab.className = "px-3 py-1.5 rounded text-xs font-medium transition-all bg-indigo-600 text-white shadow-sm";
-                btnRunner.className = "px-3 py-1.5 rounded text-xs font-medium text-slate-400 hover:text-white transition-all";
-                
-                fetchFormDetails(); // Load initial form details
-            }
-        }
-
         async function authenticate() {
             const btn = document.getElementById('session-btn');
             const dot = document.getElementById('session-dot');
             const text = document.getElementById('session-text');
-            
-            text.innerText = "Checking...";
-
-            // 1. Check if we have a session cookie
-            const savedToken = getCookie('sci_session_token'); // Just for UI logic check
-            
-            if (savedToken) {
-                console.log("Restored session from cookie");
-                dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
-                text.innerText = "Session Restored";
-                btn.classList.add('border-emerald-500/50', 'bg-emerald-500/10', 'text-emerald-400');
-                return;
-            }
-
             text.innerText = "Connecting...";
             try {
                 const res = await SecureClient.post('/session/init', {});
                 if (res.status === 200) {
-                    // Set a dummy cookie on client side just to know we are logged in for UI purposes
-                    // The REAL httpOnly cookie is set by server response
-                    setCookie('sci_session_token', 'active', 1); 
-
+                    setCookie('sci_session_token', 'active', 1);
                     dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
                     text.innerText = "Session Active";
                     btn.classList.add('border-emerald-500/50', 'bg-emerald-500/10', 'text-emerald-400');
-                    log('success', 'Auth Success', { msg: "Session initialized via Cookie" });
                 }
             } catch (e) {
                 text.innerText = "Auth Failed";
                 dot.className = "w-2 h-2 rounded-full bg-rose-500";
-                console.error(e);
             }
         }
 
-        // --- 🧪 Test Runner Logic ---
-        const suites = {
-            functional: [
-                { id: 'f1', name: '1. Init Session', method: 'POST /session/init', body: {}, expected: 200 },
-                { id: 'f2', name: '2. Get Form Config', method: 'GET /forms/JT35?degree_level=bachelor', expected: 200 },
-                { id: 'f3', name: '3. Mock Upload', method: 'UPLOAD_MOCK', expected: 200 },
-                { id: 'f4', name: '4. AI Chat Test', method: 'POST /chat/recommend', body: { message: 'test', degree_level: 'bachelor' }, expected: 200 },
-            ],
-            negative: [
-                { id: 'n1', name: 'Block .EXE File', method: 'POST /upload/signed-url', body: { file_type: 'application/x-msdownload', file_name: 'virus.exe', file_size: 1024, file_key: 'main_form' }, expected: 400 },
-                { id: 'n2', name: 'Invalid Form Code', method: 'GET /forms/INVALID-99', expected: 404 }
-            ],
-            security: [
-                { id: 's1', name: 'Invalid Token', method: 'POST /chat/recommend', body: { message: 'hi' }, headerOverride: { Authorization: 'Bearer fake-token' }, expected: 403 }, // Note: cookie auth might make testing bad headers tricky without clearing cookies
-                { id: 's2', name: 'No Token', method: 'POST /chat/recommend', body: { message: 'hi' }, headerOverride: { Authorization: '' }, expected: 401 }
-            ]
-        };
-
-        function setTestMode(mode) {
-            state.mode = mode;
-            document.querySelectorAll('.test-tab-btn').forEach(b => {
-                const isActive = b.dataset.mode === mode;
-                b.classList.toggle('active', isActive);
-                b.className = isActive 
-                    ? "test-tab-btn active px-2 py-1.5 rounded text-[10px] font-bold text-center transition bg-slate-700 text-white shadow"
-                    : "test-tab-btn px-2 py-1.5 rounded text-[10px] font-bold text-center transition text-slate-400 hover:text-slate-300";
-            });
-            renderTestList();
-        }
-
-        function renderTestList() {
-            const container = document.getElementById('test-list-container');
-            container.innerHTML = suites[state.mode].map(t => `
-                <div id="card-${t.id}" class="p-3 mb-2 rounded border border-slate-800 bg-slate-800/30 flex items-center justify-between group hover:bg-slate-800 transition">
-                    <div class="flex items-center gap-3">
-                        <div class="w-6 h-6 rounded bg-slate-900 flex items-center justify-center text-xs text-slate-500 font-mono">${t.id}</div>
-                        <span class="text-xs text-slate-300 font-medium">${t.name}</span>
-                    </div>
-                    <div class="status-dot w-2 h-2 rounded-full bg-slate-700 transition-colors"></div>
-                </div>
-            `).join('');
-        }
-
-        async function runCurrentSuite() {
-            if(!getCookie('sci_session_token')) await authenticate();
-            document.getElementById('console-logs').innerHTML = '';
-            for(const test of suites[state.mode]) {
-                const card = document.getElementById(`card-${test.id}`);
-                const dot = card.querySelector('.status-dot');
-                dot.className = "status-dot w-2 h-2 rounded-full bg-amber-400 animate-pulse";
-                
-                try {
-                    let res;
-                    if(test.method === 'UPLOAD_MOCK') {
-                        res = { status: 200, data: { msg: 'Mock Upload Success' } }; 
-                        await new Promise(r => setTimeout(r, 500)); // Simulate delay
-                    } else if(test.method.startsWith('GET')) {
-                        const endpoint = test.method.split(' ')[1];
-                        res = await SecureClient.get(endpoint);
-                    } else {
-                        // Note: headerOverride might not work as expected with cookies, but logic remains
-                        const headers = test.headerOverride || {};
-                        res = await SecureClient.post(test.method.split(' ')[1], test.body, headers);
-                    }
-                    
-                    if(res.status === test.expected || (test.method === 'UPLOAD_MOCK' && res.status === 200)) {
-                        dot.className = "status-dot w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
-                        log('success', test.name, res.data);
-                    } else {
-                        throw new Error(`Expected ${test.expected}, got ${res.status}`);
-                    }
-                } catch(e) {
-                    dot.className = "status-dot w-2 h-2 rounded-full bg-rose-500";
-                    log('error', test.name, e.response?.data || e.message);
-                }
-                await new Promise(r => setTimeout(r, 300));
-            }
-        }
-
-        function log(type, title, data) {
-            const box = document.getElementById('console-logs');
-            const styles = { 
-                success: 'border-emerald-500/30 bg-emerald-950/10 text-emerald-300', 
-                error: 'border-rose-500/30 bg-rose-950/10 text-rose-300',
-                info: 'border-blue-500/30 bg-blue-950/10 text-blue-300'
-            };
-            const style = styles[type] || 'text-slate-400 border-slate-600';
-            
-            // Syntax Highlighting for JSON
-            let prettyData = '';
-            if (typeof data === 'object') {
-                const json = JSON.stringify(data, null, 2);
-                prettyData = json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
-                    let cls = 'json-number';
-                    if (/^"/.test(match)) {
-                        if (/:$/.test(match)) {
-                            cls = 'json-key';
-                        } else {
-                            cls = 'json-string';
-                        }
-                    } else if (/true|false/.test(match)) {
-                        cls = 'json-boolean';
-                    } else if (/null/.test(match)) {
-                        cls = 'text-slate-500';
-                    }
-                    return '<span class="' + cls + '">' + match + '</span>';
-                });
-            } else {
-                prettyData = data;
-            }
-
-            const html = `
-                <div class="border-l-2 pl-3 py-2 mb-2 ${style} font-mono text-[10px] animate-fade-in rounded-r bg-opacity-50">
-                    <div class="font-bold uppercase tracking-wider mb-1 flex justify-between items-center opacity-90">
-                        <span>${title}</span>
-                        <span class="opacity-50 text-[9px]">${new Date().toLocaleTimeString()}</span>
-                    </div>
-                    <pre class="overflow-x-auto whitespace-pre-wrap opacity-90 leading-4 text-[10px]">${prettyData}</pre>
-                </div>`;
-            box.innerHTML += html;
-            box.scrollTop = box.scrollHeight;
-        }
-        function clearLogs() { document.getElementById('console-logs').innerHTML = ''; }
-
-        // --- 🔬 Interactive Lab Logic ---
-
-        // 1. File Input Handler
-        const fileInput = document.getElementById('lab-file-input');
-        const dropZone = document.getElementById('drop-zone');
-        const fileNameDisplay = document.getElementById('file-name-display');
-        const btnLabCheck = document.getElementById('btn-lab-check');
-
-        fileInput.addEventListener('change', handleFileSelect);
-
-        function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if(file) {
-                state.lab.selectedFile = file;
-                document.getElementById('file-name-text').innerText = `${file.name} (${(file.size/1024).toFixed(1)} KB)`;
-                fileNameDisplay.classList.remove('hidden');
-                dropZone.classList.add('border-indigo-500', 'bg-indigo-500/5');
-                dropZone.classList.remove('border-dashed');
-                
-                btnLabCheck.disabled = false;
-                btnLabCheck.classList.remove('bg-slate-800', 'text-slate-500', 'cursor-not-allowed', 'border-slate-700');
-                btnLabCheck.classList.add('bg-indigo-600', 'text-white', 'hover:bg-indigo-500', 'shadow-lg', 'border-indigo-500');
-                btnLabCheck.innerHTML = '<span>Upload & Validate</span> <i class="fa-solid fa-bolt ml-1"></i>';
-            }
-        }
-
-        // 2. Fetch Form Info
         async function fetchFormDetails() {
             if(!getCookie('sci_session_token')) await authenticate();
             const formCode = document.getElementById('lab-form-code').value;
             const degree = document.getElementById('lab-degree').value;
-            const infoBox = document.getElementById('lab-form-info');
-            
             try {
-                // Reset UI
-                infoBox.classList.add('hidden');
-                
                 const res = await SecureClient.get(`/forms/${formCode}?degree_level=${degree}`);
-                
-                infoBox.classList.remove('hidden');
+                document.getElementById('lab-form-info').classList.remove('hidden');
                 document.getElementById('info-location').innerText = res.data.submission_location || '-';
-                
-                const stepsList = document.getElementById('info-steps');
-                stepsList.innerHTML = (res.data.submission_steps || []).map(s => `<li>${s}</li>`).join('');
-                
-            } catch(e) {
-                console.error("Fetch form failed", e);
-            }
+                document.getElementById('info-steps').innerHTML = (res.data.submission_steps || []).map(s => `<li>${s}</li>`).join('');
+            } catch(e) { console.error(e); }
         }
 
-        // 3. Upload & Validate (Improved)
+        // --- 🔬 Upload & Validate Logic ---
+        document.getElementById('lab-file-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                state.lab.selectedFile = file;
+                document.getElementById('file-name-text').innerText = file.name;
+                document.getElementById('file-name-display').classList.remove('hidden');
+                const btn = document.getElementById('btn-lab-check');
+                btn.disabled = false;
+                btn.className = "w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg text-xs transition-all shadow-lg active:scale-[0.98]";
+                btn.innerText = "Upload & Validate";
+            }
+        });
+
         async function labUploadAndCheck() {
             if(!getCookie('sci_session_token')) await authenticate();
             const file = state.lab.selectedFile;
             const fileKey = document.getElementById('lab-file-key').value;
             const formCode = document.getElementById('lab-form-code').value;
+            const btn = document.getElementById('btn-lab-check');
 
-            btnLabCheck.innerHTML = '<i class="fa-solid fa-spinner fa-spin animate-spin"></i> Processing...';
-            btnLabCheck.disabled = true;
+            btn.innerText = "Processing...";
+            btn.disabled = true;
             
             try {
                 // Step A: Get Signed URL
-                log('info', 'Process Started', `Requesting upload URL for ${file.name}`);
                 const r1 = await SecureClient.post('/upload/signed-url', {
-                    file_name: file.name,
-                    file_type: file.type || 'application/pdf',
-                    file_size: file.size,
-                    file_key: fileKey
+                    file_name: file.name, file_type: file.type || 'application/pdf',
+                    file_size: file.size, file_key: fileKey
                 });
 
                 if(r1.status !== 200) throw new Error('Signed URL failed');
 
-                // Step B: Upload to GCS
-                log('info', 'Uploading', 'Sending file to Google Cloud Storage...');
-                await axios.put(r1.data.upload_url, file, { headers: { 'Content-Type': file.type } });
-                
-                const gcsPath = r1.data.gcs_path;
+                // ✅ Step B: Upload to GCS (FIXED: Set withCredentials to false)
+                console.log('Uploading to GCS...');
+                await axios.put(r1.data.upload_url, file, { 
+                    headers: { 'Content-Type': file.type },
+                    withCredentials: false // 👈 สำคัญ: ห้ามส่ง Cookie ไป GCS เพราะจะติด CORS
+                });
                 
                 // Step C: Validate
-                log('info', 'Validating', 'Asking AI to check document...');
                 const r2 = await SecureClient.post('/validation/check-completeness', {
                     form_code: formCode,
-                    uploaded_files: [{ key: fileKey, gcs_path: gcsPath }]
+                    uploaded_files: [{ key: fileKey, gcs_path: r1.data.gcs_path }]
                 });
 
                 // Display Result
                 const resultBox = document.getElementById('lab-result');
                 const resultContent = document.getElementById('lab-result-content');
-                document.getElementById('result-timestamp').innerText = new Date().toLocaleTimeString();
                 resultBox.classList.remove('hidden');
                 
-                // Smart Parser for AI Response
                 const rawData = r2.data;
-                let status = 'UNKNOWN';
-                let reason = 'No specific reason provided.';
-                let confidence = null;
-
-                // Handle nested structure { "file_key": { ... } }
+                let status = 'UNKNOWN', reason = 'No reason provided';
                 if (rawData[fileKey]) {
-                    status = rawData[fileKey].status || 'UNKNOWN';
-                    reason = rawData[fileKey].reason || reason;
-                    confidence = rawData[fileKey].confidence;
-                } 
-                // Handle flat structure { "status": ..., "reason": ... }
-                else if (rawData.status) {
-                    status = rawData.status;
-                    reason = rawData.reason || rawData.message || reason;
-                }
-                // Handle generic/error
-                else {
-                    reason = JSON.stringify(rawData);
+                    status = rawData[fileKey].status; reason = rawData[fileKey].reason;
                 }
 
-                const isPass = status.toLowerCase().includes('valid') && !status.toLowerCase().includes('invalid');
-                const statusColor = isPass ? 'text-emerald-400' : 'text-rose-400';
-                const statusIcon = isPass ? 'fa-circle-check' : 'fa-circle-xmark';
-                const bgClass = isPass ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30';
+                const isPass = status.toLowerCase().includes('valid');
+                const color = isPass ? 'emerald' : 'rose';
 
-                let html = `
+                resultContent.innerHTML = `
                     <div class="flex items-stretch">
-                        <div class="w-1.5 ${isPass ? 'bg-emerald-500' : 'bg-rose-500'}"></div>
-                        <div class="p-4 flex-1 ${bgClass}">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid ${statusIcon} ${statusColor} text-lg"></i>
-                                    <span class="font-bold text-sm uppercase ${statusColor}">${status}</span>
-                                </div>
-                                ${confidence ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">Confidence: ${confidence}</span>` : ''}
+                        <div class="w-1.5 bg-${color}-500"></div>
+                        <div class="p-4 flex-1 bg-${color}-500/10 border-${color}-500/30">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid ${isPass ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-rose-400'}"></i>
+                                <span class="font-bold text-sm uppercase text-${color}-400">${status}</span>
                             </div>
-                            <div class="text-slate-300 text-xs leading-relaxed border-t border-white/5 pt-2 mt-2 prose prose-invert prose-xs">
-                                <span class="text-slate-500 font-bold block mb-1">AI Reasoning:</span>
+                            <div class="text-slate-300 text-xs leading-relaxed prose prose-invert prose-xs">
                                 ${marked.parse(reason)}
                             </div>
                         </div>
                     </div>
                 `;
-
-                resultContent.innerHTML = html;
-                btnLabCheck.innerHTML = '<span>Check Another File</span>';
-                btnLabCheck.disabled = false;
-                
-                log('success', 'Validation Complete', rawData);
+                btn.innerText = "Check Another File";
+                btn.disabled = false;
 
             } catch(e) {
-                // Error Handling in UI
-                const resultBox = document.getElementById('lab-result');
-                const resultContent = document.getElementById('lab-result-content');
-                resultBox.classList.remove('hidden');
-                
-                const errorMsg = e.response?.data?.message || e.response?.data?.error || e.message;
-                
-                let html = `
-                    <div class="flex items-stretch">
-                        <div class="w-1.5 bg-amber-500"></div>
-                        <div class="p-4 flex-1 bg-amber-500/10 border-amber-500/30">
-                            <div class="flex items-center gap-2 mb-2">
-                                <i class="fa-solid fa-triangle-exclamation text-amber-500 text-lg"></i>
-                                <span class="font-bold text-sm uppercase text-amber-500">System Error</span>
-                            </div>
-                            <div class="text-amber-200/80 text-xs font-mono mt-2">${errorMsg}</div>
-                        </div>
-                    </div>
-                `;
-                resultContent.innerHTML = html;
-                
-                btnLabCheck.innerHTML = '<span>Retry Upload</span>';
-                btnLabCheck.disabled = false;
-                log('error', 'Validation Failed', e.response?.data || e.message);
+                alert("Error: " + (e.response?.data?.error || e.message));
+                btn.innerText = "Retry Upload";
+                btn.disabled = false;
             }
         }
 
-        // 4. Chat Logic (Optimized)
         async function sendChatMessage() {
             if(!getCookie('sci_session_token')) await authenticate();
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
             if(!message) return;
 
-            addChatBubble('user', message);
+            const container = document.getElementById('chat-history');
+            container.insertAdjacentHTML('beforeend', `<div class="flex gap-3 flex-row-reverse animate-slide-up"><div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white shrink-0 shadow-sm"><i class="fa-solid fa-user text-xs"></i></div><div class="p-3.5 rounded-2xl bg-slate-800 text-white rounded-tr-none text-sm max-w-[85%] shadow-sm">${message}</div></div>`);
             input.value = '';
-
-            const loadingId = addChatBubble('bot', '...', true);
+            container.scrollTop = container.scrollHeight;
 
             try {
                 const degree = document.getElementById('lab-degree').value;
-                const res = await SecureClient.post('/chat/recommend', {
-                    message: message,
-                    degree_level: degree
-                }); // Cookie sent automatically
-
-                document.getElementById(loadingId).remove();
+                const res = await SecureClient.post('/chat/recommend', { message, degree_level: degree });
+                let botText = res.data.reply || res.data.text || JSON.stringify(res.data);
                 
-                // Smart Key Detection
-                let botText = "";
-                const data = res.data;
-                if (typeof data === 'string') {
-                    botText = data;
-                } else {
-                    botText = data.reply || data.text || data.message || data.answer || data.result;
-                }
-
-                if (!botText) {
-                    // Try to pretty print unexpected JSON
-                    botText = "⚠️ **Raw Response:**\n```json\n" + JSON.stringify(data, null, 2) + "\n```";
-                }
-
-                addChatBubble('bot', botText);
-
-            } catch(e) {
-                if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
-                
-                let errorMsg = e.message;
-                if(e.response && e.response.data && e.response.data.error) {
-                    errorMsg = e.response.data.error;
-                }
-                
-                // Error Bubble
-                const container = document.getElementById('chat-history');
-                const html = `
-                    <div class="flex gap-3 animate-fade-in">
-                        <div class="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-rose-500/20"><i class="fa-solid fa-triangle-exclamation text-xs"></i></div>
-                        <div class="bg-rose-950/30 p-3 rounded-2xl rounded-tl-none text-sm text-rose-200 max-w-[85%] border border-rose-500/30 shadow-sm">
-                            <span class="font-bold block mb-1">Error Occurred</span>
-                            ${errorMsg}
-                        </div>
-                    </div>`;
-                container.insertAdjacentHTML('beforeend', html);
+                container.insertAdjacentHTML('beforeend', `<div class="flex gap-3 animate-slide-up"><div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg"><i class="fa-solid fa-robot text-xs"></i></div><div class="p-3.5 rounded-2xl bg-slate-800 text-slate-300 border border-slate-700 rounded-tl-none text-sm max-w-[85%] prose prose-invert prose-xs">${marked.parse(botText)}</div></div>`);
                 container.scrollTop = container.scrollHeight;
-                
-                console.error("Chat Error:", e);
-            }
-        }
-
-        function addChatBubble(sender, text, isLoading = false) {
-            const container = document.getElementById('chat-history');
-            const id = 'msg-' + Date.now();
-            const isUser = sender === 'user';
-            
-            const html = `
-                <div id="${id}" class="flex gap-3 ${isUser ? 'flex-row-reverse' : ''} animate-slide-up">
-                    <div class="w-8 h-8 rounded-full ${isUser ? 'bg-slate-700' : 'bg-indigo-600'} flex items-center justify-center text-white shrink-0 shadow-sm ring-2 ${isUser ? 'ring-slate-600' : 'ring-indigo-500/50'}">
-                        <i class="fa-solid ${isUser ? 'fa-user' : (isLoading ? 'fa-ellipsis animate-pulse' : 'fa-robot')} text-xs"></i>
-                    </div>
-                    <div class="p-3.5 rounded-2xl ${isUser ? 'bg-slate-800 text-white rounded-tr-none' : 'bg-indigo-900/20 text-slate-200 border border-indigo-500/20 rounded-tl-none'} text-sm max-w-[85%] shadow-sm leading-relaxed prose prose-invert prose-xs">
-                        ${isLoading ? '<div class="flex gap-1.5 px-1"><div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></div><div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-75"></div><div class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce delay-150"></div></div>' : marked.parse(text)}
-                    </div>
-                </div>
-            `;
-            container.insertAdjacentHTML('beforeend', html);
-            container.scrollTop = container.scrollHeight;
-            return id;
+            } catch(e) { console.error(e); }
         }
 
         // Init
-        authenticate(); // Load cookie on start
-        fetchFormDetails(); // Load initial form details
+        SecureClient.init();
+        fetchFormDetails();
     </script>
 </body>
 </html>
