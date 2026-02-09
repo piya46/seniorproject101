@@ -5,21 +5,21 @@ PROJECT_ID="seniorproject101"
 SERVICE_NAME="sci-request-system"
 BUCKET_NAME="sci-request-files-prod"
 SECRET_NAME="JWT_SECRET"
-FRONTEND_URL="http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500"
+FRONTEND_URL="http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500|http://localhost:5173"
 # ✅ 1. ชื่อ Secret ของ Key ต่างๆ
 PRIV_KEY_SECRET="Gb_PRIVATE_KEY_BASE64"
 PUB_KEY_SECRET="Gb_PUBLIC_KEY_BASE64"
 DB_KEY_SECRET="DB_ENCRYPTION_KEY" # 👈 เพิ่มใหม่
 
 # ✅ 2. App Region
-REGION="asia-southeast1"
+REGION="asia-southeast3"
 
 # ✅ 3. AI Region
 AI_LOCATION="us-central1"
 
 echo "--------------------------------------------------"
 echo "🚀 Starting deployment for $SERVICE_NAME..."
-echo "📍 App Region: $REGION (Singapore)"
+echo "📍 App Region: $REGION"
 echo "🧠 AI Region: $AI_LOCATION (US)"
 echo "MJ  Security: Using Secret Manager for Keys"
 echo "--------------------------------------------------"
