@@ -4,19 +4,18 @@ const { Storage } = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
-// ✅ Import DB function
 const { addFileToSession } = require('../utils/dbUtils');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
-// Route 1: สร้าง URL สำหรับอัปโหลด
+// Route 1: Signed URL (เหมือนเดิม)
 router.post('/signed-url', authMiddleware, strictLimiter, async (req, res) => {
+  // ... (โค้ดเดิมของคุณ OK แล้ว) ...
   try {
     const { file_type, file_key, file_size } = req.body;
     const sessionId = req.session.session_id;
 
-    // Validate Check
     const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
     if (!allowedMimeTypes.includes(file_type)) {
       return res.status(400).json({ error: 'Invalid file type.' });
@@ -29,7 +28,6 @@ router.post('/signed-url', authMiddleware, strictLimiter, async (req, res) => {
     const extensionMap = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
     const extension = extensionMap[file_type] || 'bin';
     
-    // ตั้งชื่อไฟล์
     const uniqueFileName = `${uuidv4()}.${extension}`;
     const gcsPath = `${sessionId}/${uniqueFileName}`;
     const file = bucket.file(gcsPath);
@@ -39,9 +37,11 @@ router.post('/signed-url', authMiddleware, strictLimiter, async (req, res) => {
       action: 'write',
       expires: Date.now() + 15 * 60 * 1000,
       contentType: file_type,
+      extensionHeaders: {
+          'Content-Length': file_size // ✅ บังคับขนาดไฟล์ตั้งแต่ตอน Upload
+      }
     });
 
-    // ส่ง gcs_path กลับไปให้ frontend เพื่อเอามายืนยันตอน finalize
     res.json({
       upload_url: url,
       file_key: file_key,
@@ -54,18 +54,32 @@ router.post('/signed-url', authMiddleware, strictLimiter, async (req, res) => {
   }
 });
 
-// ✅ Route 2: Finalize Upload (เพิ่มอันนี้!)
-// Frontend จะเรียก route นี้เมื่ออัปโหลดเสร็จ เพื่อบันทึกลง DB
+// Route 2: Finalize Upload (เพิ่ม Security Check)
 router.post('/finalize', authMiddleware, async (req, res) => {
     try {
         const { file_key, gcs_path, file_type } = req.body;
         const sessionId = req.session.session_id;
 
-        if (!gcs_path || !file_key) {
-            return res.status(400).json({ error: 'Missing metadata' });
+        // Security Check 1: ตรวจสอบว่า Path ที่ส่งมา เป็นของ Session นี้จริงๆ (ป้องกัน Path Traversal/Hijacking)
+        if (!gcs_path.startsWith(`${sessionId}/`)) {
+            console.warn(`⚠️ Security Alert: Session ${sessionId} tried to claim file outside scope: ${gcs_path}`);
+            return res.status(403).json({ error: 'Invalid file path scope' });
         }
 
-        // 🔥 บันทึกลง Firestore ตรงนี้
+        // Security Check 2: ตรวจสอบว่าไฟล์มีอยู่จริงบน GCS
+        const file = bucket.file(gcs_path);
+        const [exists] = await file.exists();
+        if (!exists) {
+            return res.status(404).json({ error: 'File verification failed: File not found in storage' });
+        }
+
+        // Security Check 3 (Optional but recommended): ตรวจสอบ Metadata ของไฟล์บน GCS
+        const [metadata] = await file.getMetadata();
+        if (metadata.contentType !== file_type) {
+             console.warn(`⚠️ MimeType Mismatch: Claimed ${file_type}, Actual ${metadata.contentType}`);
+             // อาจจะแค่ warn หรือ reject เลยก็ได้
+        }
+
         await addFileToSession(sessionId, {
             file_key,
             gcs_path,
