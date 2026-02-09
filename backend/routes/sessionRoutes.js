@@ -8,14 +8,13 @@ const { strictLimiter } = require('../middlewares/rateLimitMiddleware');
 router.post('/init', strictLimiter, async (req, res) => {
   try {
       let sessionId;
-      // ✅ 1. อ่าน Token จาก Cookie ชื่อ 'sci_session_token'
+      // ✅ 1. อ่านจากชื่อเดียว
       const existingToken = req.cookies.sci_session_token;
       
       if (existingToken) {
           try {
               const decoded = jwt.verify(existingToken, process.env.JWT_SECRET);
               sessionId = decoded.session_id;
-              console.log(`♻️ Resuming session: ${sessionId}`);
           } catch (e) {
               sessionId = `sess_${uuidv4().split('-')[0]}`;
           }
@@ -23,13 +22,12 @@ router.post('/init', strictLimiter, async (req, res) => {
           sessionId = `sess_${uuidv4().split('-')[0]}`;
       }
 
-      // 🔥 สำคัญ: บันทึก Session เริ่มต้นลง Firestore
       await initSessionRecord(sessionId);
 
-      const expiresIn = 86400; // 24 ชั่วโมง
+      const expiresIn = 86400; // 24 ชม.
       const token = jwt.sign({ session_id: sessionId }, process.env.JWT_SECRET, { expiresIn });
 
-      // ✅ 2. ตั้งชื่อ Cookie ว่า 'sci_session_token' ให้ตรงกับ Auth Middleware และ Frontend
+      // ✅ 2. ตั้งชื่อ Cookie ชื่อเดียว
       res.cookie('sci_session_token', token, {
           httpOnly: true,
           secure: true,      
@@ -37,10 +35,7 @@ router.post('/init', strictLimiter, async (req, res) => {
           maxAge: expiresIn * 1000
       });
 
-      res.json({
-        message: 'Session initialized',
-        session_id: sessionId
-      });
+      res.json({ message: 'Session initialized', session_id: sessionId });
 
   } catch (error) {
       console.error('Session Init Error:', error);
