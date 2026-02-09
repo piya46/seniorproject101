@@ -61,7 +61,6 @@ router.post('/recommend', authMiddleware, async (req, res) => {
     const { message, degree_level } = req.body;
     const sessionId = req.session.session_id;
     
-    // 1. ดึงประวัติการคุยเก่าจาก Firestore
     const history = await getChatHistory(sessionId);
 
     // 2. เริ่ม Chat Session (ใส่ประวัติเก่าเข้าไปด้วย)

@@ -1,6 +1,5 @@
 // backend/data/staticData.js
 
-// 1. รายชื่อภาควิชาและอีเมลติดต่อ (ใช้สำหรับส่ง Notification)
 exports.departments = [
   // กลุ่มวิทยาศาสตร์กายภาพ
   { id: "math_ug", name_th: "คณิตศาสตร์ (ป.ตรี)", email: "supattra.ua@chula.ac.th" },
