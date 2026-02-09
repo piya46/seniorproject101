@@ -7,7 +7,8 @@ const { forms, getFormConfig } = require('../data/staticData');
 const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
 
 const project = process.env.GCP_PROJECT_ID || "seniorproject101";
-const location = process.env.GCP_LOCATION || "us-central1";
+// ✅ เปลี่ยน Location ของ AI เป็น global ตามที่ระบุ
+const location = "global";
 
 // สร้าง Context ข้อมูลฟอร์มสำหรับส่งให้ AI
 const getFormsContext = () => {
@@ -51,7 +52,8 @@ ${formsInfo}
 
 const vertex_ai = new VertexAI({ project: project, location: location });
 const model = vertex_ai.getGenerativeModel({
-  model: 'gemini-2.5-pro', // ใช้รุ่นนี้เพื่อให้รองรับ systemInstruction และ chat history ได้ดี
+  // ✅ ใช้โมเดล gemini-3.0-flash ตามคำสั่ง
+  model: 'gemini-3.0-flash', 
   systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
   generationConfig: { responseMimeType: "application/json" }
 });

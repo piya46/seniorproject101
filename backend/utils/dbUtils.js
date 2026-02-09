@@ -2,7 +2,7 @@ const { Firestore } = require('@google-cloud/firestore');
 const crypto = require('crypto');
 
 const firestore = new Firestore();
-const COLLECTION_NAME = 'user_sessions';
+const COLLECTION_NAME = 'sessiondd';
 const SUB_COLLECTION_NAME = 'files';
 
 // Helper: ดึง Key จาก Argument (สำหรับ Rotation) หรือ Env

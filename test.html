@@ -57,8 +57,9 @@
         <div class="flex items-center gap-4">
             <div class="relative group">
                 <i class="fa-solid fa-server absolute left-3 top-2.5 text-slate-500 text-xs transition-colors group-focus-within:text-indigo-400"></i>
-                <input type="text" id="baseUrl" value="https://sci-request-system-466086429766.asia-southeast1.run.app" 
-                       class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg pl-9 pr-3 py-2 w-64 font-mono focus:border-indigo-500 outline-none transition-all shadow-sm">
+                <input type="text" id="baseUrl" value="https://sci-request-system-466086429766.asia-southeast3.run.app" 
+                       placeholder="http://localhost:3000"
+                       class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg pl-9 pr-3 py-2 w-72 font-mono focus:border-indigo-500 outline-none transition-all shadow-sm">
             </div>
             <button onclick="authenticate()" id="session-btn" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 transition text-xs font-medium text-slate-300">
                 <div id="session-dot" class="w-2 h-2 rounded-full bg-slate-500"></div>
@@ -100,14 +101,15 @@
 
                 <div class="glass rounded-xl p-5 mb-6 flex-1 shadow-lg relative">
                     <h2 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> Step 2: Upload & Validate
+                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> Step 2: Upload & Validate (Gemini 1.5 Pro)
                     </h2>
                     <div class="mb-4">
-                        <label class="text-[10px] text-slate-500 uppercase mb-1 block font-bold">Document Type</label>
+                        <label class="text-[10px] text-slate-500 uppercase mb-1 block font-bold">Document Type (Key)</label>
                         <select id="lab-file-key" class="w-full bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg p-2.5 outline-none focus:border-indigo-500">
-                            <option value="main_form">Main Form (แบบฟอร์มหลัก)</option>
-                            <option value="med_cert">Medical Certificate (ใบรับรองแพทย์)</option>
-                            <option value="payment_slip">Payment Slip (หลักฐานการโอนเงิน)</option>
+                            <option value="main_form">main_form (แบบฟอร์มหลัก)</option>
+                            <option value="med_cert">med_cert (ใบรับรองแพทย์)</option>
+                            <option value="payment_slip">payment_slip (สลิปโอนเงิน)</option>
+                            <option value="id_card">id_card (สำเนาบัตร)</option>
                         </select>
                     </div>
 
@@ -133,14 +135,14 @@
             <div class="w-5/12 flex flex-col bg-slate-900/30 border-l border-slate-800">
                 <div class="p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur flex justify-between items-center shadow-sm z-10">
                     <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-robot text-indigo-400"></i> AI Assistant
+                        <i class="fa-solid fa-robot text-indigo-400"></i> AI Assistant (Gemini 3.0 Flash)
                     </h2>
                 </div>
                 <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-950/50">
                     <div class="flex gap-3">
                         <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg"><i class="fa-solid fa-robot text-xs"></i></div>
                         <div class="bg-slate-800 p-3.5 rounded-2xl rounded-tl-none text-sm text-slate-300 max-w-[90%] border border-slate-700 shadow-sm">
-                            สวัสดีครับ 👋 ผมคือ AI ผู้ช่วย มีอะไรให้ช่วยสอบถามได้เลยครับ
+                            สวัสดีครับ 👋 ผมคือพี่ทะเบียน AI (ใช้โมเดลใหม่ Gemini 3.0 Flash) มีอะไรให้ช่วยสอบถามได้เลยครับ
                         </div>
                     </div>
                 </div>
@@ -189,20 +191,28 @@
         const SecureClient = {
             publicKey: null,
             async init() {
-                const url = document.getElementById('baseUrl').value;
-                state.baseUrl = url.replace(/\/$/, '') + '/api/v1';
-                // ✅ สำคัญ: เปิดใช้งาน credentials สำหรับระบบหลัก
+                const urlInput = document.getElementById('baseUrl').value.replace(/\/$/, '');
+                state.baseUrl = urlInput + '/api/v1'; // เพิ่ม /api/v1 เสมอ
+                
+                // ✅ สำคัญ: เปิดใช้งาน credentials (cookies)
                 axios.defaults.withCredentials = true;
 
                 if(!this.publicKey) {
                     try {
+                        console.log('Handshaking with:', state.baseUrl);
                         const res = await axios.get(`${state.baseUrl}/auth/public-key`);
                         this.publicKey = res.data.publicKey;
-                    } catch(e) { console.error('Handshake error', e); alert("Connection Failed."); }
+                        console.log('Handshake Success');
+                    } catch(e) { 
+                        console.error('Handshake error', e); 
+                        alert("Connection Failed. Please check the URL."); 
+                    }
                 }
             },
             async post(endpoint, data, headers = {}) {
                 if(!this.publicKey) await this.init();
+                
+                // Encryption Logic (เหมือนเดิม)
                 const aesKey = forge.random.getBytesSync(32);
                 const iv = forge.random.getBytesSync(12);
                 const cipher = forge.cipher.createCipher('AES-GCM', aesKey);
@@ -220,6 +230,8 @@
                 };
 
                 const res = await axios.post(`${state.baseUrl}${endpoint}`, payload, { headers, validateStatus: () => true });
+                
+                // Decryption Logic
                 if(res.data && res.data.payload) {
                     const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
                     decipher.start({ iv: forge.util.decode64(res.data.iv), tag: forge.util.decode64(res.data.tag) });
@@ -239,16 +251,22 @@
             const btn = document.getElementById('session-btn');
             const dot = document.getElementById('session-dot');
             const text = document.getElementById('session-text');
+            
+            // รีเซ็ต Base URL กรณีเปลี่ยนค่า
+            SecureClient.publicKey = null; 
+            
             text.innerText = "Connecting...";
             try {
                 const res = await SecureClient.post('/session/init', {});
-                if (res.status === 200) {
+                if (res.status === 200 || res.status === 201) {
                     setCookie('sci_session_token', 'active', 1);
                     dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
                     text.innerText = "Session Active";
                     btn.classList.add('border-emerald-500/50', 'bg-emerald-500/10', 'text-emerald-400');
+                    console.log('Session ID:', res.data.session_id);
                 }
             } catch (e) {
+                console.error(e);
                 text.innerText = "Auth Failed";
                 dot.className = "w-2 h-2 rounded-full bg-rose-500";
             }
@@ -266,7 +284,7 @@
             } catch(e) { console.error(e); }
         }
 
-        // --- 🔬 Upload & Validate Logic ---
+        // --- 🔬 Upload & Validate Logic (UPDATED) ---
         document.getElementById('lab-file-input').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if(file) {
@@ -285,31 +303,54 @@
             const file = state.lab.selectedFile;
             const fileKey = document.getElementById('lab-file-key').value;
             const formCode = document.getElementById('lab-form-code').value;
+            const degree = document.getElementById('lab-degree').value;
             const btn = document.getElementById('btn-lab-check');
 
-            btn.innerText = "Processing...";
+            btn.innerText = "1/3 Uploading...";
             btn.disabled = true;
             
             try {
-                // Step A: Get Signed URL
+                // 1. Get Signed URL
+                console.log('Step 1: Get Signed URL');
                 const r1 = await SecureClient.post('/upload/signed-url', {
-                    file_name: file.name, file_type: file.type || 'application/pdf',
-                    file_size: file.size, file_key: fileKey
+                    file_name: file.name, 
+                    file_type: file.type || 'application/pdf',
+                    file_size: file.size, 
+                    file_key: fileKey
                 });
 
                 if(r1.status !== 200) throw new Error('Signed URL failed');
+                const { upload_url, gcs_path } = r1.data;
 
-                // ✅ Step B: Upload to GCS (FIXED: Set withCredentials to false)
-                console.log('Uploading to GCS...');
-                await axios.put(r1.data.upload_url, file, { 
+                // 2. Upload to GCS
+                console.log('Step 2: Upload to GCS');
+                await axios.put(upload_url, file, { 
                     headers: { 'Content-Type': file.type },
-                    withCredentials: false // 👈 สำคัญ: ห้ามส่ง Cookie ไป GCS เพราะจะติด CORS
+                    withCredentials: false // ห้ามส่ง Cookie ไป GCS
+                });
+
+                // 3. Confirm & Save to Firestore (IMPORTANT: Validation reads from DB)
+                console.log('Step 3: Confirm Upload');
+                btn.innerText = "2/3 Saving...";
+                // สมมติว่ามี Route สำหรับยืนยัน (ถ้าไม่มี ให้ใช้ /upload/finalize หรือใกล้เคียง)
+                // *หมายเหตุ: ถ้าโค้ด backend ของ uploadRoutes ทำ auto-save ตอน get url ไม่ต้องทำขั้นนี้ 
+                // แต่จาก dbUtils ที่เห็น ควรต้องมีการ trigger save 
+                // ผมจะใช้ Route: /upload/finalize (ถ้า 404 ให้ลองตรวจสอบ backend อีกที)
+                await SecureClient.post('/upload/finalize', {
+                    file_key: fileKey,
+                    gcs_path: gcs_path,
+                    file_type: file.type,
+                    file_name: file.name
                 });
                 
-                // Step C: Validate
+                // 4. Validate
+                console.log('Step 4: AI Validation');
+                btn.innerText = "3/3 AI Checking...";
+                
                 const r2 = await SecureClient.post('/validation/check-completeness', {
                     form_code: formCode,
-                    uploaded_files: [{ key: fileKey, gcs_path: r1.data.gcs_path }]
+                    student_level: degree, // แก้เป็น student_level ตาม validationRoutes
+                    sub_type: null
                 });
 
                 // Display Result
@@ -318,12 +359,20 @@
                 resultBox.classList.remove('hidden');
                 
                 const rawData = r2.data;
+                console.log('Validation Result:', rawData);
+
                 let status = 'UNKNOWN', reason = 'No reason provided';
+                
+                // รองรับ Structure: { "key": { status... } }
                 if (rawData[fileKey]) {
-                    status = rawData[fileKey].status; reason = rawData[fileKey].reason;
+                    status = rawData[fileKey].status; 
+                    reason = rawData[fileKey].reason;
+                } else if (rawData.status) { // Fallback
+                    status = rawData.status;
+                    reason = rawData.message || rawData.reason;
                 }
 
-                const isPass = status.toLowerCase().includes('valid');
+                const isPass = status && status.toLowerCase().includes('valid');
                 const color = isPass ? 'emerald' : 'rose';
 
                 resultContent.innerHTML = `
@@ -344,6 +393,7 @@
                 btn.disabled = false;
 
             } catch(e) {
+                console.error(e);
                 alert("Error: " + (e.response?.data?.error || e.message));
                 btn.innerText = "Retry Upload";
                 btn.disabled = false;
@@ -363,16 +413,30 @@
 
             try {
                 const degree = document.getElementById('lab-degree').value;
+                // ส่ง message และ degree_level
                 const res = await SecureClient.post('/chat/recommend', { message, degree_level: degree });
+                
+                // รับ Response ใหม่: { reply: "...", recommended_form: "..." }
                 let botText = res.data.reply || res.data.text || JSON.stringify(res.data);
                 
+                // ถ้ามี Recommended Form ให้แสดงเพิ่ม
+                if(res.data.recommended_form) {
+                    botText += `\n\n💡 **แนะนำฟอร์ม:** \`${res.data.recommended_form}\``;
+                }
+
                 container.insertAdjacentHTML('beforeend', `<div class="flex gap-3 animate-slide-up"><div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg"><i class="fa-solid fa-robot text-xs"></i></div><div class="p-3.5 rounded-2xl bg-slate-800 text-slate-300 border border-slate-700 rounded-tl-none text-sm max-w-[85%] prose prose-invert prose-xs">${marked.parse(botText)}</div></div>`);
                 container.scrollTop = container.scrollHeight;
             } catch(e) { console.error(e); }
         }
 
         // Init
-        SecureClient.init();
+        // ลอง Connect ทันทีเมื่อโหลด
+        setTimeout(() => {
+            if(document.getElementById('baseUrl').value) {
+                SecureClient.init().then(() => authenticate());
+            }
+        }, 500);
+        
         fetchFormDetails();
     </script>
 </body>

@@ -42,16 +42,17 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     }
 
     const project = process.env.GCP_PROJECT_ID || "seniorproject101";
-    const location = process.env.GCP_LOCATION || "us-central1";
+    // ✅ เปลี่ยน Location ของ AI เป็น global
+    const location = "global";
     const bucketName = process.env.GCS_BUCKET_NAME;
 
     const storage = new Storage();
     const bucket = storage.bucket(bucketName);
     const vertex_ai = new VertexAI({ project: project, location: location });
 
-    // ✅ เลือกใช้ 'gemini-1.5-pro' : เก่งที่สุดในการอ่านลายมือ, ตาราง และการ Cross-Check ข้อมูลข้ามเอกสาร
+    // ✅ เลือกใช้ 'gemini-1.5-pro' : เก่งที่สุดในเรื่องภาพ (Vision) และเอกสาร
     const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-2.5-pro', 
+      model: 'gemini-1.5-pro', 
       generationConfig: { responseMimeType: "application/json" }
     });
 
