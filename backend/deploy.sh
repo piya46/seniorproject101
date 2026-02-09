@@ -20,7 +20,7 @@ DB_KEY_SECRET="DB_ENCRYPTION_KEY"
 REGION="asia-southeast3" 
 
 # 🧠 AI Region (Global)
-AI_LOCATION="global"
+AI_LOCATION="us-central1"
 
 # สีสำหรับ Output
 GREEN='\033[0;32m'

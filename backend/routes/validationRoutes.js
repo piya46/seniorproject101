@@ -43,16 +43,15 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
 
     const project = process.env.GCP_PROJECT_ID || "seniorproject101";
     // ✅ เปลี่ยน Location ของ AI เป็น global
-    const location = "global";
+    const location = "us-central1";
     const bucketName = process.env.GCS_BUCKET_NAME;
 
     const storage = new Storage();
     const bucket = storage.bucket(bucketName);
     const vertex_ai = new VertexAI({ project: project, location: location });
 
-    // ✅ เลือกใช้ 'gemini-1.5-pro' : เก่งที่สุดในเรื่องภาพ (Vision) และเอกสาร
     const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-1.5-pro', 
+      model: 'gemini-2.5-pro', 
       generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -60,7 +59,6 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     const fileProcessingPromises = userFiles.map(async (file) => {
         const gcsFile = bucket.file(file.gcs_path);
         
-        // ตรวจสอบว่าไฟล์มีอยู่จริงใน Storage
         const [exists] = await gcsFile.exists();
         if (!exists) {
             console.warn(`File missing in GCS: ${file.gcs_path}`);
@@ -68,17 +66,21 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
         }
         
         const [metadata] = await gcsFile.getMetadata();
-        // ดึงกฎเฉพาะของไฟล์นั้นๆ มาใส่ใน Prompt
+        
+        // [FIX 3 - Step A] โหลดไฟล์เป็น Buffer แล้วแปลงเป็น Base64
+        const [fileBuffer] = await gcsFile.download();
+        const base64Data = fileBuffer.toString('base64');
+        
         const specificRule = criteriaMap[file.file_key] || "ตรวจสอบความถูกต้องสมบูรณ์ตามมาตรฐานราชการ";
 
         return {
-            inlinePart: {
-                fileData: {
+            // [FIX 3 - Step B] ส่งโครงสร้างให้ถูกต้องตาม SDK (part -> inlineData)
+            part: {
+                inlineData: {
                     mimeType: metadata.contentType,
-                    fileUri: `gs://${bucketName}/${file.gcs_path}` // ส่ง URI จริงให้ AI อ่าน
+                    data: base64Data
                 }
             },
-            // Label ให้ AI รู้ว่าไฟล์นี้คืออะไร และต้องตรวจอะไร
             ruleDescription: `[เอกสารรหัส: "${file.file_key}"] \n   -> เกณฑ์การตรวจ: "${specificRule}"`
         };
     });
@@ -139,6 +141,10 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     const result = await model.generateContent({ contents });
     const response = await result.response;
     let aiText = response.candidates[0].content.parts[0].text;
+
+    if (!response.candidates || !response.candidates[0] || !response.candidates[0].content) {
+         throw new Error("AI blocked the response (Safety Filter).");
+    }
     
     // Clean JSON String (เผื่อ AI เผลอใส่ Markdown backticks มา)
     aiText = aiText.replace(/```json|```/g, '').trim();

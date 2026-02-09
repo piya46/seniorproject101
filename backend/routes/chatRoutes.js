@@ -3,14 +3,13 @@ const router = express.Router();
 const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { forms, getFormConfig } = require('../data/staticData');
-// Import ฟังก์ชันใหม่สำหรับจัดการประวัติแชท
 const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
 
 const project = process.env.GCP_PROJECT_ID || "seniorproject101";
-// ✅ เปลี่ยน Location ของ AI เป็น global ตามที่ระบุ
-const location = "global";
 
-// สร้าง Context ข้อมูลฟอร์มสำหรับส่งให้ AI
+// ✅ ใช้ Global Endpoint ตามที่คุณต้องการ (Vertex AI จะ Auto-route ไป region ที่ว่าง)
+const location = 'us-central1';
+
 const getFormsContext = () => {
   return forms.map(f => {
     let desc = `- รหัส ${f.form_code}: ${f.name_th} (${f.category})`;
@@ -34,7 +33,6 @@ const getFormsContext = () => {
 
 const formsInfo = getFormsContext();
 
-// กำหนด System Instruction (บุคลิกของ AI)
 const SYSTEM_INSTRUCTION = `
 คุณคือ "พี่ทะเบียนใจดี" (Registrar Assistant) ของคณะวิทยาศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย
 หน้าที่ของคุณคือแนะนำการยื่นคำร้องให้นิสิตอย่างเป็นกันเอง สุภาพ และช่วยเหลือเต็มที่
@@ -43,65 +41,102 @@ const SYSTEM_INSTRUCTION = `
 ${formsInfo}
 
 กฎการตอบคำถาม:
-1. ตอบเป็น "ภาษาไทย" เสมอ โดยใช้สรรพนามแทนตัวว่า "พี่" และแทนนิสิตว่า "เรา" หรือ "น้อง"
+1. ตอบเป็น "ภาษาไทย" เสมอ
 2. หากนิสิตถามปัญหา ให้วิเคราะห์ว่าตรงกับฟอร์มไหน แล้วแนะนำรหัสฟอร์ม (เช่น JT41, JT44) ให้ชัดเจน
 3. หากมีเงื่อนไขสำคัญ (เช่น ต้องยื่นภายในกี่วัน) ต้องแจ้งเตือนด้วยด้วยความหวังดี
 4. ตอบกลับในรูปแบบ JSON เท่านั้น ห้ามตอบเป็นข้อความธรรมดา
    Format: { "reply": "ข้อความตอบกลับนิสิต...", "recommended_form": "รหัสฟอร์ม หรือ null" }
 `;
 
+// Initialize Vertex AI with Global Location
 const vertex_ai = new VertexAI({ project: project, location: location });
+
+// [CRITICAL FIX] เปลี่ยนชื่อโมเดลเป็นตัวที่มีอยู่จริง (gemini-3.0 ยังไม่มี)
+// การใช้ชื่อผิดกับ Global Endpoint จะทำให้ Server ตอบกลับเป็น HTML Error Page (สาเหตุของ SyntaxError)
 const model = vertex_ai.getGenerativeModel({
-  // ✅ ใช้โมเดล gemini-3.0-flash ตามคำสั่ง
-  model: 'gemini-3.0-flash', 
+  model: 'gemini-2.5-flash', 
   systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-  generationConfig: { responseMimeType: "application/json" }
+  generationConfig: { 
+      responseMimeType: "application/json",
+      temperature: 0.4,
+  }
 });
 
 router.post('/recommend', authMiddleware, async (req, res) => {
   try {
     const { message, degree_level } = req.body;
     const sessionId = req.session.session_id;
-    
-    const history = await getChatHistory(sessionId);
 
-    // 2. เริ่ม Chat Session (ใส่ประวัติเก่าเข้าไปด้วย)
+    if (!message) {
+        return res.status(400).json({ error: "Message is required" });
+    }
+    
+    // 1. ดึงประวัติแชท
+    let history = [];
+    try {
+        history = await getChatHistory(sessionId);
+    } catch (err) {
+        console.warn("Could not fetch chat history:", err);
+    }
+
+    // 2. เริ่ม Chat Session
     const chat = model.startChat({
         history: history,
     });
 
-    // 3. เตรียมข้อความฝั่งผู้ใช้
     const userMessage = `[ระดับการศึกษา: ${degree_level}] ${message}`;
 
-    // 4. ส่งข้อความไปหา AI
-    const result = await chat.sendMessage(userMessage);
+    // 3. ส่งข้อความไปหา AI (เพิ่ม Error Handling ขั้นสูง)
+    let result;
+    try {
+        result = await chat.sendMessage(userMessage);
+    } catch (apiError) {
+        console.error("Vertex AI API Error:", apiError);
+        // ถ้า error เป็น 404/Not Found แสดงว่า Model ID ผิด หรือ Region ไม่รองรับ Model นี้
+        throw new Error(`AI Service connection failed: ${apiError.message}`);
+    }
+
     const response = await result.response;
-    const aiText = response.candidates[0].content.parts[0].text;
     
-    // Clean JSON (เผื่อมี backticks ติดมา)
+    // Check Safety Filters / Empty Response
+    if (!response.candidates || !response.candidates[0] || !response.candidates[0].content) {
+        throw new Error("AI did not return content (Possible Safety Filter Trigger)");
+    }
+
+    const aiText = response.candidates[0].content.parts[0].text;
     const cleanJson = aiText.replace(/```json|```/g, '').trim();
+    
     let aiResponse;
     try {
         aiResponse = JSON.parse(cleanJson);
     } catch (e) {
-        // Fallback กรณี AI ตอบมาไม่ใช่ JSON เป๊ะๆ
-        aiResponse = { reply: aiText, recommended_form: null };
+        console.error("Failed to parse AI JSON:", cleanJson);
+        aiResponse = { reply: cleanJson, recommended_form: null };
     }
 
-    // 5. บันทึกลง Firestore (บันทึกทั้ง User Message และ AI Response เพื่อให้จำได้ในรอบหน้า)
-    await saveChatMessage(sessionId, 'user', userMessage);
-    await saveChatMessage(sessionId, 'model', cleanJson); // บันทึก JSON กลับไปเพื่อให้ AI คง Context เดิม
+    // 4. บันทึกลง Firestore
+    try {
+        await saveChatMessage(sessionId, 'user', userMessage);
+        await saveChatMessage(sessionId, 'model', cleanJson);
+    } catch (dbError) {
+        console.error("Database save error:", dbError);
+    }
 
-    // 6. ส่ง Response กลับไปที่ Frontend (แบบ Flat Structure แก้ปัญหา Nested Data)
-    // Frontend รอรับ: res.data.reply
+    // 5. ส่ง Response
     res.json({
-        reply: aiResponse.reply || aiResponse.reply_message,
+        reply: aiResponse.reply || aiResponse.reply_message || "ระบบกำลังประมวลผลคำตอบครับ",
         recommended_form: aiResponse.recommended_form
     });
 
   } catch (error) {
-    console.error('Chat Error:', error);
-    res.status(500).json({ error: 'Chat processing failed', details: error.message });
+    console.error('Chat Processing Error:', error);
+    
+    // ส่ง JSON Error กลับเสมอ (ป้องกัน Frontend พังเพราะ HTML)
+    res.status(500).json({ 
+        error: 'Chat processing failed', 
+        details: error.message,
+        reply: "ขออภัย ระบบ AI ขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง" 
+    });
   }
 });
 
