@@ -12,7 +12,7 @@ PUB_KEY_SECRET="Gb_PUBLIC_KEY_BASE64"
 DB_KEY_SECRET="DB_ENCRYPTION_KEY" # 👈 เพิ่มใหม่
 
 # ✅ 2. App Region
-REGION="asia-southeast3"
+REGION="asia-southeast1"
 
 # ✅ 3. AI Region
 AI_LOCATION="us-central1"
