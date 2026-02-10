@@ -7,7 +7,7 @@ const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
 
 const project = process.env.GCP_PROJECT_ID || "seniorproject101";
 
-// ✅ ใช้ Global Endpoint ตามที่คุณต้องการ (Vertex AI จะ Auto-route ไป region ที่ว่าง)
+// ✅ ใช้ Global Endpoint (Vertex AI จะ Auto-route)
 const location = 'us-central1';
 
 const getFormsContext = () => {
@@ -62,7 +62,9 @@ const model = vertex_ai.getGenerativeModel({
 router.post('/recommend', authMiddleware, async (req, res) => {
   try {
     const { message, degree_level } = req.body;
-    const sessionId = req.session.session_id;
+    
+    // ✅ FIX: เปลี่ยนจาก req.session เป็น req.user
+    const sessionId = req.user.session_id;
 
     if (!message) {
         return res.status(400).json({ error: "Message is required" });
@@ -81,19 +83,18 @@ router.post('/recommend', authMiddleware, async (req, res) => {
 
     const userMessage = `[ระดับการศึกษา: ${degree_level}] ${message}`;
 
-    // 3. ส่งข้อความไปหา AI (เพิ่ม Error Handling ขั้นสูง)
+    // 3. ส่งข้อความไปหา AI
     let result;
     try {
         result = await chat.sendMessage(userMessage);
     } catch (apiError) {
         console.error("Vertex AI API Error:", apiError);
-        // ถ้า error เป็น 404/Not Found แสดงว่า Model ID ผิด หรือ Region ไม่รองรับ Model นี้
         throw new Error(`AI Service connection failed: ${apiError.message}`);
     }
 
     const response = await result.response;
     
-    // Check Safety Filters / Empty Response
+    // Check Safety Filters
     if (!response.candidates || !response.candidates[0] || !response.candidates[0].content) {
         throw new Error("AI did not return content (Possible Safety Filter Trigger)");
     }
@@ -125,8 +126,6 @@ router.post('/recommend', authMiddleware, async (req, res) => {
 
   } catch (error) {
     console.error('Chat Processing Error:', error);
-    
-    // ส่ง JSON Error กลับเสมอ (ป้องกัน Frontend พังเพราะ HTML)
     res.status(500).json({ 
         error: 'Chat processing failed', 
         details: error.message,

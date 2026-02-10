@@ -12,7 +12,7 @@ const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 router.post('/check-completeness', authMiddleware, strictLimiter, async (req, res) => {
   try {
     const { form_code, student_level, sub_type } = req.body;
-    const sessionId = req.session.session_id;
+    const sessionId = req.user.session_id;
 
     // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติจาก Utility)
     const allFiles = await getDecryptedSessionFiles(sessionId);
@@ -26,6 +26,8 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     const latestFilesMap = new Map();
     
     allFiles.forEach(file => {
+        if (!file.file_key || !file.gcs_path) return;
+        
         const existing = latestFilesMap.get(file.file_key);
         // ถ้ายังไม่มี key นี้ หรือ ไฟล์นี้ใหม่กว่าไฟล์เดิม -> ให้บันทึกทับ
         if (!existing || new Date(file.uploaded_at) > new Date(existing.uploaded_at)) {

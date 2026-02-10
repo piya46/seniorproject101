@@ -1,10 +1,10 @@
 const jwt = require('jsonwebtoken');
 
 module.exports = (req, res, next) => {
-  // ✅ Clean: อ่านแค่ชื่อเดียวที่ถูกต้อง
+  // ✅ Clean: อ่าน Token จาก Cookie เป็นหลัก
   let token = req.cookies.sci_session_token;
 
-  // Fallback: กรณี Client ไม่รองรับ Cookie (เช่น Mobile App ในอนาคต)
+  // Fallback: รองรับ Bearer Token กรณี Client ไม่ได้ใช้ Cookie
   if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
   }
@@ -15,12 +15,13 @@ module.exports = (req, res, next) => {
   }
 
   try {
-    // ✅ Security Fix: ระบุ Algorithm ให้ชัดเจน (HS256) ป้องกัน Downgrade Attack
+    // ✅ Security Fix: ระบุ Algorithm (HS256) ป้องกัน Downgrade Attack
     const decoded = jwt.verify(token, process.env.JWT_SECRET, {
         algorithms: ['HS256'] 
     });
     
-    req.session = decoded; 
+ 
+    req.user = decoded; 
     next();
   } catch (err) {
     // 403 Forbidden (Token ผิดหรือหมดอายุ)

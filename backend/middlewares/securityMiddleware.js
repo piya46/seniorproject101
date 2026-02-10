@@ -1,7 +1,7 @@
 const { decryptHybridPayload, encryptSymmetric } = require('../utils/cryptoUtils');
 
 module.exports = (req, res, next) => {
-    // กำหนด Method ที่บังคับต้องเข้ารหัส
+    // กำหนด Method ที่บังคับต้องเข้ารหัสขาเข้า (Inbound)
     const ENCRYPTED_METHODS = ['POST', 'PUT', 'PATCH'];
 
     // --- 1. ตรวจสอบและถอดรหัส (Inbound) ---
@@ -22,9 +22,9 @@ module.exports = (req, res, next) => {
 
             const { data, aesKey } = result;
 
-            // ✅ 2. [NEW] Anti-Replay Attack Protection
-            // Client ต้องส่ง { ...data, _ts: Date.now() } มาด้วยเสมอ
-            const REQUEST_MAX_AGE = 60 * 1000; // 1 นาที
+            // ✅ 2. [FIXED] Anti-Replay Attack Protection
+            // ลดเวลาเหลือ 15 วินาที (จากเดิม 60s) เพื่อความปลอดภัยสูงสุด
+            const REQUEST_MAX_AGE = 15 * 1000; 
             const now = Date.now();
 
             if (!data._ts || typeof data._ts !== 'number') {
@@ -37,7 +37,7 @@ module.exports = (req, res, next) => {
                 return res.status(403).json({ error: 'Security Error', message: 'Request expired. Please sync your clock.' });
             }
 
-            // (Optional) Future timestamp check (กันคนตั้งเวลาล่วงหน้า)
+            // (Optional) Future timestamp check (กันคนตั้งเวลาล่วงหน้าเกิน 5 วิ)
             if (data._ts > now + 5000) {
                  return res.status(400).json({ error: 'Security Error', message: 'Invalid timestamp (future).' });
             }
@@ -60,9 +60,11 @@ module.exports = (req, res, next) => {
     const originalJson = res.json;
     res.json = function (data) {
 
+        // จะเข้ารหัสขากลับได้ ต้องมี sessionKey (ซึ่งได้มาจากการ Decrypt Request ขาเข้า)
+        // หมายเหตุ: GET Request จะไม่มี sessionKey ทำให้ Response เป็น Plaintext (ถ้าต้องการ E2EE ขา GET ต้องเปลี่ยนเป็น POST)
         if (res.locals.sessionKey) {
             try {
-                // ตอบกลับก็ควรมี Timestamp ด้วยเพื่อให้ Client เช็คได้ (Optional แต่แนะนำ)
+                // ตอบกลับพร้อม Timestamp ใหม่
                 const responseData = typeof data === 'object' ? { ...data, _ts: Date.now() } : data;
                 
                 const encryptedResponse = encryptSymmetric(responseData, res.locals.sessionKey);

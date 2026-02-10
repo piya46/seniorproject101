@@ -13,7 +13,6 @@ const getDbKey = (keyBuffer) => {
     
     const hex = process.env.DB_ENCRYPTION_KEY;
     if (!hex) {
-        // 🔥 CRITICAL FIX: ห้ามสุ่ม Key ใหม่เด็ดขาด ถ้าไม่มี Key ต้องหยุดทำงานทันที
         console.error('❌ FATAL ERROR: DB_ENCRYPTION_KEY is missing in environment variables.');
         throw new Error('DB_ENCRYPTION_KEY is missing. Cannot encrypt/decrypt data safely.');
     }
@@ -37,17 +36,20 @@ const encryptData = (text, keyBuffer = null) => {
         return `${iv.toString('hex')}:${encrypted}:${tag}`;
     } catch (error) {
         console.error('Encryption Error:', error);
-        throw error; // ควร throw เพื่อให้รู้ว่า save ไม่สำเร็จ
+        throw error; 
     }
 };
 
 const decryptData = (text, keyBuffer = null) => {
-    if (!text || typeof text !== 'string' || !text.includes(':')) return text;
+    // ✅ FIX: ถ้าข้อมูลไม่ใช่ Format ที่ถูกต้อง ให้ return null ทันที (เดิม return text อาจทำ JSON.parse พัง)
+    if (!text || typeof text !== 'string' || !text.includes(':')) return null; 
+
     try {
         const key = getDbKey(keyBuffer);
         const parts = text.split(':');
         
-        if (parts.length !== 3) return text; 
+        // ✅ FIX: ตรวจสอบจำนวนส่วนประกอบให้ครบ 3 ส่วน (IV:Data:Tag)
+        if (parts.length !== 3) return null; 
         
         const [ivHex, encryptedHex, tagHex] = parts;
         const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
@@ -58,12 +60,13 @@ const decryptData = (text, keyBuffer = null) => {
         
         try { return JSON.parse(decrypted); } catch { return decrypted; }
     } catch (err) {
-        console.error('Decryption Failed (Possible Key Mismatch or Tampering):', err.message);
-        return null; 
+        // Log แค่ว่า Decrypt พลาด แต่อย่าพ่น Error Stack ออกไปถ้าไม่จำเป็น
+        console.error('Decryption Failed (Key mismatch or Data tampering):', err.message);
+        return null; // ✅ FIX: คืนค่า null เพื่อบอกว่าอ่านไม่ได้
     }
 };
 
-// ... (Export ส่วนอื่นๆ เหมือนเดิม) ...
+// ... (ส่วน Exports อื่นๆ คงเดิม ไม่ต้องแก้) ...
 exports.initSessionRecord = async (sessionId) => {
     try {
         await firestore.collection(COLLECTION_NAME).doc(sessionId).set({
@@ -80,7 +83,6 @@ exports.addFileToSession = async (sessionId, fileMeta) => {
     try {
         const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
         
-        // Encrypt Sensitive Data
         const encryptedFile = {
             file_key: encryptData(fileMeta.file_key),
             gcs_path: encryptData(fileMeta.gcs_path),
@@ -99,7 +101,6 @@ exports.addFileToSession = async (sessionId, fileMeta) => {
     }
 };
 
-// ... (ส่วน getDecryptedSessionFiles และ Chat เหมือนเดิม) ...
 exports.getDecryptedSessionFiles = async (sessionId) => {
     try {
         const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
@@ -110,15 +111,22 @@ exports.getDecryptedSessionFiles = async (sessionId) => {
         const files = [];
         snapshot.forEach(doc => {
             const data = doc.data();
-            files.push({
-                id: doc.id, 
-                file_key: decryptData(data.file_key),
-                gcs_path: decryptData(data.gcs_path),
-                file_type: decryptData(data.file_type),
-                uploaded_at: data.uploaded_at
-            });
+            
+            // ใช้ decryptData ตัวใหม่ที่ปลอดภัยขึ้น
+            const gcsPathDecrypted = decryptData(data.gcs_path);
+
+            // ถ้า Decrypt ไม่ได้ (เป็น null) แสดงว่าไฟล์เสีย หรือ Key ผิด -> ให้ข้ามไป
+            if (gcsPathDecrypted) {
+                files.push({
+                    id: doc.id, 
+                    file_key: decryptData(data.file_key),
+                    gcs_path: gcsPathDecrypted,
+                    file_type: decryptData(data.file_type),
+                    uploaded_at: data.uploaded_at
+                });
+            }
         });
-        return files.filter(f => f.gcs_path !== null);
+        return files;
     } catch (error) {
         console.error('❌ Firestore Get Files Error:', error);
         return [];
