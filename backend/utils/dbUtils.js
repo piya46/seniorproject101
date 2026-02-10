@@ -81,10 +81,10 @@ exports.getFileRecordByKey = async (sessionId, fileKey, formCode) => {
         for (const doc of snapshot.docs) {
             const data = doc.data();
             const decryptedKey = decryptData(data.file_key);
-            const decryptedForm = decryptData(data.form_code);
+            const decryptedForm = decryptData(data.form_code); // ค่านี้จะเป็น null สำหรับไฟล์เก่า
 
-            // เช็คว่า Key ตรง และ Form ตรง (หรือเป็น General)
-            if (decryptedKey === fileKey && (decryptedForm === formCode || formCode === 'general')) {
+            // ✅ FIX: เพิ่มเงื่อนไข !decryptedForm เพื่อรองรับไฟล์เก่า
+            if (decryptedKey === fileKey && (decryptedForm === formCode || !decryptedForm || formCode === 'general')) {
                 return { 
                     id: doc.id, 
                     gcs_path: decryptData(data.gcs_path) 
