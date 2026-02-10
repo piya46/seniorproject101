@@ -1,18 +1,7 @@
 const { decryptHybridPayload, encryptSymmetric } = require('../utils/cryptoUtils');
+const { checkAndMarkNonce } = require('../utils/dbUtils'); // ✅ Import ฟังก์ชันใหม่
 
-// ✅ SECURITY UPGRADE: In-Memory Replay Cache (ใช้ Map เพื่อประสิทธิภาพสูงสุด)
-// เก็บ Nonce ที่ใช้ไปแล้ว และจะลบทิ้งอัตโนมัติเมื่อหมดเวลา
-const usedNonces = new Map();
-
-// ฟังก์ชันล้าง Nonce ที่หมดอายุ (Run ทุก 60 วินาที)
-setInterval(() => {
-    const now = Date.now();
-    for (const [nonce, expireTime] of usedNonces) {
-        if (now > expireTime) usedNonces.delete(nonce);
-    }
-}, 60 * 1000);
-
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป็น async function
     const ENCRYPTED_METHODS = ['POST', 'PUT', 'PATCH'];
 
     // --- 1. ตรวจสอบและถอดรหัส (Inbound) ---
@@ -20,7 +9,7 @@ module.exports = (req, res, next) => {
         
         if (req.body && req.body.encKey && req.body.payload) {
             
-            // ✅ 1. พยายามถอดรหัส
+            // 1.1 พยายามถอดรหัส
             const result = decryptHybridPayload(req.body);
             
             if (!result) {
@@ -33,39 +22,38 @@ module.exports = (req, res, next) => {
 
             const { data, aesKey } = result;
 
-            // ✅ 2. [UPGRADE] Anti-Replay Attack Protection (Timestamp + Nonce)
-            const REQUEST_MAX_AGE = 15 * 1000; // 15 วินาที
+            // 1.2 ตรวจสอบ Replay Attack (Timestamp + Nonce)
+            const REQUEST_MAX_AGE = 15; // 15 วินาที
             const now = Date.now();
 
-            // 2.1 ตรวจสอบ Timestamp
+            // เช็ค Timestamp
             if (!data._ts || typeof data._ts !== 'number') {
                  console.warn(`⚠️ Security Alert: Missing timestamp in payload from IP ${req.ip}`);
                  return res.status(400).json({ error: 'Security Error', message: 'Missing timestamp (_ts).' });
             }
 
-            if (now - data._ts > REQUEST_MAX_AGE) {
+            if (now - data._ts > REQUEST_MAX_AGE * 1000) {
                 console.warn(`⚠️ Replay Attack Detected: Expired timestamp from IP ${req.ip}`);
                 return res.status(403).json({ error: 'Security Error', message: 'Request expired. Please sync your clock.' });
             }
 
-            if (data._ts > now + 5000) {
+            if (data._ts > now + 5000) { // เผื่อ Clock เหลื่อมได้นิดหน่อย (Future date check)
                  return res.status(400).json({ error: 'Security Error', message: 'Invalid timestamp (future).' });
             }
 
-            // 2.2 ตรวจสอบ Nonce (ต้อง Unique ภายในช่วงเวลา 15 วินาที)
+            // เช็ค Nonce
             if (!data.nonce) {
-                // ถ้า Client ยังไม่แก้ให้ส่ง Nonce อาจจะอนุโลมช่วงแรก แต่เพื่อ High Security ควร Reject
                 console.warn(`⚠️ Security Alert: Missing Nonce from IP ${req.ip}`);
                 return res.status(400).json({ error: 'Security Error', message: 'Missing unique nonce.' });
             }
 
-            if (usedNonces.has(data.nonce)) {
+            // ✅ เรียกเช็คกับ Firestore (แทน Map เดิม)
+            const isNonceValid = await checkAndMarkNonce(data.nonce, REQUEST_MAX_AGE);
+
+            if (!isNonceValid) {
                 console.warn(`🔥 Replay Attack BLOCKED: Duplicate Nonce ${data.nonce} from IP ${req.ip}`);
                 return res.status(403).json({ error: 'Security Error', message: 'Replay detected (Duplicate Nonce).' });
             }
-
-            // บันทึก Nonce ลง Cache (หมดอายุตามเวลา Max Age)
-            usedNonces.set(data.nonce, now + REQUEST_MAX_AGE);
 
             // ถอดรหัสสำเร็จ & ผ่าน Security Check: แทนที่ Body เดิม
             req.body = data;
@@ -80,12 +68,12 @@ module.exports = (req, res, next) => {
         }
     }
 
-    // --- 3. เข้ารหัสข้อมูลขากลับ (Outbound) ---
+    // --- 2. เข้ารหัสข้อมูลขากลับ (Outbound) ---
     const originalJson = res.json;
     res.json = function (data) {
         if (res.locals.sessionKey) {
             try {
-                // ตอบกลับพร้อม Timestamp และ Nonce ใหม่ (ถ้าจำเป็น)
+                // ตอบกลับพร้อม Timestamp (Nonce ขากลับอาจไม่จำเป็นถ้า Client ไม่ได้เช็ค)
                 const responseData = typeof data === 'object' ? { ...data, _ts: Date.now() } : data;
                 
                 const encryptedResponse = encryptSymmetric(responseData, res.locals.sessionKey);

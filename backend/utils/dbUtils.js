@@ -158,6 +158,37 @@ exports.getChatHistory = async (sessionId) => {
     } catch (e) { return []; }
 };
 
+exports.checkAndMarkNonce = async (nonce, expireSeconds) => {
+    // ใช้ Collection แยกชื่อ 'used_nonces' (เพื่อไม่ให้ปนกับ Session)
+    const nonceRef = firestore.collection('used_nonces').doc(nonce);
+
+    try {
+        // ใช้ Transaction เพื่อความชัวร์ (Atomic Operation) ป้องกัน Race Condition
+        return await firestore.runTransaction(async (t) => {
+            const doc = await t.get(nonceRef);
+            
+            if (doc.exists) {
+                // เจอว่ามีอยู่แล้ว = ซ้ำ (Replay Attack!)
+                return false; 
+            }
+
+            // ถ้ายังไม่มี ให้บันทึกใหม่
+            // expire_at ใช้สำหรับทำ TTL (ให้ Google Cloud ลบให้อัตโนมัติ)
+            const expireDate = new Date(Date.now() + (expireSeconds * 1000));
+            t.set(nonceRef, { 
+                created_at: new Date(),
+                expire_at: expireDate 
+            });
+            
+            return true; // ผ่าน (Unique)
+        });
+    } catch (error) {
+        console.error('❌ Firestore Nonce Error:', error);
+        // กรณี Error ให้ถือว่าไม่ผ่านไว้ก่อนเพื่อความปลอดภัย (Fail Closed)
+        return false; 
+    }
+};
+
 exports.firestore = firestore;
 exports.COLLECTION_NAME = COLLECTION_NAME;
 exports.SUB_COLLECTION_NAME = SUB_COLLECTION_NAME;
