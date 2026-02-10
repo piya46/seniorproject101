@@ -6,6 +6,7 @@ const { departments, getFormConfig } = require('../data/staticData');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 const { validate } = require('../middlewares/validationMiddleware');
+const { docMergeSchema } = require('../validators/schemas');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);

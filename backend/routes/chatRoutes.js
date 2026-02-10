@@ -5,6 +5,7 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const { forms, getFormConfig } = require('../data/staticData');
 const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
 const { validate } = require('../middlewares/validationMiddleware');
+const { chatRecommendSchema } = require('../validators/schemas');
 
 const project = process.env.GCP_PROJECT_ID || "seniorproject101";
 
