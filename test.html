@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Request | Secured Client</title>
+    <title>Sci-Request | Secured Client (E2EE)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -50,7 +50,7 @@
                 <i class="fa-solid fa-flask text-lg"></i>
             </div>
             <div>
-                <h1 class="font-bold text-slate-100 text-lg tracking-tight">Sci-Request <span class="text-indigo-400 font-mono text-xs ml-2 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-500/20">SECURED</span></h1>
+                <h1 class="font-bold text-slate-100 text-lg tracking-tight">Sci-Request <span class="text-indigo-400 font-mono text-xs ml-2 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-500/20">E2EE SECURED</span></h1>
             </div>
         </div>
         
@@ -217,7 +217,7 @@
             }
         }
 
-        // --- 🔐 Secure Client (Fixed for Security Middleware) ---
+        // --- 🔐 Secure Client (JSON API Requests) ---
         const SecureClient = {
             publicKey: null,
             
@@ -241,14 +241,12 @@
             async post(endpoint, data, headers = {}) {
                 if(!this.publicKey) await this.init();
                 
-                // ✅ FIX: Inject Timestamp & Nonce BEFORE Encryption
                 const securePayload = {
                     ...data,
                     _ts: Date.now(),
                     nonce: generateNonce()
                 };
 
-                // Hybrid Encryption Process
                 const aesKey = forge.random.getBytesSync(32);
                 const iv = forge.random.getBytesSync(12);
                 const cipher = forge.cipher.createCipher('AES-GCM', aesKey);
@@ -256,7 +254,6 @@
                 cipher.update(forge.util.createBuffer(JSON.stringify(securePayload), 'utf8'));
                 cipher.finish();
 
-                // Encrypt AES Key with RSA
                 const pubKeyObj = forge.pki.publicKeyFromPem(this.publicKey);
                 const encryptedAesKey = pubKeyObj.encrypt(aesKey, 'RSA-OAEP', { md: forge.md.sha256.create() });
                 
@@ -269,7 +266,6 @@
 
                 const res = await axios.post(`${state.baseUrl}${endpoint}`, finalBody, { headers, validateStatus: () => true });
 
-                // Decrypt Response if Encrypted
                 if(res.data && res.data.payload) {
                     try {
                         const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
@@ -321,11 +317,9 @@
             text.innerText = "Connecting...";
             
             try {
-                // Now sends _ts and nonce automatically inside SecureClient.post
                 const res = await SecureClient.post('/session/init', {});
-                
                 if (res.status === 200 || res.status === 201) {
-                    setCookie('sci_session_token', 'active', 1); // Frontend state only
+                    setCookie('sci_session_token', 'active', 1);
                     dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
                     text.innerText = "Session Active";
                     btn.classList.add('border-emerald-500/50', 'bg-emerald-500/10', 'text-emerald-400');
@@ -341,7 +335,7 @@
             }
         }
 
-        // --- 📋 Dynamic Form & Checklist Logic ---
+        // --- 📋 Dynamic Form Logic ---
         async function fetchFormDetails() {
             if(!getCookie('sci_session_token')) await authenticate();
             
@@ -350,7 +344,6 @@
             const subTypeWrapper = document.getElementById('sub-type-wrapper');
             const subType = document.getElementById('lab-sub-type').value;
 
-            // Clear previous uploads state
             state.uploadedFiles.clear();
             updateValidateButton();
             document.getElementById('results-container').innerHTML = '';
@@ -371,12 +364,8 @@
                     document.getElementById('lab-form-info').classList.remove('hidden');
                     document.getElementById('info-location').innerText = data.submission_location || '-';
                     document.getElementById('info-steps').innerHTML = (data.submission_steps || []).map(s => `<li>${s}</li>`).join('');
-                    
-                    if (data.conditions && data.conditions.length > 0) {
-                         document.getElementById('info-conditions').innerHTML = `⚠️ <strong>Conditions:</strong> ${data.conditions.join(', ')}`;
-                    } else { document.getElementById('info-conditions').innerHTML = ''; }
+                    document.getElementById('info-conditions').innerHTML = data.conditions && data.conditions.length > 0 ? `⚠️ <strong>Conditions:</strong> ${data.conditions.join(', ')}` : '';
 
-                    // --- Render Document Checklist ---
                     const container = document.getElementById('doc-checklist-container');
                     container.innerHTML = '';
                     
@@ -418,53 +407,73 @@
             } catch(e) { console.error(e); }
         }
 
-        // --- 📤 Single File Upload Logic ---
+        // --- 📤 Encrypted File Upload Logic (Client-Side Encryption) ---
         async function handleSingleUpload(key) {
+            // 1. Check Auth & Key
             if(!getCookie('sci_session_token')) await authenticate();
+            if(!SecureClient.publicKey) await SecureClient.init();
             
             const fileInput = document.getElementById(`file-${key}`);
             const file = fileInput.files[0];
             if (!file) return;
 
-            // UI Update: Start Upload
+            // UI Update
             const btn = document.getElementById(`btn-upload-${key}`);
             const progress = document.getElementById(`progress-${key}`);
             const progressBar = progress.firstElementChild;
             const statusIcon = document.getElementById(`status-icon-${key}`);
             
             btn.classList.add('pointer-events-none', 'opacity-50');
-            btn.innerText = "Uploading...";
+            btn.innerText = "Encrypting..."; // 🔐 1. Encrypting State
             progress.classList.remove('hidden');
-            progressBar.style.width = '30%';
+            progressBar.style.width = '10%';
 
             try {
-                // 1. Get Signed URL (Secure Encrypted Post)
-                const r1 = await SecureClient.post('/upload/signed-url', {
-                    file_name: file.name, 
-                    file_type: file.type || 'application/pdf',
-                    file_size: file.size, 
-                    file_key: key
-                });
+                // --- 🔐 STEP 1: Client-Side AES-GCM Encryption ---
+                const arrayBuffer = await file.arrayBuffer();
+                const fileBytes = forge.util.createBuffer(arrayBuffer);
 
-                if(r1.status !== 200) throw new Error(r1.data.message || 'Signed URL failed');
+                const aesKey = forge.random.getBytesSync(32);
+                const iv = forge.random.getBytesSync(12);
+
+                const cipher = forge.cipher.createCipher('AES-GCM', aesKey);
+                cipher.start({ iv: iv });
+                cipher.update(fileBytes);
+                cipher.finish();
                 
-                progressBar.style.width = '60%';
-                const { upload_url, gcs_path } = r1.data;
+                const encryptedFileBytes = cipher.output.getBytes();
+                const tag = cipher.mode.tag.getBytes();
 
-                // 2. Upload to GCS (Direct Put - No Encryption Needed for binary)
-                await axios.put(upload_url, file, { 
-                    headers: { 'Content-Type': file.type },
-                    withCredentials: false
-                });
+                // Create Encrypted Blob
+                const encryptedUint8 = new Uint8Array(encryptedFileBytes.length);
+                for(let i=0; i<encryptedFileBytes.length; i++) encryptedUint8[i] = encryptedFileBytes.charCodeAt(i);
+                const encryptedBlob = new Blob([encryptedUint8], { type: 'application/octet-stream' });
+
+                // Encrypt AES Key with RSA
+                const pubKeyObj = forge.pki.publicKeyFromPem(SecureClient.publicKey);
+                const encryptedAesKey = pubKeyObj.encrypt(aesKey, 'RSA-OAEP', { md: forge.md.sha256.create() });
+
+                // --- 📤 STEP 2: Upload via FormData ---
+                btn.innerText = "Uploading...";
+                progressBar.style.width = '30%';
+
+                const formData = new FormData();
+                formData.append('file', encryptedBlob, file.name); // Send Encrypted Blob
+                formData.append('file_key', key);
+                formData.append('form_code', document.getElementById('lab-form-code').value);
                 
-                progressBar.style.width = '90%';
+                // Attach Decryption Metadata
+                formData.append('encKey', forge.util.encode64(encryptedAesKey));
+                formData.append('iv', forge.util.encode64(iv));
+                formData.append('tag', forge.util.encode64(tag));
 
-                // 3. Confirm (Secure Encrypted Post)
-                await SecureClient.post('/upload/finalize', {
-                    file_key: key,
-                    gcs_path: gcs_path,
-                    file_type: file.type,
-                    file_name: file.name
+                const res = await axios.post(`${state.baseUrl}/upload`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    withCredentials: true,
+                    onUploadProgress: (p) => {
+                        const percent = Math.round((p.loaded * 100) / p.total);
+                        progressBar.style.width = `${30 + (percent * 0.7)}%`;
+                    }
                 });
 
                 // Success UI
@@ -473,20 +482,20 @@
                 
                 btn.classList.remove('bg-slate-800', 'text-slate-400', 'border-slate-700');
                 btn.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/30', 'cursor-default');
-                btn.innerHTML = `<i class="fa-solid fa-check mr-1"></i> ${file.name.substring(0, 15)}...`;
+                btn.innerHTML = `<i class="fa-solid fa-lock mr-1"></i> Encrypted`; // 🔒 Show Encrypted Status
                 
-                statusIcon.innerHTML = `<div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.4)]"><i class="fa-solid fa-check text-xs"></i></div>`;
+                statusIcon.innerHTML = `<div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.4)]"><i class="fa-solid fa-shield-halved text-xs"></i></div>`;
                 
-                // Track Upload
                 state.uploadedFiles.add(key);
                 updateValidateButton();
+                console.log('✅ Secure Upload Success:', res.data);
 
             } catch (e) {
                 console.error(e);
                 progressBar.classList.add('bg-rose-500');
-                btn.innerText = "Failed - Retry";
+                btn.innerText = "Failed";
                 btn.classList.remove('pointer-events-none', 'opacity-50');
-                alert("Upload Failed: " + (e.response?.data?.error || e.message));
+                alert("Secure Upload Failed: " + (e.response?.data?.error || e.message));
             }
         }
 
@@ -509,17 +518,11 @@
             btn.disabled = true;
             btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Analyzing Documents...`;
             
-            // Switch to Results Tab
             switchTab('results');
             document.getElementById('empty-state-results').classList.add('hidden');
             const resContainer = document.getElementById('results-container');
             resContainer.classList.remove('hidden');
-            resContainer.innerHTML = `
-                <div class="animate-pulse space-y-4">
-                    <div class="h-24 bg-slate-800/50 rounded-xl"></div>
-                    <div class="h-24 bg-slate-800/50 rounded-xl"></div>
-                </div>
-            `;
+            resContainer.innerHTML = `<div class="animate-pulse space-y-4"><div class="h-24 bg-slate-800/50 rounded-xl"></div><div class="h-24 bg-slate-800/50 rounded-xl"></div></div>`;
 
             try {
                 const formCode = document.getElementById('lab-form-code').value;
@@ -532,7 +535,6 @@
                     sub_type: subType
                 });
 
-                // Render Results
                 resContainer.innerHTML = '';
                 const rawData = res.data;
                 const resultKeys = Object.keys(rawData);
@@ -544,9 +546,7 @@
 
                 resultKeys.forEach(key => {
                     if (key === 'status' || key === 'message' || key === '_ts') return;
-
                     const item = rawData[key];
-                    // Skip if not an object or missing status
                     if (typeof item !== 'object' || !item.status) return;
 
                     const status = item.status || 'unknown';
@@ -555,41 +555,26 @@
                     const color = isValid ? 'emerald' : 'rose';
                     const icon = isValid ? 'fa-circle-check' : 'fa-circle-xmark';
 
-                    const cardHTML = `
+                    resContainer.insertAdjacentHTML('beforeend', `
                         <div class="bg-slate-900 border border-${color}-500/30 rounded-xl overflow-hidden shadow-lg animate-fade-in">
                             <div class="bg-${color}-500/10 px-4 py-3 border-b border-${color}-500/20 flex justify-between items-center">
                                 <span class="text-xs font-mono font-bold text-${color}-400 break-all">${key}</span>
                                 <span class="text-[10px] uppercase font-bold bg-${color}-500/20 text-${color}-300 px-2 py-0.5 rounded">${status}</span>
                             </div>
-                            <div class="p-4">
-                                <div class="flex gap-3">
-                                    <div class="mt-0.5"><i class="fa-solid ${icon} text-${color}-400 text-sm"></i></div>
-                                    <div class="text-slate-300 text-xs leading-relaxed prose prose-invert prose-xs">
-                                        ${marked.parse(reason)}
-                                    </div>
-                                </div>
-                            </div>
+                            <div class="p-4"><div class="flex gap-3"><div class="mt-0.5"><i class="fa-solid ${icon} text-${color}-400 text-sm"></i></div><div class="text-slate-300 text-xs leading-relaxed prose prose-invert prose-xs">${marked.parse(reason)}</div></div></div>
                         </div>
-                    `;
-                    resContainer.insertAdjacentHTML('beforeend', cardHTML);
+                    `);
                 });
-
             } catch (e) {
                 console.error(e);
-                resContainer.innerHTML = `
-                    <div class="bg-rose-950/30 border border-rose-500/50 rounded-xl p-4 text-center">
-                        <i class="fa-solid fa-triangle-exclamation text-rose-400 text-2xl mb-2"></i>
-                        <p class="text-rose-300 text-xs font-bold">Analysis Failed</p>
-                        <p class="text-rose-400/70 text-[10px] mt-1">${e.response?.data?.message || e.message}</p>
-                    </div>
-                `;
+                resContainer.innerHTML = `<div class="bg-rose-950/30 border border-rose-500/50 rounded-xl p-4 text-center"><i class="fa-solid fa-triangle-exclamation text-rose-400 text-2xl mb-2"></i><p class="text-rose-300 text-xs font-bold">Analysis Failed</p><p class="text-rose-400/70 text-[10px] mt-1">${e.response?.data?.message || e.message}</p></div>`;
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Validate All Documents with AI`;
             }
         }
 
-        // --- Chat (Same as before) ---
+        // --- Chat ---
         async function sendChatMessage() {
             if(!getCookie('sci_session_token')) await authenticate();
             const input = document.getElementById('chat-input');
@@ -612,14 +597,7 @@
         }
 
         // Init
-        setTimeout(() => { 
-            // Only auto-connect if base url is present
-            if(document.getElementById('baseUrl').value) {
-                SecureClient.init();
-            }
-        }, 500);
-        
-        // Initial Fetch
+        setTimeout(() => { if(document.getElementById('baseUrl').value) SecureClient.init(); }, 500);
         fetchFormDetails();
     </script>
 </body>

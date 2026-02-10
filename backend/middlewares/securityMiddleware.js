@@ -2,6 +2,10 @@ const { decryptHybridPayload, encryptSymmetric } = require('../utils/cryptoUtils
 const { checkAndMarkNonce } = require('../utils/dbUtils'); // ✅ Import ฟังก์ชันใหม่
 
 module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป็น async function
+    if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+        return next();
+    }
+    
     const ENCRYPTED_METHODS = ['POST', 'PUT', 'PATCH'];
 
     // --- 1. ตรวจสอบและถอดรหัส (Inbound) ---
