@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Request | QA & Prototype Lab</title>
+    <title>Sci-Request | Multi-File Lab</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -75,14 +75,23 @@
                 
                 <div class="glass rounded-xl p-5 mb-8 shadow-lg">
                     <h2 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-file-contract text-indigo-400"></i> Step 1: Form Selection
+                        <i class="fa-solid fa-file-contract text-indigo-400"></i> Step 1: Select Request Type
                     </h2>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-[10px] text-slate-500 uppercase mb-1 font-bold">Form Type</label>
+                            <label class="block text-[10px] text-slate-500 uppercase mb-1 font-bold">Form Code</label>
                             <select id="lab-form-code" onchange="fetchFormDetails()" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg p-2.5 outline-none focus:border-indigo-500">
                                 <option value="JT35" selected>JT35 - ทักท้วงผลการเรียน</option>
                                 <option value="JT44">JT44 - ลาป่วย</option>
+                                <option value="JT31">JT31 - ลาออก</option>
+                                <option value="JT32">JT32 - รักษาสถานภาพ (Grad)</option>
+                                <option value="JT34">JT34 - คืนสถานภาพ (Grad)</option>
+                                <option value="JT43">JT43 - ขอ S/U หรือ V/W</option>
+                                <option value="JT48">JT48 - ถอนรายวิชา (W)</option>
+                                <option value="JT49">JT49 - ลาพักการศึกษา</option>
+                                <option value="JT66">JT66 - ขอยกเว้นรายวิชา</option>
+                                <option value="CF">CF - Course Withdrawal with CF</option>
+                                <option value="JT41">JT41 - คำร้องทั่วไป</option>
                             </select>
                         </div>
                         <div>
@@ -93,67 +102,85 @@
                             </select>
                         </div>
                     </div>
+
+                    <div id="sub-type-wrapper" class="hidden mt-4 animate-fade-in">
+                         <label class="block text-[10px] text-slate-500 uppercase mb-1 font-bold text-amber-500">General Request Topic (JT41)</label>
+                         <select id="lab-sub-type" onchange="fetchFormDetails()" class="w-full bg-slate-900 border border-amber-500/30 text-white text-sm rounded-lg p-2.5 outline-none focus:border-amber-500">
+                            <option value="tuition_installment">ขอผ่อนผันค่าเล่าเรียน</option>
+                            <option value="late_reg">ขอลงทะเบียนเรียนหลังกำหนด</option>
+                            <option value="keep_midterm_score">ขอเก็บตัวสอบกลางภาค</option>
+                            <option value="missing_midterm">ขอขาดสอบกลางภาค</option>
+                            <option value="review_midterm">ขอทบทวนคะแนนสอบกลางภาค</option>
+                            <option value="sick_midterm">ลาป่วยสำหรับกลางภาค</option>
+                            <option value="postpone_final">ขอเลื่อนสอบปลายภาค</option>
+                         </select>
+                    </div>
+
                     <div id="lab-form-info" class="mt-4 text-xs text-slate-400 bg-slate-850/50 rounded-lg p-4 border border-slate-800 hidden animate-fade-in">
                         <p class="mb-2"><strong class="text-indigo-400">📍 Location:</strong> <span id="info-location">...</span></p>
                         <div><strong class="text-indigo-400">📝 Steps:</strong> <ul id="info-steps" class="list-disc ml-4 mt-1"></ul></div>
+                        <div class="mt-2 text-amber-500/80" id="info-conditions"></div>
                     </div>
                 </div>
 
                 <div class="glass rounded-xl p-5 mb-6 flex-1 shadow-lg relative">
-                    <h2 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> Step 2: Upload & Validate (Gemini 1.5 Pro)
-                    </h2>
-                    <div class="mb-4">
-                        <label class="text-[10px] text-slate-500 uppercase mb-1 block font-bold">Document Type (Key)</label>
-                        <select id="lab-file-key" class="w-full bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg p-2.5 outline-none focus:border-indigo-500">
-                            <option value="main_form">main_form (แบบฟอร์มหลัก)</option>
-                            <option value="med_cert">med_cert (ใบรับรองแพทย์)</option>
-                            <option value="payment_slip">payment_slip (สลิปโอนเงิน)</option>
-                            <option value="id_card">id_card (สำเนาบัตร)</option>
-                        </select>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> Step 2: Upload Documents
+                        </h2>
+                        <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Required Checklist</span>
                     </div>
-
-                    <div id="drop-zone" class="border-2 border-dashed border-slate-700 rounded-xl h-40 flex flex-col items-center justify-center text-slate-500 hover:border-indigo-500 hover:bg-indigo-500/5 transition-all cursor-pointer relative bg-slate-900/30">
-                        <input type="file" id="lab-file-input" class="absolute inset-0 opacity-0 cursor-pointer z-20">
-                        <i class="fa-solid fa-file-pdf text-2xl mb-2"></i>
-                        <p class="text-xs">Click to upload or drag & drop</p>
-                        <div id="file-name-display" class="hidden absolute bottom-4 px-3 py-1 bg-indigo-500/20 rounded-full border border-indigo-500/50 text-indigo-300 text-[10px] animate-fade-in">
-                             <i class="fa-solid fa-check mr-1"></i> <span id="file-name-text">filename.pdf</span>
-                        </div>
-                    </div>
-
-                    <button onclick="labUploadAndCheck()" id="btn-lab-check" class="w-full mt-6 bg-slate-800 text-slate-500 font-bold py-3 rounded-lg text-xs transition-all border border-slate-700 cursor-not-allowed" disabled>
-                        Select File First
-                    </button>
                     
-                    <div id="lab-result" class="mt-6 hidden animate-slide-up">
-                        <div id="lab-result-content" class="rounded-lg bg-slate-900 border border-slate-800 overflow-hidden shadow-inner"></div>
+                    <div id="doc-checklist-container" class="space-y-3 mb-6">
+                        <div class="text-center text-slate-600 py-8 text-xs">Select a form type above to see required documents.</div>
+                    </div>
+
+                    <div class="border-t border-slate-800 pt-4 mt-4">
+                         <button onclick="batchValidate()" id="btn-batch-validate" class="w-full bg-slate-800 text-slate-500 font-bold py-3.5 rounded-xl text-sm transition-all border border-slate-700 cursor-not-allowed flex items-center justify-center gap-2" disabled>
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Validate All Documents with AI
+                        </button>
                     </div>
                 </div>
             </div>
 
             <div class="w-5/12 flex flex-col bg-slate-900/30 border-l border-slate-800">
-                <div class="p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur flex justify-between items-center shadow-sm z-10">
-                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-robot text-indigo-400"></i> AI Assistant (Gemini 3.0 Flash)
-                    </h2>
+                
+                <div class="flex border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+                    <button onclick="switchTab('results')" id="tab-results" class="flex-1 py-3 text-xs font-bold text-emerald-400 border-b-2 border-emerald-500 bg-emerald-500/5 transition-all">
+                        <i class="fa-solid fa-clipboard-check mr-2"></i> Validation Results
+                    </button>
+                    <button onclick="switchTab('chat')" id="tab-chat" class="flex-1 py-3 text-xs font-bold text-slate-500 hover:text-slate-300 transition-all">
+                        <i class="fa-solid fa-comments mr-2"></i> AI Assistant
+                    </button>
                 </div>
-                <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-950/50">
-                    <div class="flex gap-3">
-                        <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg"><i class="fa-solid fa-robot text-xs"></i></div>
-                        <div class="bg-slate-800 p-3.5 rounded-2xl rounded-tl-none text-sm text-slate-300 max-w-[90%] border border-slate-700 shadow-sm">
-                            สวัสดีครับ 👋 ผมคือพี่ทะเบียน AI (ใช้โมเดลใหม่ Gemini 3.0 Flash) มีอะไรให้ช่วยสอบถามได้เลยครับ
+
+                <div id="view-results" class="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+                    <div id="empty-state-results" class="h-full flex flex-col items-center justify-center text-slate-600">
+                        <i class="fa-solid fa-magnifying-glass-chart text-4xl mb-3 opacity-20"></i>
+                        <p class="text-xs">Upload documents and click Validate to see AI analysis.</p>
+                    </div>
+                    <div id="results-container" class="space-y-4 hidden"></div>
+                </div>
+
+                <div id="view-chat" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+                    <div id="chat-history" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-slate-950/50">
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg"><i class="fa-solid fa-robot text-xs"></i></div>
+                            <div class="bg-slate-800 p-3.5 rounded-2xl rounded-tl-none text-sm text-slate-300 max-w-[90%] border border-slate-700 shadow-sm">
+                                สวัสดีครับ 👋 ผมคือพี่ทะเบียน AI ยินดีให้คำปรึกษาเรื่องการยื่นคำร้องครับ
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-slate-900 border-t border-slate-800">
+                        <div class="relative group">
+                            <input type="text" id="chat-input" placeholder="Type your message..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-4 pr-12 py-3.5 text-sm text-white focus:border-indigo-500 outline-none" onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                            <button onclick="sendChatMessage()" class="absolute right-2 top-2.5 w-9 h-9 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center justify-center transition shadow-lg active:scale-95">
+                                <i class="fa-solid fa-paper-plane text-xs"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="p-4 bg-slate-900 border-t border-slate-800">
-                    <div class="relative group">
-                        <input type="text" id="chat-input" placeholder="Type your message..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-4 pr-12 py-3.5 text-sm text-white focus:border-indigo-500 outline-none" onkeypress="if(event.key === 'Enter') sendChatMessage()">
-                        <button onclick="sendChatMessage()" class="absolute right-2 top-2.5 w-9 h-9 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center justify-center transition shadow-lg active:scale-95">
-                            <i class="fa-solid fa-paper-plane text-xs"></i>
-                        </button>
-                    </div>
-                </div>
+
             </div>
         </div>
     </div>
@@ -162,57 +189,46 @@
         // --- Shared State ---
         let state = {
             baseUrl: document.getElementById('baseUrl').value,
-            lab: { selectedFile: null }
+            uploadedFiles: new Set() // Track uploaded keys
         };
 
-        // --- 🍪 Cookie Helpers ---
-        function setCookie(name, value, days) {
-            let expires = "";
-            if (days) {
-                const date = new Date();
-                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-                expires = "; expires=" + date.toUTCString();
+        // --- Helpers ---
+        function switchTab(tab) {
+            const vRes = document.getElementById('view-results');
+            const vChat = document.getElementById('view-chat');
+            const tRes = document.getElementById('tab-results');
+            const tChat = document.getElementById('tab-chat');
+
+            if (tab === 'results') {
+                vRes.classList.remove('hidden');
+                vChat.classList.add('hidden');
+                tRes.className = "flex-1 py-3 text-xs font-bold text-emerald-400 border-b-2 border-emerald-500 bg-emerald-500/5 transition-all";
+                tChat.className = "flex-1 py-3 text-xs font-bold text-slate-500 hover:text-slate-300 transition-all";
+            } else {
+                vRes.classList.add('hidden');
+                vChat.classList.remove('hidden');
+                vChat.classList.add('flex'); // Chat needs flex
+                tChat.className = "flex-1 py-3 text-xs font-bold text-indigo-400 border-b-2 border-indigo-500 bg-indigo-500/5 transition-all";
+                tRes.className = "flex-1 py-3 text-xs font-bold text-slate-500 hover:text-slate-300 transition-all";
             }
-            document.cookie = name + "=" + (value || "") + expires + "; path=/";
         }
 
-        function getCookie(name) {
-            const nameEQ = name + "=";
-            const ca = document.cookie.split(';');
-            for(let i=0; i < ca.length; i++) {
-                let c = ca[i];
-                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
-            }
-            return null;
-        }
-
-        // --- 🔐 Secure Client ---
+        // --- 🔐 Secure Client (Same as before) ---
         const SecureClient = {
             publicKey: null,
             async init() {
                 const urlInput = document.getElementById('baseUrl').value.replace(/\/$/, '');
-                state.baseUrl = urlInput + '/api/v1'; // เพิ่ม /api/v1 เสมอ
-                
-                // ✅ สำคัญ: เปิดใช้งาน credentials (cookies)
+                state.baseUrl = urlInput + '/api/v1'; 
                 axios.defaults.withCredentials = true;
-
                 if(!this.publicKey) {
                     try {
-                        console.log('Handshaking with:', state.baseUrl);
                         const res = await axios.get(`${state.baseUrl}/auth/public-key`);
                         this.publicKey = res.data.publicKey;
-                        console.log('Handshake Success');
-                    } catch(e) { 
-                        console.error('Handshake error', e); 
-                        alert("Connection Failed. Please check the URL."); 
-                    }
+                    } catch(e) { console.error('Handshake error', e); }
                 }
             },
             async post(endpoint, data, headers = {}) {
                 if(!this.publicKey) await this.init();
-                
-                // Encryption Logic (เหมือนเดิม)
                 const aesKey = forge.random.getBytesSync(32);
                 const iv = forge.random.getBytesSync(12);
                 const cipher = forge.cipher.createCipher('AES-GCM', aesKey);
@@ -228,10 +244,7 @@
                     payload: forge.util.encode64(cipher.output.getBytes()),
                     tag: forge.util.encode64(cipher.mode.tag.getBytes())
                 };
-
                 const res = await axios.post(`${state.baseUrl}${endpoint}`, payload, { headers, validateStatus: () => true });
-                
-                // Decryption Logic
                 if(res.data && res.data.payload) {
                     const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
                     decipher.start({ iv: forge.util.decode64(res.data.iv), tag: forge.util.decode64(res.data.tag) });
@@ -240,21 +253,38 @@
                 }
                 return res;
             },
-            async get(endpoint) {
+            async get(endpoint, params = {}) {
                 if(!state.baseUrl) await this.init();
-                return await axios.get(`${state.baseUrl}${endpoint}`, { validateStatus: () => true });
+                return await axios.get(`${state.baseUrl}${endpoint}`, { params, validateStatus: () => true });
             }
         };
 
-        // --- 🌐 Global Functions ---
+        // --- Auth & Initial Logic ---
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/";
+        }
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for(let i=0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
         async function authenticate() {
             const btn = document.getElementById('session-btn');
             const dot = document.getElementById('session-dot');
             const text = document.getElementById('session-text');
-            
-            // รีเซ็ต Base URL กรณีเปลี่ยนค่า
             SecureClient.publicKey = null; 
-            
             text.innerText = "Connecting...";
             try {
                 const res = await SecureClient.post('/session/init', {});
@@ -263,7 +293,6 @@
                     dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
                     text.innerText = "Session Active";
                     btn.classList.add('border-emerald-500/50', 'bg-emerald-500/10', 'text-emerald-400');
-                    console.log('Session ID:', res.data.session_id);
                 }
             } catch (e) {
                 console.error(e);
@@ -272,134 +301,257 @@
             }
         }
 
+        // --- 📋 Dynamic Form & Checklist Logic ---
         async function fetchFormDetails() {
             if(!getCookie('sci_session_token')) await authenticate();
+            
             const formCode = document.getElementById('lab-form-code').value;
             const degree = document.getElementById('lab-degree').value;
+            const subTypeWrapper = document.getElementById('sub-type-wrapper');
+            const subType = document.getElementById('lab-sub-type').value;
+
+            // Clear previous uploads state
+            state.uploadedFiles.clear();
+            updateValidateButton();
+            document.getElementById('results-container').innerHTML = '';
+            document.getElementById('results-container').classList.add('hidden');
+            document.getElementById('empty-state-results').classList.remove('hidden');
+
+            if (formCode === 'JT41') subTypeWrapper.classList.remove('hidden');
+            else subTypeWrapper.classList.add('hidden');
+
             try {
-                const res = await SecureClient.get(`/forms/${formCode}?degree_level=${degree}`);
-                document.getElementById('lab-form-info').classList.remove('hidden');
-                document.getElementById('info-location').innerText = res.data.submission_location || '-';
-                document.getElementById('info-steps').innerHTML = (res.data.submission_steps || []).map(s => `<li>${s}</li>`).join('');
+                const res = await SecureClient.get(`/forms/${formCode}`, {
+                    degree_level: degree,
+                    sub_type: formCode === 'JT41' ? subType : null
+                });
+
+                if (res.status === 200) {
+                    const data = res.data;
+                    document.getElementById('lab-form-info').classList.remove('hidden');
+                    document.getElementById('info-location').innerText = data.submission_location || '-';
+                    document.getElementById('info-steps').innerHTML = (data.submission_steps || []).map(s => `<li>${s}</li>`).join('');
+                    
+                    if (data.conditions && data.conditions.length > 0) {
+                         document.getElementById('info-conditions').innerHTML = `⚠️ <strong>Conditions:</strong> ${data.conditions.join(', ')}`;
+                    } else { document.getElementById('info-conditions').innerHTML = ''; }
+
+                    // --- Render Document Checklist ---
+                    const container = document.getElementById('doc-checklist-container');
+                    container.innerHTML = '';
+                    
+                    if (data.required_documents && data.required_documents.length > 0) {
+                        data.required_documents.forEach(doc => {
+                            const isReq = doc.required;
+                            const itemHTML = `
+                                <div class="bg-slate-900 border border-slate-700 rounded-lg p-3 transition-all hover:border-slate-600 group" id="card-${doc.key}">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <h3 class="text-xs font-bold text-white">${doc.label}</h3>
+                                                ${isReq ? '<span class="text-[10px] bg-rose-500/10 text-rose-400 px-1.5 py-0.5 rounded border border-rose-500/20">Required</span>' : '<span class="text-[10px] bg-slate-700/30 text-slate-400 px-1.5 py-0.5 rounded">Optional</span>'}
+                                            </div>
+                                            <p class="text-[10px] text-slate-500 mt-1">${doc.validation_criteria ? doc.validation_criteria.substring(0, 60) + '...' : 'Upload required document'}</p>
+                                        </div>
+                                        <div id="status-icon-${doc.key}">
+                                            <div class="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-slate-600 border border-slate-700"><i class="fa-solid fa-cloud-arrow-up text-xs"></i></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <input type="file" id="file-${doc.key}" class="hidden" onchange="handleSingleUpload('${doc.key}')">
+                                        <label for="file-${doc.key}" id="btn-upload-${doc.key}" class="flex-1 cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-[10px] font-bold py-2 px-3 rounded border border-slate-700 text-center transition-all">
+                                            Select File
+                                        </label>
+                                    </div>
+                                    <div id="progress-${doc.key}" class="hidden mt-2 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                        <div class="h-full bg-indigo-500 w-0 transition-all duration-300"></div>
+                                    </div>
+                                </div>
+                            `;
+                            container.insertAdjacentHTML('beforeend', itemHTML);
+                        });
+                    } else {
+                        container.innerHTML = '<div class="text-center text-slate-500 text-xs">No documents required for this form.</div>';
+                    }
+                }
             } catch(e) { console.error(e); }
         }
 
-        // --- 🔬 Upload & Validate Logic (UPDATED) ---
-        document.getElementById('lab-file-input').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if(file) {
-                state.lab.selectedFile = file;
-                document.getElementById('file-name-text').innerText = file.name;
-                document.getElementById('file-name-display').classList.remove('hidden');
-                const btn = document.getElementById('btn-lab-check');
-                btn.disabled = false;
-                btn.className = "w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg text-xs transition-all shadow-lg active:scale-[0.98]";
-                btn.innerText = "Upload & Validate";
-            }
-        });
-
-        async function labUploadAndCheck() {
+        // --- 📤 Single File Upload Logic ---
+        async function handleSingleUpload(key) {
             if(!getCookie('sci_session_token')) await authenticate();
-            const file = state.lab.selectedFile;
-            const fileKey = document.getElementById('lab-file-key').value;
-            const formCode = document.getElementById('lab-form-code').value;
-            const degree = document.getElementById('lab-degree').value;
-            const btn = document.getElementById('btn-lab-check');
-
-            btn.innerText = "1/3 Uploading...";
-            btn.disabled = true;
             
+            const fileInput = document.getElementById(`file-${key}`);
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            // UI Update: Start Upload
+            const btn = document.getElementById(`btn-upload-${key}`);
+            const progress = document.getElementById(`progress-${key}`);
+            const progressBar = progress.firstElementChild;
+            const statusIcon = document.getElementById(`status-icon-${key}`);
+            
+            btn.classList.add('pointer-events-none', 'opacity-50');
+            btn.innerText = "Uploading...";
+            progress.classList.remove('hidden');
+            progressBar.style.width = '30%';
+
             try {
                 // 1. Get Signed URL
-                console.log('Step 1: Get Signed URL');
                 const r1 = await SecureClient.post('/upload/signed-url', {
                     file_name: file.name, 
                     file_type: file.type || 'application/pdf',
                     file_size: file.size, 
-                    file_key: fileKey
+                    file_key: key
                 });
-
                 if(r1.status !== 200) throw new Error('Signed URL failed');
+                
+                progressBar.style.width = '60%';
                 const { upload_url, gcs_path } = r1.data;
 
                 // 2. Upload to GCS
-                console.log('Step 2: Upload to GCS');
                 await axios.put(upload_url, file, { 
                     headers: { 'Content-Type': file.type },
-                    withCredentials: false // ห้ามส่ง Cookie ไป GCS
+                    withCredentials: false
                 });
+                
+                progressBar.style.width = '90%';
 
-                // 3. Confirm & Save to Firestore (IMPORTANT: Validation reads from DB)
-                console.log('Step 3: Confirm Upload');
-                btn.innerText = "2/3 Saving...";
-                // สมมติว่ามี Route สำหรับยืนยัน (ถ้าไม่มี ให้ใช้ /upload/finalize หรือใกล้เคียง)
-                // *หมายเหตุ: ถ้าโค้ด backend ของ uploadRoutes ทำ auto-save ตอน get url ไม่ต้องทำขั้นนี้ 
-                // แต่จาก dbUtils ที่เห็น ควรต้องมีการ trigger save 
-                // ผมจะใช้ Route: /upload/finalize (ถ้า 404 ให้ลองตรวจสอบ backend อีกที)
+                // 3. Confirm
                 await SecureClient.post('/upload/finalize', {
-                    file_key: fileKey,
+                    file_key: key,
                     gcs_path: gcs_path,
                     file_type: file.type,
                     file_name: file.name
                 });
+
+                // Success UI
+                progressBar.style.width = '100%';
+                setTimeout(() => progress.classList.add('hidden'), 500);
                 
-                // 4. Validate
-                console.log('Step 4: AI Validation');
-                btn.innerText = "3/3 AI Checking...";
+                btn.classList.remove('bg-slate-800', 'text-slate-400', 'border-slate-700');
+                btn.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/30', 'cursor-default');
+                btn.innerHTML = `<i class="fa-solid fa-check mr-1"></i> ${file.name.substring(0, 15)}...`;
                 
-                const r2 = await SecureClient.post('/validation/check-completeness', {
-                    form_code: formCode,
-                    student_level: degree, // แก้เป็น student_level ตาม validationRoutes
-                    sub_type: null
-                });
-
-                // Display Result
-                const resultBox = document.getElementById('lab-result');
-                const resultContent = document.getElementById('lab-result-content');
-                resultBox.classList.remove('hidden');
+                statusIcon.innerHTML = `<div class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.4)]"><i class="fa-solid fa-check text-xs"></i></div>`;
                 
-                const rawData = r2.data;
-                console.log('Validation Result:', rawData);
+                // Track Upload
+                state.uploadedFiles.add(key);
+                updateValidateButton();
 
-                let status = 'UNKNOWN', reason = 'No reason provided';
-                
-                // รองรับ Structure: { "key": { status... } }
-                if (rawData[fileKey]) {
-                    status = rawData[fileKey].status; 
-                    reason = rawData[fileKey].reason;
-                } else if (rawData.status) { // Fallback
-                    status = rawData.status;
-                    reason = rawData.message || rawData.reason;
-                }
-
-                const isPass = status && status.toLowerCase().includes('valid');
-                const color = isPass ? 'emerald' : 'rose';
-
-                resultContent.innerHTML = `
-                    <div class="flex items-stretch">
-                        <div class="w-1.5 bg-${color}-500"></div>
-                        <div class="p-4 flex-1 bg-${color}-500/10 border-${color}-500/30">
-                            <div class="flex items-center gap-2 mb-2">
-                                <i class="fa-solid ${isPass ? 'fa-circle-check text-emerald-400' : 'fa-circle-xmark text-rose-400'}"></i>
-                                <span class="font-bold text-sm uppercase text-${color}-400">${status}</span>
-                            </div>
-                            <div class="text-slate-300 text-xs leading-relaxed prose prose-invert prose-xs">
-                                ${marked.parse(reason)}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                btn.innerText = "Check Another File";
-                btn.disabled = false;
-
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
-                alert("Error: " + (e.response?.data?.error || e.message));
-                btn.innerText = "Retry Upload";
-                btn.disabled = false;
+                progressBar.classList.add('bg-rose-500');
+                btn.innerText = "Failed - Retry";
+                btn.classList.remove('pointer-events-none', 'opacity-50');
+                alert("Upload Failed: " + (e.response?.data?.error || e.message));
             }
         }
 
+        function updateValidateButton() {
+            const btn = document.getElementById('btn-batch-validate');
+            if (state.uploadedFiles.size > 0) {
+                btn.disabled = false;
+                btn.classList.remove('bg-slate-800', 'text-slate-500', 'cursor-not-allowed');
+                btn.classList.add('bg-indigo-600', 'hover:bg-indigo-500', 'text-white', 'shadow-lg', 'shadow-indigo-500/20');
+            } else {
+                btn.disabled = true;
+                btn.classList.add('bg-slate-800', 'text-slate-500', 'cursor-not-allowed');
+                btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-500', 'text-white', 'shadow-lg', 'shadow-indigo-500/20');
+            }
+        }
+
+        // --- ✨ Batch Validate Logic ---
+        async function batchValidate() {
+            const btn = document.getElementById('btn-batch-validate');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Analyzing ${state.uploadedFiles.size} Documents...`;
+            
+            // Switch to Results Tab
+            switchTab('results');
+            document.getElementById('empty-state-results').classList.add('hidden');
+            const resContainer = document.getElementById('results-container');
+            resContainer.classList.remove('hidden');
+            resContainer.innerHTML = `
+                <div class="animate-pulse space-y-4">
+                    <div class="h-24 bg-slate-800/50 rounded-xl"></div>
+                    <div class="h-24 bg-slate-800/50 rounded-xl"></div>
+                </div>
+            `;
+
+            try {
+                const formCode = document.getElementById('lab-form-code').value;
+                const degree = document.getElementById('lab-degree').value;
+                const subType = formCode === 'JT41' ? document.getElementById('lab-sub-type').value : null;
+
+                const res = await SecureClient.post('/validation/check-completeness', {
+                    form_code: formCode,
+                    student_level: degree,
+                    sub_type: subType
+                });
+
+                // Render Results
+                resContainer.innerHTML = '';
+                const rawData = res.data;
+                console.log('Validation Results:', rawData);
+
+                // Iterate through uploaded files to match results
+                // Note: The AI might return keys we don't expect, or skip keys.
+                // We map based on the results returned.
+                
+                const resultKeys = Object.keys(rawData);
+                if (resultKeys.length === 0) {
+                    resContainer.innerHTML = '<div class="text-center text-slate-500 text-xs py-4">No analysis results returned.</div>';
+                    return;
+                }
+
+                resultKeys.forEach(key => {
+                    // Skip if it's "status" or "message" root keys
+                    if (key === 'status' || key === 'message') return;
+
+                    const item = rawData[key];
+                    const status = item.status || 'unknown';
+                    const reason = item.reason || 'No details provided';
+                    const isValid = status.toLowerCase().includes('valid') && !status.toLowerCase().includes('invalid');
+                    const color = isValid ? 'emerald' : 'rose';
+                    const icon = isValid ? 'fa-circle-check' : 'fa-circle-xmark';
+
+                    const cardHTML = `
+                        <div class="bg-slate-900 border border-${color}-500/30 rounded-xl overflow-hidden shadow-lg animate-fade-in">
+                            <div class="bg-${color}-500/10 px-4 py-3 border-b border-${color}-500/20 flex justify-between items-center">
+                                <span class="text-xs font-mono font-bold text-${color}-400 break-all">${key}</span>
+                                <span class="text-[10px] uppercase font-bold bg-${color}-500/20 text-${color}-300 px-2 py-0.5 rounded">${status}</span>
+                            </div>
+                            <div class="p-4">
+                                <div class="flex gap-3">
+                                    <div class="mt-0.5"><i class="fa-solid ${icon} text-${color}-400 text-sm"></i></div>
+                                    <div class="text-slate-300 text-xs leading-relaxed prose prose-invert prose-xs">
+                                        ${marked.parse(reason)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    resContainer.insertAdjacentHTML('beforeend', cardHTML);
+                });
+
+            } catch (e) {
+                console.error(e);
+                resContainer.innerHTML = `
+                    <div class="bg-rose-950/30 border border-rose-500/50 rounded-xl p-4 text-center">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-400 text-2xl mb-2"></i>
+                        <p class="text-rose-300 text-xs font-bold">Analysis Failed</p>
+                        <p class="text-rose-400/70 text-[10px] mt-1">${e.response?.data?.error || e.message}</p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Validate All Documents with AI`;
+            }
+        }
+
+        // --- Chat (Same as before) ---
         async function sendChatMessage() {
             if(!getCookie('sci_session_token')) await authenticate();
             const input = document.getElementById('chat-input');
@@ -413,30 +565,16 @@
 
             try {
                 const degree = document.getElementById('lab-degree').value;
-                // ส่ง message และ degree_level
                 const res = await SecureClient.post('/chat/recommend', { message, degree_level: degree });
-                
-                // รับ Response ใหม่: { reply: "...", recommended_form: "..." }
                 let botText = res.data.reply || res.data.text || JSON.stringify(res.data);
-                
-                // ถ้ามี Recommended Form ให้แสดงเพิ่ม
-                if(res.data.recommended_form) {
-                    botText += `\n\n💡 **แนะนำฟอร์ม:** \`${res.data.recommended_form}\``;
-                }
-
+                if(res.data.recommended_form) botText += `\n\n💡 **แนะนำฟอร์ม:** \`${res.data.recommended_form}\``;
                 container.insertAdjacentHTML('beforeend', `<div class="flex gap-3 animate-slide-up"><div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-lg"><i class="fa-solid fa-robot text-xs"></i></div><div class="p-3.5 rounded-2xl bg-slate-800 text-slate-300 border border-slate-700 rounded-tl-none text-sm max-w-[85%] prose prose-invert prose-xs">${marked.parse(botText)}</div></div>`);
                 container.scrollTop = container.scrollHeight;
             } catch(e) { console.error(e); }
         }
 
         // Init
-        // ลอง Connect ทันทีเมื่อโหลด
-        setTimeout(() => {
-            if(document.getElementById('baseUrl').value) {
-                SecureClient.init().then(() => authenticate());
-            }
-        }, 500);
-        
+        setTimeout(() => { if(document.getElementById('baseUrl').value) SecureClient.init().then(() => authenticate()); }, 500);
         fetchFormDetails();
     </script>
 </body>

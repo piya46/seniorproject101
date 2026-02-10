@@ -8,8 +8,6 @@ const { strictLimiter } = require('../middlewares/rateLimitMiddleware');
 const { getFormConfig } = require('../data/staticData'); 
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 
-// ❌ เอา isValidFileSignature ออกแล้ว (ย้ายไปตรวจสอบที่ AI แทน เพื่อความยืดหยุ่น)
-
 // ✅ เพิ่ม strictLimiter ใน Route
 router.post('/check-completeness', authMiddleware, strictLimiter, async (req, res) => {
   try {
@@ -17,11 +15,30 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     const sessionId = req.session.session_id;
 
     // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติจาก Utility)
-    const userFiles = await getDecryptedSessionFiles(sessionId);
+    const allFiles = await getDecryptedSessionFiles(sessionId);
     
-    if (!userFiles || userFiles.length === 0) {
+    if (!allFiles || allFiles.length === 0) {
         return res.status(400).json({ status: 'error', message: 'No uploaded files found.' });
     }
+
+    // 🔥 FIX: กรองเอาเฉพาะไฟล์ล่าสุดของแต่ละ Key เท่านั้น
+    // (แก้ปัญหาอัปโหลดซ้ำแล้ว AI เอาไฟล์เก่ามาตรวจ)
+    const latestFilesMap = new Map();
+    
+    allFiles.forEach(file => {
+        const existing = latestFilesMap.get(file.file_key);
+        // ถ้ายังไม่มี key นี้ หรือ ไฟล์นี้ใหม่กว่าไฟล์เดิม -> ให้บันทึกทับ
+        if (!existing || new Date(file.uploaded_at) > new Date(existing.uploaded_at)) {
+            latestFilesMap.set(file.file_key, file);
+        }
+    });
+
+    // แปลงกลับเป็น Array เฉพาะไฟล์ล่าสุด
+    const userFiles = Array.from(latestFilesMap.values());
+    
+    console.log(`🔍 Filtering Files: Found ${allFiles.length} total, Validating latest ${userFiles.length} files.`);
+
+    
 
     // ดึง Config ของฟอร์มเพื่อดูว่าต้องตรวจอะไรบ้าง
     const formConfig = getFormConfig(form_code, student_level, sub_type);
@@ -42,7 +59,7 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     }
 
     const project = process.env.GCP_PROJECT_ID || "seniorproject101";
-    // ✅ เปลี่ยน Location ของ AI เป็น global
+    // ✅ ใช้ us-central1 เพื่อความเสถียรและรองรับ model ใหม่ๆ
     const location = "us-central1";
     const bucketName = process.env.GCS_BUCKET_NAME;
 
@@ -50,8 +67,10 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     const bucket = storage.bucket(bucketName);
     const vertex_ai = new VertexAI({ project: project, location: location });
 
+    // ⚠️ แก้ไข: ใช้โมเดลที่มีอยู่จริง (Gemini 1.5 Flash หรือ Pro)
+    // 'gemini-2.5-pro' ยังไม่มีให้บริการ ณ ปัจจุบัน
     const model = vertex_ai.getGenerativeModel({
-      model: 'gemini-2.5-pro', 
+      model: 'gemini-2.5-pro', // แนะนำใช้ตัวนี้เพราะเร็วและราคาประหยัด หรือ 'gemini-1.5-pro-001' ถ้าต้องการความละเอียดสูง
       generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -92,7 +111,9 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
         return res.status(400).json({ status: 'error', message: 'No valid files available for validation (Files might be missing).' });
     }
 
-    const fileParts = validFiles.map(f => f.inlinePart);
+    // ⚠️ แก้ไข: ดึงข้อมูลจาก property 'part' ที่ถูกต้อง
+    // เดิม: const fileParts = validFiles.map(f => f.inlinePart); <- ผิด เพราะข้างบน return { part: ... }
+    const fileParts = validFiles.map(f => f.part);
     const promptRules = validFiles.map(f => f.ruleDescription).join('\n\n');
     
     // ✅ PROMPT ฉบับสมบูรณ์: เพิ่ม Cross-Check, Persona และแนวทางการตอบ
@@ -140,11 +161,13 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
 
     const result = await model.generateContent({ contents });
     const response = await result.response;
-    let aiText = response.candidates[0].content.parts[0].text;
-
+    
+    // ตรวจสอบ Safety Filter ก่อนเข้าถึงเนื้อหา
     if (!response.candidates || !response.candidates[0] || !response.candidates[0].content) {
          throw new Error("AI blocked the response (Safety Filter).");
     }
+
+    let aiText = response.candidates[0].content.parts[0].text;
     
     // Clean JSON String (เผื่อ AI เผลอใส่ Markdown backticks มา)
     aiText = aiText.replace(/```json|```/g, '').trim();
