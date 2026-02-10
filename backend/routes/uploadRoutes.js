@@ -3,9 +3,10 @@ const router = express.Router();
 const { Storage } = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
-const path = require('path');
 const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
+const rateLimit = require('express-rate-limit'); // ✅ ต้องลง npm install express-rate-limit เพิ่ม
+
 const authMiddleware = require('../middlewares/authMiddleware');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { addFileToSession, deleteFileRecord, getFileRecordByKey } = require('../utils/dbUtils');
@@ -13,9 +14,23 @@ const { addFileToSession, deleteFileRecord, getFileRecordByKey } = require('../u
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
+// ✅ SECURITY UPGRADE 1: สร้าง Rate Limiter แยกเฉพาะสำหรับ Upload
+// ป้องกันการระดมยิงไฟล์ใส่ Server จน RAM เต็ม
+const uploadLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 นาที
+    max: 10, // อนุญาตแค่ 10 Request ต่อ IP (สำหรับการ Upload)
+    message: { error: 'Too many uploads', message: 'Upload limit exceeded. Please wait.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// ✅ SECURITY UPGRADE 2: Config Multer ให้เข้มงวดที่สุด
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }
+  storage: multer.memoryStorage(), // ยังใช้ RAM แต่มี limiter คุมหน้าด่านแล้ว
+  limits: { 
+      fileSize: 5 * 1024 * 1024, // 5MB (Hard Limit)
+      files: 1 // รับแค่ทีละ 1 ไฟล์เท่านั้น
+  }
 });
 
 const sanitizeFormCode = (code) => {
@@ -23,16 +38,15 @@ const sanitizeFormCode = (code) => {
     return code.replace(/[^a-zA-Z0-9-_]/g, '');
 };
 
-router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (req, res) => {
+// นำ uploadLimiter มาแปะหน้าสุด
+router.post('/', uploadLimiter, authMiddleware, strictLimiter, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
-    // ✅ SECURITY UPGRADE: Magic Number Validation
-    // ใช้ Dynamic Import เพราะ file-type เวอร์ชั่นใหม่เป็น ESM Module
+    // ✅ SECURITY UPGRADE 3: Magic Number Validation
     const { fileTypeFromBuffer } = await import('file-type');
     const detectedType = await fileTypeFromBuffer(req.file.buffer);
     
-    // อนุญาตเฉพาะ PDF, PNG, JPG, WEBP
     const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     const ALLOWED_EXTS = ['jpg', 'png', 'webp', 'pdf'];
 
@@ -48,7 +62,7 @@ router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (re
 
     const safeFormCode = sanitizeFormCode(form_code);
     
-    // --- STEP 1: Overwrite Logic ---
+    // --- STEP 1: Overwrite Logic (Cleanup Old File) ---
     try {
         const oldFile = await getFileRecordByKey(sessionId, file_key, safeFormCode);
         if (oldFile) {
@@ -68,7 +82,7 @@ router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (re
 
     // --- STEP 2: Sanitization & Re-processing ---
     let processedBuffer;
-    let finalMimeType = detectedType.mime; // ใช้ Type จริงที่ตรวจเจอ
+    let finalMimeType = detectedType.mime;
     let fileExtension = `.${detectedType.ext}`;
 
     try {

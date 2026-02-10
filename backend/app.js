@@ -7,7 +7,7 @@ const securityMiddleware = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
 
-// 📄 Swagger Imports
+// Swagger Imports
 const swaggerUi = require('swagger-ui-express');
 const fs = require('fs');
 const path = require('path');
@@ -22,14 +22,22 @@ if (missingEnv.length > 0) {
   process.exit(1);
 }
 
-
 app.set('trust proxy', 1);
 
-// ✅ 3. Helmet (เพิ่มความปลอดภัย HTTP Headers)
-app.use(helmet());
+// ✅ SECURITY UPGRADE: Helmet with strict CSP
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"], 
+            scriptSrc: ["'self'"], // ห้ามรัน Inline Script
+            objectSrc: ["'none'"], // ปิดช่องโหว่ Flash/Plugin
+            upgradeInsecureRequests: [], // บังคับใช้ HTTPS
+        },
+    },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
 
-// ✅ 4. CORS Setup (Robust Version)
-// รองรับทั้ง Comma (,) และ Pipe (|) เพื่อแก้ปัญหา Deploy Script
+// CORS Setup
 const rawOrigins = process.env.FRONTEND_URL || "http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500";
 const allowedOrigins = rawOrigins.split(/[,|]/).map(url => url.trim());
 
@@ -53,16 +61,14 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser()); 
 app.use(generalLimiter);
 
-// -------------------------------------------------------
-// 📄 SWAGGER SETUP
-// -------------------------------------------------------
+// Swagger Setup
 const swaggerFile = path.join(__dirname, 'swagger.json');
 if (process.env.NODE_ENV === 'development' && fs.existsSync(swaggerFile)) {
     const swaggerDocument = require(swaggerFile);
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 }
 
-// ✅ Security Middleware
+// Security Middleware (Encryption/Decryption)
 app.use(securityMiddleware);
 
 const BASE_URL = '/api/v1';

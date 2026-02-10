@@ -4,11 +4,9 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { initSessionRecord } = require('../utils/dbUtils');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware');
-// ✅ Import Validation
 const { validate } = require('../middlewares/validationMiddleware');
 const { sessionInitSchema } = require('../validators/schemas');
 
-// ✅ เพิ่ม validate(sessionInitSchema)
 router.post('/init', strictLimiter, validate(sessionInitSchema), async (req, res) => {
   try {
       let sessionId;
@@ -30,10 +28,13 @@ router.post('/init', strictLimiter, validate(sessionInitSchema), async (req, res
       const expiresIn = 86400; // 24 hours
       const token = jwt.sign({ session_id: sessionId }, process.env.JWT_SECRET, { expiresIn });
 
+      // ✅ SECURITY UPGRADE: Robust Cookie Configuration
+      const isProduction = process.env.NODE_ENV === 'production';
+      
       res.cookie('sci_session_token', token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'Strict',
+          httpOnly: true, // ห้าม JavaScript ฝั่ง Client เข้าถึง
+          secure: isProduction, // บังคับ HTTPS เฉพาะ Production (จะได้ test local ง่าย)
+          sameSite: isProduction ? 'Strict' : 'Lax', // Production ต้อง Strict เท่านั้น
           maxAge: expiresIn * 1000
       });
 
