@@ -21,24 +21,15 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
         return res.status(400).json({ status: 'error', message: 'No uploaded files found.' });
     }
 
-    // 🔥 FIX: กรองเอาเฉพาะไฟล์ล่าสุดของแต่ละ Key เท่านั้น
-    // (แก้ปัญหาอัปโหลดซ้ำแล้ว AI เอาไฟล์เก่ามาตรวจ)
-    const latestFilesMap = new Map();
-    
-    allFiles.forEach(file => {
-        if (!file.file_key || !file.gcs_path) return;
-        
-        const existing = latestFilesMap.get(file.file_key);
-        // ถ้ายังไม่มี key นี้ หรือ ไฟล์นี้ใหม่กว่าไฟล์เดิม -> ให้บันทึกทับ
-        if (!existing || new Date(file.uploaded_at) > new Date(existing.uploaded_at)) {
-            latestFilesMap.set(file.file_key, file);
-        }
-    });
+   // ✅ OPTIMIZATION: ไม่ต้องวนลูปหาล่าสุดแล้ว เพราะ Upload Route ลบตัวเก่าให้แล้ว
+    // กรองเอาเฉพาะไฟล์ของ Form นี้ หรือไฟล์ General (เช่น บัตร ปชช.)
+    const userFiles = allFiles.filter(f => f.form_code === form_code || f.form_code === 'general');
 
-    // แปลงกลับเป็น Array เฉพาะไฟล์ล่าสุด
-    const userFiles = Array.from(latestFilesMap.values());
-    
-    console.log(`🔍 Filtering Files: Found ${allFiles.length} total, Validating latest ${userFiles.length} files.`);
+    if (userFiles.length === 0) {
+        return res.status(400).json({ error: 'No relevant files found for this form.' });
+    }
+
+    console.log(`🔍 Validation: Checking ${userFiles.length} files for form ${form_code}`);
 
     
 

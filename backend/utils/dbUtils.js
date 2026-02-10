@@ -7,32 +7,23 @@ const firestore = new Firestore({
 const COLLECTION_NAME = 'SESSION';
 const SUB_COLLECTION_NAME = 'files';
 
-// Helper: ดึง Key
 const getDbKey = (keyBuffer) => {
     if (keyBuffer) return keyBuffer;
-    
     const hex = process.env.DB_ENCRYPTION_KEY;
-    if (!hex) {
-        console.error('❌ FATAL ERROR: DB_ENCRYPTION_KEY is missing in environment variables.');
-        throw new Error('DB_ENCRYPTION_KEY is missing. Cannot encrypt/decrypt data safely.');
-    }
+    if (!hex) throw new Error('DB_ENCRYPTION_KEY is missing.');
     return Buffer.from(hex, 'hex');
 };
 
-// --- Encryption (AES-256-GCM) ---
 const encryptData = (text, keyBuffer = null) => {
     if (!text) return text;
     try {
         const key = getDbKey(keyBuffer);
         const plainText = typeof text === 'object' ? JSON.stringify(text) : String(text);
-        
         const iv = crypto.randomBytes(12);
         const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-        
         let encrypted = cipher.update(plainText, 'utf8', 'hex');
         encrypted += cipher.final('hex');
         const tag = cipher.getAuthTag().toString('hex');
-        
         return `${iv.toString('hex')}:${encrypted}:${tag}`;
     } catch (error) {
         console.error('Encryption Error:', error);
@@ -41,62 +32,80 @@ const encryptData = (text, keyBuffer = null) => {
 };
 
 const decryptData = (text, keyBuffer = null) => {
-    // ✅ FIX: ถ้าข้อมูลไม่ใช่ Format ที่ถูกต้อง ให้ return null ทันที (เดิม return text อาจทำ JSON.parse พัง)
     if (!text || typeof text !== 'string' || !text.includes(':')) return null; 
-
     try {
         const key = getDbKey(keyBuffer);
         const parts = text.split(':');
-        
-        // ✅ FIX: ตรวจสอบจำนวนส่วนประกอบให้ครบ 3 ส่วน (IV:Data:Tag)
         if (parts.length !== 3) return null; 
-        
         const [ivHex, encryptedHex, tagHex] = parts;
         const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
         decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-        
         let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
-        
         try { return JSON.parse(decrypted); } catch { return decrypted; }
     } catch (err) {
-        // Log แค่ว่า Decrypt พลาด แต่อย่าพ่น Error Stack ออกไปถ้าไม่จำเป็น
-        console.error('Decryption Failed (Key mismatch or Data tampering):', err.message);
-        return null; // ✅ FIX: คืนค่า null เพื่อบอกว่าอ่านไม่ได้
+        return null; 
     }
 };
 
-// ... (ส่วน Exports อื่นๆ คงเดิม ไม่ต้องแก้) ...
 exports.initSessionRecord = async (sessionId) => {
-    try {
-        await firestore.collection(COLLECTION_NAME).doc(sessionId).set({
-            created_at: new Date().toISOString(),
-            last_active: new Date().toISOString()
-        }, { merge: true });
-        console.log(`✅ Firestore: Session initialized [${sessionId}]`);
-    } catch (error) {
-        console.error('❌ Firestore Init Error:', error);
-    }
+    await firestore.collection(COLLECTION_NAME).doc(sessionId).set({
+        created_at: new Date().toISOString(),
+        last_active: new Date().toISOString()
+    }, { merge: true });
 };
 
 exports.addFileToSession = async (sessionId, fileMeta) => {
-    try {
-        const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
-        
-        const encryptedFile = {
-            file_key: encryptData(fileMeta.file_key),
-            gcs_path: encryptData(fileMeta.gcs_path),
-            file_type: encryptData(fileMeta.file_type),
-            uploaded_at: new Date().toISOString()
-        };
+    const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
+    const encryptedFile = {
+        file_key: encryptData(fileMeta.file_key),
+        gcs_path: encryptData(fileMeta.gcs_path),
+        file_type: encryptData(fileMeta.file_type),
+        form_code: encryptData(fileMeta.form_code), // เพิ่ม field form_code
+        uploaded_at: new Date().toISOString()
+    };
+    await filesCollRef.add(encryptedFile);
+    await firestore.collection(COLLECTION_NAME).doc(sessionId).update({
+        last_active: new Date().toISOString()
+    });
+};
 
-        await filesCollRef.add(encryptedFile);
-        
-        await firestore.collection(COLLECTION_NAME).doc(sessionId).update({
-            last_active: new Date().toISOString()
-        });
+// ✅ NEW: ค้นหาไฟล์เก่า (ต้อง Decrypt มาเช็คเพราะ Encrypt at App Level)
+exports.getFileRecordByKey = async (sessionId, fileKey, formCode) => {
+    try {
+        const snapshot = await firestore.collection(COLLECTION_NAME).doc(sessionId)
+            .collection(SUB_COLLECTION_NAME).get();
+
+        if (snapshot.empty) return null;
+
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+            const decryptedKey = decryptData(data.file_key);
+            const decryptedForm = decryptData(data.form_code);
+
+            // เช็คว่า Key ตรง และ Form ตรง (หรือเป็น General)
+            if (decryptedKey === fileKey && (decryptedForm === formCode || formCode === 'general')) {
+                return { 
+                    id: doc.id, 
+                    gcs_path: decryptData(data.gcs_path) 
+                };
+            }
+        }
+        return null;
     } catch (error) {
-        console.error('❌ Firestore Add File Error:', error);
+        console.error('❌ Get File By Key Error:', error.message);
+        return null;
+    }
+};
+
+// ✅ NEW: ลบไฟล์จาก DB
+exports.deleteFileRecord = async (sessionId, docId) => {
+    try {
+        await firestore.collection(COLLECTION_NAME).doc(sessionId)
+            .collection(SUB_COLLECTION_NAME).doc(docId).delete();
+        console.log(`✅ DB Record Deleted: ${docId}`);
+    } catch (error) {
+        console.error('❌ Delete DB Record Error:', error.message);
         throw error;
     }
 };
@@ -105,23 +114,21 @@ exports.getDecryptedSessionFiles = async (sessionId) => {
     try {
         const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
         const snapshot = await filesCollRef.get();
-
         if (snapshot.empty) return [];
 
         const files = [];
         snapshot.forEach(doc => {
             const data = doc.data();
-            
-            // ใช้ decryptData ตัวใหม่ที่ปลอดภัยขึ้น
             const gcsPathDecrypted = decryptData(data.gcs_path);
-
-            // ถ้า Decrypt ไม่ได้ (เป็น null) แสดงว่าไฟล์เสีย หรือ Key ผิด -> ให้ข้ามไป
-            if (gcsPathDecrypted) {
+            const fileKeyDecrypted = decryptData(data.file_key);
+            
+            if (gcsPathDecrypted && fileKeyDecrypted) {
                 files.push({
                     id: doc.id, 
-                    file_key: decryptData(data.file_key),
+                    file_key: fileKeyDecrypted,
                     gcs_path: gcsPathDecrypted,
                     file_type: decryptData(data.file_type),
+                    form_code: decryptData(data.form_code),
                     uploaded_at: data.uploaded_at
                 });
             }
@@ -133,32 +140,22 @@ exports.getDecryptedSessionFiles = async (sessionId) => {
     }
 };
 
+// ... (Chat Functions คงเดิม) ...
 exports.saveChatMessage = async (sessionId, role, message) => {
+    /* Code เดิม */
     try {
-        const chatRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection('chat_history');
-        await chatRef.add({
-            role: role, 
-            parts: [{ text: message }],
-            timestamp: Firestore.FieldValue.serverTimestamp()
+        await firestore.collection(COLLECTION_NAME).doc(sessionId).collection('chat_history').add({
+            role, parts: [{ text: message }], timestamp: Firestore.FieldValue.serverTimestamp()
         });
-    } catch (error) {
-        console.error('Save Chat Error:', error);
-    }
+    } catch (e) { console.error(e); }
 };
 
 exports.getChatHistory = async (sessionId) => {
+    /* Code เดิม */
     try {
-        const chatRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection('chat_history');
-        const snapshot = await chatRef.orderBy('timestamp', 'asc').get();
-        if (snapshot.empty) return [];
-        return snapshot.docs.map(doc => ({
-            role: doc.data().role,
-            parts: doc.data().parts
-        }));
-    } catch (error) {
-        console.error('Get History Error:', error);
-        return [];
-    }
+        const s = await firestore.collection(COLLECTION_NAME).doc(sessionId).collection('chat_history').orderBy('timestamp', 'asc').get();
+        return s.docs.map(d => ({ role: d.data().role, parts: d.data().parts }));
+    } catch (e) { return []; }
 };
 
 exports.firestore = firestore;
