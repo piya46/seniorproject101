@@ -5,11 +5,12 @@ const { PDFDocument } = require('pdf-lib');
 const { departments, getFormConfig } = require('../data/staticData');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
+const { validate } = require('../middlewares/validationMiddleware');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
-router.post('/merge', authMiddleware, async (req, res) => {
+router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res) => {
   try {
     const { form_code, degree_level, sub_type } = req.body;
     // ✅ ใช้ req.user

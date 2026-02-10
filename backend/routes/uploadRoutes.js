@@ -4,8 +4,8 @@ const { Storage } = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
-const sharp = require('sharp'); // ต้อง npm install sharp
-const { PDFDocument } = require('pdf-lib'); // ต้อง npm install pdf-lib
+const sharp = require('sharp');
+const { PDFDocument } = require('pdf-lib');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { addFileToSession, deleteFileRecord, getFileRecordByKey } = require('../utils/dbUtils');
@@ -13,10 +13,9 @@ const { addFileToSession, deleteFileRecord, getFileRecordByKey } = require('../u
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
-// Config Multer: เก็บใน RAM ชั่วคราว (เพื่อรอ Process)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 } // Limit 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 const sanitizeFormCode = (code) => {
@@ -28,6 +27,20 @@ router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (re
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
+    // ✅ SECURITY UPGRADE: Magic Number Validation
+    // ใช้ Dynamic Import เพราะ file-type เวอร์ชั่นใหม่เป็น ESM Module
+    const { fileTypeFromBuffer } = await import('file-type');
+    const detectedType = await fileTypeFromBuffer(req.file.buffer);
+    
+    // อนุญาตเฉพาะ PDF, PNG, JPG, WEBP
+    const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    const ALLOWED_EXTS = ['jpg', 'png', 'webp', 'pdf'];
+
+    if (!detectedType || !ALLOWED_EXTS.includes(detectedType.ext) || !ALLOWED_MIMES.includes(detectedType.mime)) {
+        console.warn(`⛔ Security: File signature mismatch! Detected: ${detectedType ? detectedType.mime : 'Unknown'}`);
+        return res.status(400).json({ error: 'Security Violation: Invalid file signature.' });
+    }
+
     const sessionId = req.user.session_id; 
     const { file_key, form_code } = req.body; 
 
@@ -35,16 +48,11 @@ router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (re
 
     const safeFormCode = sanitizeFormCode(form_code);
     
-    // -------------------------------------------------------------------
-    // STEP 1: Overwrite Logic (หาไฟล์เก่าแล้วลบทิ้ง)
-    // -------------------------------------------------------------------
+    // --- STEP 1: Overwrite Logic ---
     try {
         const oldFile = await getFileRecordByKey(sessionId, file_key, safeFormCode);
-        
         if (oldFile) {
             console.log(`♻️ Cleanup: Removing old version of ${file_key}`);
-            
-            // 1.1 ลบไฟล์จาก GCS
             try {
                 const gcsFile = bucket.file(oldFile.gcs_path);
                 const [exists] = await gcsFile.exists();
@@ -52,46 +60,35 @@ router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (re
             } catch (gcsErr) {
                 console.warn('⚠️ GCS Delete Warning:', gcsErr.message);
             }
-
-            // 1.2 ลบ Record จาก Database
             await deleteFileRecord(sessionId, oldFile.id);
         }
     } catch (err) {
         console.error('❌ Pre-upload cleanup failed:', err.message);
-        // ไม่ return error เพื่อให้ process การอัปโหลดไฟล์ใหม่ทำงานต่อได้ (Fail-Open)
     }
 
-    // -------------------------------------------------------------------
-    // STEP 2: Sanitization & Re-processing (Polyglot Protection)
-    // -------------------------------------------------------------------
+    // --- STEP 2: Sanitization & Re-processing ---
     let processedBuffer;
-    let finalMimeType = req.file.mimetype;
-    let fileExtension = path.extname(req.file.originalname).toLowerCase();
+    let finalMimeType = detectedType.mime; // ใช้ Type จริงที่ตรวจเจอ
+    let fileExtension = `.${detectedType.ext}`;
 
     try {
-        if (['image/jpeg', 'image/png', 'image/webp'].includes(req.file.mimetype)) {
-            // ✅ Re-encode รูปภาพด้วย Sharp (ล้าง Exif/Metadata/Scripts)
+        if (['image/jpeg', 'image/png', 'image/webp'].includes(finalMimeType)) {
             processedBuffer = await sharp(req.file.buffer)
-                .rotate() // หมุนภาพตาม Exif แล้วลบ Exif ทิ้ง
+                .rotate()
                 .toFormat('jpeg', { quality: 80 }) 
                 .toBuffer();
             finalMimeType = 'image/jpeg';
             fileExtension = '.jpg';
-        } else if (req.file.mimetype === 'application/pdf') {
-            // ✅ Re-save PDF ด้วย pdf-lib (ล้าง JS objects แฝง)
+        } else if (finalMimeType === 'application/pdf') {
             const pdfDoc = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
             processedBuffer = Buffer.from(await pdfDoc.save()); 
-        } else {
-            return res.status(400).json({ error: 'Unsupported file type. Only PDF and Images allowed.' });
         }
     } catch (processErr) {
         console.error('❌ File Sanitization Failed:', processErr.message);
         return res.status(400).json({ error: 'File verification failed. The file may be corrupted or unsafe.' });
     }
 
-    // -------------------------------------------------------------------
-    // STEP 3: Upload New File to GCS
-    // -------------------------------------------------------------------
+    // --- STEP 3: Upload New File to GCS ---
     const uniqueFileName = `${uuidv4()}${fileExtension}`;
     const gcsPath = `${sessionId}/${safeFormCode}/${uniqueFileName}`;
     const blob = bucket.file(gcsPath);
@@ -101,7 +98,6 @@ router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (re
       contentType: finalMimeType,
       metadata: {
         metadata: {
-            // ✅ ไม่เก็บ Original Filename เพื่อป้องกัน Reflected XSS
             originalName: 'sanitized_upload', 
             uploadedBy: sessionId,
             formCode: safeFormCode,
@@ -117,9 +113,6 @@ router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (re
 
     blobStream.on('finish', async () => {
       try {
-        // -------------------------------------------------------------------
-        // STEP 4: Save Metadata to DB
-        // -------------------------------------------------------------------
         await addFileToSession(sessionId, {
             file_key: file_key,
             gcs_path: gcsPath,
@@ -142,7 +135,7 @@ router.post('/', authMiddleware, strictLimiter, upload.single('file'), async (re
       }
     });
 
-    blobStream.end(processedBuffer); // ส่ง Buffer ที่ผ่านการฆ่าเชื้อแล้ว
+    blobStream.end(processedBuffer);
 
   } catch (error) {
     console.error('❌ Upload Handler Error:', error.message);

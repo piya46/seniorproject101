@@ -4,6 +4,7 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { forms, getFormConfig } = require('../data/staticData');
 const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
+const { validate } = require('../middlewares/validationMiddleware');
 
 const project = process.env.GCP_PROJECT_ID || "seniorproject101";
 
@@ -59,7 +60,7 @@ const model = vertex_ai.getGenerativeModel({
   }
 });
 
-router.post('/recommend', authMiddleware, async (req, res) => {
+router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (req, res) => {
   try {
     const { message, degree_level } = req.body;
     
