@@ -7,14 +7,12 @@ module.exports = (req, res, next) => {
     // --- 1. ตรวจสอบและถอดรหัส (Inbound) ---
     if (ENCRYPTED_METHODS.includes(req.method)) {
         
-        // เช็คว่ามี Body และมีโครงสร้างการเข้ารหัสครบไหม (encKey + payload)
         if (req.body && req.body.encKey && req.body.payload) {
             
-            // ✅ มีการเข้ารหัสมา -> พยายามถอดรหัส
+            // ✅ 1. พยายามถอดรหัส
             const result = decryptHybridPayload(req.body);
             
             if (!result) {
-                // กรณี Key ผิด หรือข้อมูลถูกดัดแปลงกลางทาง
                 console.warn(`⚠️ Security Alert: Decryption failed from IP ${req.ip}`);
                 return res.status(400).json({ 
                     error: 'Security Error', 
@@ -22,18 +20,35 @@ module.exports = (req, res, next) => {
                 });
             }
 
-            // ถอดรหัสสำเร็จ: แทนที่ Body เดิมด้วยข้อมูลจริง
-            req.body = result.data;
-            res.locals.sessionKey = result.aesKey; // เก็บ Key ไว้ตอบกลับ
+            const { data, aesKey } = result;
+
+            // ✅ 2. [NEW] Anti-Replay Attack Protection
+            // Client ต้องส่ง { ...data, _ts: Date.now() } มาด้วยเสมอ
+            const REQUEST_MAX_AGE = 60 * 1000; // 1 นาที
+            const now = Date.now();
+
+            if (!data._ts || typeof data._ts !== 'number') {
+                 console.warn(`⚠️ Security Alert: Missing timestamp in payload from IP ${req.ip}`);
+                 return res.status(400).json({ error: 'Security Error', message: 'Missing timestamp (_ts) in encrypted payload.' });
+            }
+
+            if (now - data._ts > REQUEST_MAX_AGE) {
+                console.warn(`⚠️ Replay Attack Detected: Expired timestamp from IP ${req.ip}`);
+                return res.status(403).json({ error: 'Security Error', message: 'Request expired. Please sync your clock.' });
+            }
+
+            // (Optional) Future timestamp check (กันคนตั้งเวลาล่วงหน้า)
+            if (data._ts > now + 5000) {
+                 return res.status(400).json({ error: 'Security Error', message: 'Invalid timestamp (future).' });
+            }
+
+            // ถอดรหัสสำเร็จ & ผ่าน Security Check: แทนที่ Body เดิม
+            req.body = data;
+            res.locals.sessionKey = aesKey; 
 
         } else {
-            // ❌ ไม่มีการเข้ารหัสมา (Plaintext) -> REJECT ทันที!
+            // ❌ ไม่มีการเข้ารหัสมา (Plaintext) -> REJECT
             console.warn(`⛔ Blocked unencrypted request to ${req.path} from IP ${req.ip}`);
-            
-            // if(req.path === '/api/v1/session/init') return next;
-            // ข้อยกเว้น: ถ้าต้องการปล่อยบาง Path ให้รับ Plaintext ได้ (เช่น Webhook) ให้ใส่ตรงนี้
-            // if (req.path === '/api/v1/webhook') return next();
-
             return res.status(403).json({ 
                 error: 'Access Denied', 
                 message: 'This API requires Encryption. Please encrypt your payload.' 
@@ -41,13 +56,16 @@ module.exports = (req, res, next) => {
         }
     }
 
-    // --- 2. เข้ารหัสข้อมูลขากลับ (Outbound) ---
+    // --- 3. เข้ารหัสข้อมูลขากลับ (Outbound) ---
     const originalJson = res.json;
     res.json = function (data) {
 
         if (res.locals.sessionKey) {
             try {
-                const encryptedResponse = encryptSymmetric(data, res.locals.sessionKey);
+                // ตอบกลับก็ควรมี Timestamp ด้วยเพื่อให้ Client เช็คได้ (Optional แต่แนะนำ)
+                const responseData = typeof data === 'object' ? { ...data, _ts: Date.now() } : data;
+                
+                const encryptedResponse = encryptSymmetric(responseData, res.locals.sessionKey);
                 return originalJson.call(this, encryptedResponse);
             } catch (err) {
                 console.error('Response Encryption Error:', err);

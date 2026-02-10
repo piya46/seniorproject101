@@ -9,6 +9,8 @@ if (process.env.Gb_PRIVATE_KEY_BASE64 && process.env.Gb_PUBLIC_KEY_BASE64) {
         PUBLIC_KEY = Buffer.from(process.env.Gb_PUBLIC_KEY_BASE64, 'base64').toString('utf8');
     } catch (e) {
         console.error("❌ Error loading keys from Env:", e.message);
+        // ใน Production ถ้า Key โหลดไม่ได้ ควร Crash App ไปเลยเพื่อความปลอดภัย
+        if (process.env.NODE_ENV === 'production') process.exit(1);
     }
 } else {
     if (process.env.NODE_ENV === 'production') {
@@ -19,10 +21,10 @@ if (process.env.Gb_PRIVATE_KEY_BASE64 && process.env.Gb_PUBLIC_KEY_BASE64) {
 
 exports.getPublicKey = () => PUBLIC_KEY;
 
-
 exports.decryptHybridPayload = (encryptedPackage) => {
     try {
         const { encKey, iv, tag, payload } = encryptedPackage;
+        if (!encKey || !iv || !tag || !payload) return null; // Validate structure
 
         // ขั้นที่ 1: ใช้ Private Key แกะ AES Key ออกมา
         const aesKeyBuffer = crypto.privateDecrypt(
@@ -47,12 +49,12 @@ exports.decryptHybridPayload = (encryptedPackage) => {
         };
 
     } catch (error) {
+        // Log แค่ message พอ อย่า Log error เต็มๆ เพราะอาจมี Sensitive Data
         console.error('Decryption Failed:', error.message);
         return null;
     }
 };
 
-// 3. เข้ารหัส (Symmetric Encrypt: AES)
 exports.encryptSymmetric = (data, aesKeyBuffer) => {
     try {
         const iv = crypto.randomBytes(12);
@@ -67,7 +69,7 @@ exports.encryptSymmetric = (data, aesKeyBuffer) => {
             tag: cipher.getAuthTag().toString('base64')
         };
     } catch (error) {
-        console.error('Encryption Failed:', error);
+        console.error('Encryption Failed:', error.message);
         throw error;
     }
 };

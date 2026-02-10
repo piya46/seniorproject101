@@ -49,7 +49,7 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser()); 
 app.use(generalLimiter);
 
@@ -57,7 +57,7 @@ app.use(generalLimiter);
 // 📄 SWAGGER SETUP
 // -------------------------------------------------------
 const swaggerFile = path.join(__dirname, 'swagger.json');
-if (fs.existsSync(swaggerFile)) {
+if (process.env.NODE_ENV === 'development' && fs.existsSync(swaggerFile)) {
     const swaggerDocument = require(swaggerFile);
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 }

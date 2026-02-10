@@ -15,7 +15,11 @@ module.exports = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // ✅ Security Fix: ระบุ Algorithm ให้ชัดเจน (HS256) ป้องกัน Downgrade Attack
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        algorithms: ['HS256'] 
+    });
+    
     req.session = decoded; 
     next();
   } catch (err) {

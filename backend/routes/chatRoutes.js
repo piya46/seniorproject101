@@ -48,11 +48,8 @@ ${formsInfo}
    Format: { "reply": "ข้อความตอบกลับนิสิต...", "recommended_form": "รหัสฟอร์ม หรือ null" }
 `;
 
-// Initialize Vertex AI with Global Location
 const vertex_ai = new VertexAI({ project: project, location: location });
 
-// [CRITICAL FIX] เปลี่ยนชื่อโมเดลเป็นตัวที่มีอยู่จริง (gemini-3.0 ยังไม่มี)
-// การใช้ชื่อผิดกับ Global Endpoint จะทำให้ Server ตอบกลับเป็น HTML Error Page (สาเหตุของ SyntaxError)
 const model = vertex_ai.getGenerativeModel({
   model: 'gemini-2.5-flash', 
   systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
@@ -71,7 +68,6 @@ router.post('/recommend', authMiddleware, async (req, res) => {
         return res.status(400).json({ error: "Message is required" });
     }
     
-    // 1. ดึงประวัติแชท
     let history = [];
     try {
         history = await getChatHistory(sessionId);
@@ -79,7 +75,6 @@ router.post('/recommend', authMiddleware, async (req, res) => {
         console.warn("Could not fetch chat history:", err);
     }
 
-    // 2. เริ่ม Chat Session
     const chat = model.startChat({
         history: history,
     });

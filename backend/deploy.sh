@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # ==========================================
 # ⚙️ CONFIGURATION
 # ==========================================
@@ -92,8 +90,7 @@ create_secret_if_missing $SECRET_NAME "$RANDOM_JWT"
 RANDOM_DB_KEY=$(openssl rand -hex 32)
 create_secret_if_missing $DB_KEY_SECRET "$RANDOM_DB_KEY"
 
-# 5.3 RSA Key Pair (สร้างจริงด้วย OpenSSL ถ้าไม่มี)
-# ตรวจสอบว่ามี Private Key หรือยัง ถ้ายังไม่มี ให้สร้างใหม่ทั้งคู่
+
 if ! gcloud secrets describe $PRIV_KEY_SECRET &> /dev/null; then
     echo -e "   ⚙️  Generating NEW RSA Key Pair..."
     
