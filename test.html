@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sci-Request | Multi-File Lab</title>
+    <title>Sci-Request | Secured Client</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -50,15 +50,15 @@
                 <i class="fa-solid fa-flask text-lg"></i>
             </div>
             <div>
-                <h1 class="font-bold text-slate-100 text-lg tracking-tight">Sci-Request <span class="text-indigo-400 font-mono text-xs ml-2 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-500/20">PROTOTYPE</span></h1>
+                <h1 class="font-bold text-slate-100 text-lg tracking-tight">Sci-Request <span class="text-indigo-400 font-mono text-xs ml-2 bg-indigo-950/50 px-2 py-0.5 rounded border border-indigo-500/20">SECURED</span></h1>
             </div>
         </div>
         
         <div class="flex items-center gap-4">
             <div class="relative group">
                 <i class="fa-solid fa-server absolute left-3 top-2.5 text-slate-500 text-xs transition-colors group-focus-within:text-indigo-400"></i>
-                <input type="text" id="baseUrl" value="https://sci-request-system-466086429766.asia-southeast3.run.app" 
-                       placeholder="http://localhost:3000"
+                <input type="text" id="baseUrl" value="http://localhost:8080" 
+                       placeholder="http://localhost:8080"
                        class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg pl-9 pr-3 py-2 w-72 font-mono focus:border-indigo-500 outline-none transition-all shadow-sm">
             </div>
             <button onclick="authenticate()" id="session-btn" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 transition text-xs font-medium text-slate-300">
@@ -189,10 +189,14 @@
         // --- Shared State ---
         let state = {
             baseUrl: document.getElementById('baseUrl').value,
-            uploadedFiles: new Set() // Track uploaded keys
+            uploadedFiles: new Set()
         };
 
         // --- Helpers ---
+        function generateNonce() {
+            return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
+
         function switchTab(tab) {
             const vRes = document.getElementById('view-results');
             const vChat = document.getElementById('view-chat');
@@ -207,52 +211,80 @@
             } else {
                 vRes.classList.add('hidden');
                 vChat.classList.remove('hidden');
-                vChat.classList.add('flex'); // Chat needs flex
+                vChat.classList.add('flex');
                 tChat.className = "flex-1 py-3 text-xs font-bold text-indigo-400 border-b-2 border-indigo-500 bg-indigo-500/5 transition-all";
                 tRes.className = "flex-1 py-3 text-xs font-bold text-slate-500 hover:text-slate-300 transition-all";
             }
         }
 
-        // --- 🔐 Secure Client (Same as before) ---
+        // --- 🔐 Secure Client (Fixed for Security Middleware) ---
         const SecureClient = {
             publicKey: null,
+            
             async init() {
                 const urlInput = document.getElementById('baseUrl').value.replace(/\/$/, '');
                 state.baseUrl = urlInput + '/api/v1'; 
                 axios.defaults.withCredentials = true;
+
                 if(!this.publicKey) {
                     try {
                         const res = await axios.get(`${state.baseUrl}/auth/public-key`);
                         this.publicKey = res.data.publicKey;
-                    } catch(e) { console.error('Handshake error', e); }
+                        console.log('✅ Handshake: Public Key Received');
+                    } catch(e) { 
+                        console.error('❌ Handshake error', e); 
+                        alert('Could not connect to server. Please check URL.');
+                    }
                 }
             },
+
             async post(endpoint, data, headers = {}) {
                 if(!this.publicKey) await this.init();
+                
+                // ✅ FIX: Inject Timestamp & Nonce BEFORE Encryption
+                const securePayload = {
+                    ...data,
+                    _ts: Date.now(),
+                    nonce: generateNonce()
+                };
+
+                // Hybrid Encryption Process
                 const aesKey = forge.random.getBytesSync(32);
                 const iv = forge.random.getBytesSync(12);
                 const cipher = forge.cipher.createCipher('AES-GCM', aesKey);
                 cipher.start({ iv: iv });
-                cipher.update(forge.util.createBuffer(JSON.stringify(data), 'utf8'));
+                cipher.update(forge.util.createBuffer(JSON.stringify(securePayload), 'utf8'));
                 cipher.finish();
+
+                // Encrypt AES Key with RSA
                 const pubKeyObj = forge.pki.publicKeyFromPem(this.publicKey);
                 const encryptedAesKey = pubKeyObj.encrypt(aesKey, 'RSA-OAEP', { md: forge.md.sha256.create() });
                 
-                const payload = {
+                const finalBody = {
                     encKey: forge.util.encode64(encryptedAesKey),
                     iv: forge.util.encode64(iv),
                     payload: forge.util.encode64(cipher.output.getBytes()),
                     tag: forge.util.encode64(cipher.mode.tag.getBytes())
                 };
-                const res = await axios.post(`${state.baseUrl}${endpoint}`, payload, { headers, validateStatus: () => true });
+
+                const res = await axios.post(`${state.baseUrl}${endpoint}`, finalBody, { headers, validateStatus: () => true });
+
+                // Decrypt Response if Encrypted
                 if(res.data && res.data.payload) {
-                    const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
-                    decipher.start({ iv: forge.util.decode64(res.data.iv), tag: forge.util.decode64(res.data.tag) });
-                    decipher.update(forge.util.createBuffer(forge.util.decode64(res.data.payload)));
-                    if(decipher.finish()) res.data = JSON.parse(decipher.output.toString());
+                    try {
+                        const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
+                        decipher.start({ iv: forge.util.decode64(res.data.iv), tag: forge.util.decode64(res.data.tag) });
+                        decipher.update(forge.util.createBuffer(forge.util.decode64(res.data.payload)));
+                        if(decipher.finish()) {
+                            res.data = JSON.parse(decipher.output.toString());
+                        }
+                    } catch (e) {
+                        console.error('Response Decryption Failed', e);
+                    }
                 }
                 return res;
             },
+
             async get(endpoint, params = {}) {
                 if(!state.baseUrl) await this.init();
                 return await axios.get(`${state.baseUrl}${endpoint}`, { params, validateStatus: () => true });
@@ -284,20 +316,28 @@
             const btn = document.getElementById('session-btn');
             const dot = document.getElementById('session-dot');
             const text = document.getElementById('session-text');
+            
             SecureClient.publicKey = null; 
             text.innerText = "Connecting...";
+            
             try {
+                // Now sends _ts and nonce automatically inside SecureClient.post
                 const res = await SecureClient.post('/session/init', {});
+                
                 if (res.status === 200 || res.status === 201) {
-                    setCookie('sci_session_token', 'active', 1);
+                    setCookie('sci_session_token', 'active', 1); // Frontend state only
                     dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]";
                     text.innerText = "Session Active";
                     btn.classList.add('border-emerald-500/50', 'bg-emerald-500/10', 'text-emerald-400');
+                    console.log('Session ID:', res.data.sessionId);
+                } else {
+                    throw new Error(res.data.message || 'Auth Failed');
                 }
             } catch (e) {
                 console.error(e);
                 text.innerText = "Auth Failed";
                 dot.className = "w-2 h-2 rounded-full bg-rose-500";
+                alert('Connection Error: ' + (e.response?.data?.message || e.message));
             }
         }
 
@@ -398,19 +438,20 @@
             progressBar.style.width = '30%';
 
             try {
-                // 1. Get Signed URL
+                // 1. Get Signed URL (Secure Encrypted Post)
                 const r1 = await SecureClient.post('/upload/signed-url', {
                     file_name: file.name, 
                     file_type: file.type || 'application/pdf',
                     file_size: file.size, 
                     file_key: key
                 });
-                if(r1.status !== 200) throw new Error('Signed URL failed');
+
+                if(r1.status !== 200) throw new Error(r1.data.message || 'Signed URL failed');
                 
                 progressBar.style.width = '60%';
                 const { upload_url, gcs_path } = r1.data;
 
-                // 2. Upload to GCS
+                // 2. Upload to GCS (Direct Put - No Encryption Needed for binary)
                 await axios.put(upload_url, file, { 
                     headers: { 'Content-Type': file.type },
                     withCredentials: false
@@ -418,7 +459,7 @@
                 
                 progressBar.style.width = '90%';
 
-                // 3. Confirm
+                // 3. Confirm (Secure Encrypted Post)
                 await SecureClient.post('/upload/finalize', {
                     file_key: key,
                     gcs_path: gcs_path,
@@ -466,7 +507,7 @@
         async function batchValidate() {
             const btn = document.getElementById('btn-batch-validate');
             btn.disabled = true;
-            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Analyzing ${state.uploadedFiles.size} Documents...`;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Analyzing Documents...`;
             
             // Switch to Results Tab
             switchTab('results');
@@ -494,23 +535,20 @@
                 // Render Results
                 resContainer.innerHTML = '';
                 const rawData = res.data;
-                console.log('Validation Results:', rawData);
-
-                // Iterate through uploaded files to match results
-                // Note: The AI might return keys we don't expect, or skip keys.
-                // We map based on the results returned.
-                
                 const resultKeys = Object.keys(rawData);
+                
                 if (resultKeys.length === 0) {
                     resContainer.innerHTML = '<div class="text-center text-slate-500 text-xs py-4">No analysis results returned.</div>';
                     return;
                 }
 
                 resultKeys.forEach(key => {
-                    // Skip if it's "status" or "message" root keys
-                    if (key === 'status' || key === 'message') return;
+                    if (key === 'status' || key === 'message' || key === '_ts') return;
 
                     const item = rawData[key];
+                    // Skip if not an object or missing status
+                    if (typeof item !== 'object' || !item.status) return;
+
                     const status = item.status || 'unknown';
                     const reason = item.reason || 'No details provided';
                     const isValid = status.toLowerCase().includes('valid') && !status.toLowerCase().includes('invalid');
@@ -542,7 +580,7 @@
                     <div class="bg-rose-950/30 border border-rose-500/50 rounded-xl p-4 text-center">
                         <i class="fa-solid fa-triangle-exclamation text-rose-400 text-2xl mb-2"></i>
                         <p class="text-rose-300 text-xs font-bold">Analysis Failed</p>
-                        <p class="text-rose-400/70 text-[10px] mt-1">${e.response?.data?.error || e.message}</p>
+                        <p class="text-rose-400/70 text-[10px] mt-1">${e.response?.data?.message || e.message}</p>
                     </div>
                 `;
             } finally {
@@ -574,7 +612,14 @@
         }
 
         // Init
-        setTimeout(() => { if(document.getElementById('baseUrl').value) SecureClient.init().then(() => authenticate()); }, 500);
+        setTimeout(() => { 
+            // Only auto-connect if base url is present
+            if(document.getElementById('baseUrl').value) {
+                SecureClient.init();
+            }
+        }, 500);
+        
+        // Initial Fetch
         fetchFormDetails();
     </script>
 </body>

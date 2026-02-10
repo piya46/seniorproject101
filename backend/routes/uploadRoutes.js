@@ -5,7 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
-const rateLimit = require('express-rate-limit'); // ✅ ต้องลง npm install express-rate-limit เพิ่ม
+const rateLimit = require('express-rate-limit');
+const forge = require('node-forge'); // ✅ เพิ่ม: Library สำหรับถอดรหัส
 
 const authMiddleware = require('../middlewares/authMiddleware');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
@@ -14,22 +15,21 @@ const { addFileToSession, deleteFileRecord, getFileRecordByKey } = require('../u
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
-// ✅ SECURITY UPGRADE 1: สร้าง Rate Limiter แยกเฉพาะสำหรับ Upload
-// ป้องกันการระดมยิงไฟล์ใส่ Server จน RAM เต็ม
+// Rate Limiter เฉพาะ Upload
 const uploadLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 นาที
-    max: 10, // อนุญาตแค่ 10 Request ต่อ IP (สำหรับการ Upload)
+    windowMs: 15 * 60 * 1000, 
+    max: 10, 
     message: { error: 'Too many uploads', message: 'Upload limit exceeded. Please wait.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
-// ✅ SECURITY UPGRADE 2: Config Multer ให้เข้มงวดที่สุด
+// Config Multer
 const upload = multer({
-  storage: multer.memoryStorage(), // ยังใช้ RAM แต่มี limiter คุมหน้าด่านแล้ว
+  storage: multer.memoryStorage(),
   limits: { 
-      fileSize: 5 * 1024 * 1024, // 5MB (Hard Limit)
-      files: 1 // รับแค่ทีละ 1 ไฟล์เท่านั้น
+      fileSize: 5 * 1024 * 1024, // 5MB
+      files: 1 
   }
 });
 
@@ -38,14 +38,65 @@ const sanitizeFormCode = (code) => {
     return code.replace(/[^a-zA-Z0-9-_]/g, '');
 };
 
-// นำ uploadLimiter มาแปะหน้าสุด
+// 🔒 Helper Function: ถอดรหัสไฟล์
+const decryptFileBuffer = (encryptedBuffer, encKey64, iv64, tag64) => {
+    try {
+        // 1. เตรียม Private Key ของ Server
+        if (!process.env.Gb_PRIVATE_KEY_BASE64) throw new Error('Server Private Key missing');
+        const privateKeyPem = Buffer.from(process.env.Gb_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
+        const rsaPrivateKey = forge.pki.privateKeyFromPem(privateKeyPem);
+
+        // 2. ถอดรหัส AES Key (ที่ถูก Encrypt มาด้วย Public Key ของ Server)
+        const aesKey = rsaPrivateKey.decrypt(forge.util.decode64(encKey64), 'RSA-OAEP', { md: forge.md.sha256.create() });
+
+        // 3. ถอดรหัสเนื้อไฟล์ (AES-GCM)
+        const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
+        decipher.start({ 
+            iv: forge.util.decode64(iv64), 
+            tag: forge.util.decode64(tag64) 
+        });
+        
+        // แปลง Buffer เป็น Binary String เพื่อให้ forge อ่านได้
+        decipher.update(forge.util.createBuffer(encryptedBuffer.toString('binary')));
+        
+        const pass = decipher.finish();
+        if (!pass) throw new Error('Decryption integrity check failed (Tag Mismatch)');
+
+        // แปลงกลับเป็น NodeJS Buffer
+        return Buffer.from(decipher.output.getBytes(), 'binary');
+
+    } catch (err) {
+        console.error('🔐 Decryption Failed:', err.message);
+        throw err; 
+    }
+};
+
+// Route Handler
 router.post('/', uploadLimiter, authMiddleware, strictLimiter, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
-    // ✅ SECURITY UPGRADE 3: Magic Number Validation
+    let finalBuffer = req.file.buffer;
+
+    // ✅ SECURITY UPGRADE: ตรวจสอบและถอดรหัสถ้ามีการเข้ารหัสส่งมา
+    if (req.body.encKey && req.body.iv && req.body.tag) {
+        console.log(`🔐 Processing Encrypted Upload: ${req.body.file_key || 'unknown'}`);
+        try {
+            finalBuffer = decryptFileBuffer(
+                req.file.buffer, 
+                req.body.encKey, 
+                req.body.iv, 
+                req.body.tag
+            );
+            console.log('✅ Decryption Successful');
+        } catch (decryptErr) {
+            return res.status(400).json({ error: 'Security Error: Unable to decrypt file. Integrity check failed.' });
+        }
+    }
+
+    // ✅ SECURITY UPGRADE 3: Magic Number Validation (ใช้ finalBuffer ที่ถอดรหัสแล้ว)
     const { fileTypeFromBuffer } = await import('file-type');
-    const detectedType = await fileTypeFromBuffer(req.file.buffer);
+    const detectedType = await fileTypeFromBuffer(finalBuffer);
     
     const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     const ALLOWED_EXTS = ['jpg', 'png', 'webp', 'pdf'];
@@ -80,21 +131,21 @@ router.post('/', uploadLimiter, authMiddleware, strictLimiter, upload.single('fi
         console.error('❌ Pre-upload cleanup failed:', err.message);
     }
 
-    // --- STEP 2: Sanitization & Re-processing ---
+    // --- STEP 2: Sanitization & Re-processing (ใช้ finalBuffer) ---
     let processedBuffer;
     let finalMimeType = detectedType.mime;
     let fileExtension = `.${detectedType.ext}`;
 
     try {
         if (['image/jpeg', 'image/png', 'image/webp'].includes(finalMimeType)) {
-            processedBuffer = await sharp(req.file.buffer)
+            processedBuffer = await sharp(finalBuffer) // ใช้ Buffer ที่ถอดรหัสแล้ว
                 .rotate()
                 .toFormat('jpeg', { quality: 80 }) 
                 .toBuffer();
             finalMimeType = 'image/jpeg';
             fileExtension = '.jpg';
         } else if (finalMimeType === 'application/pdf') {
-            const pdfDoc = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
+            const pdfDoc = await PDFDocument.load(finalBuffer, { ignoreEncryption: true }); // ใช้ Buffer ที่ถอดรหัสแล้ว
             processedBuffer = Buffer.from(await pdfDoc.save()); 
         }
     } catch (processErr) {
