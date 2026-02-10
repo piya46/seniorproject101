@@ -24,10 +24,9 @@ router.post('/init', strictLimiter, async (req, res) => {
 
       await initSessionRecord(sessionId);
 
-      const expiresIn = 86400; // 24 ชม.
+      const expiresIn = 86400;
       const token = jwt.sign({ session_id: sessionId }, process.env.JWT_SECRET, { expiresIn });
 
-      // ✅ 2. ตั้งชื่อ Cookie ชื่อเดียว
       res.cookie('sci_session_token', token, {
           httpOnly: true,
           secure: true,      
