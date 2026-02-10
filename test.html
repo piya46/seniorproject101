@@ -57,9 +57,9 @@
         <div class="flex items-center gap-4">
             <div class="relative group">
                 <i class="fa-solid fa-server absolute left-3 top-2.5 text-slate-500 text-xs transition-colors group-focus-within:text-indigo-400"></i>
-                <input type="text" id="baseUrl" value="http://localhost:8080" 
-                       placeholder="http://localhost:8080"
-                       class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg pl-9 pr-3 py-2 w-72 font-mono focus:border-indigo-500 outline-none transition-all shadow-sm">
+                <input type="text" id="baseUrl" value="https://sci-request-system-466086429766.asia-southeast3.run.app" 
+                       placeholder="https://sci-request-system-466086429766.asia-southeast3.run.app"
+                       class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg pl-9 pr-3 py-2 w-80 font-mono focus:border-indigo-500 outline-none transition-all shadow-sm">
             </div>
             <button onclick="authenticate()" id="session-btn" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 transition text-xs font-medium text-slate-300">
                 <div id="session-dot" class="w-2 h-2 rounded-full bg-slate-500"></div>
@@ -467,8 +467,8 @@
                 formData.append('iv', forge.util.encode64(iv));
                 formData.append('tag', forge.util.encode64(tag));
 
+                // ✅ FIX: ลบ Header Content-Type เพื่อให้ Axios จัดการ Boundary เอง
                 const res = await axios.post(`${state.baseUrl}/upload`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
                     withCredentials: true,
                     onUploadProgress: (p) => {
                         const percent = Math.round((p.loaded * 100) / p.total);
