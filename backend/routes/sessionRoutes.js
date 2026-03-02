@@ -34,7 +34,8 @@ router.post('/init', strictLimiter, validate(sessionInitSchema), async (req, res
       res.cookie('sci_session_token', token, {
           httpOnly: true, // ห้าม JavaScript ฝั่ง Client เข้าถึง
           secure: isProduction, // บังคับ HTTPS เฉพาะ Production (จะได้ test local ง่าย)
-          sameSite: isProduction ? 'Strict' : 'Lax', // Production ต้อง Strict เท่านั้น
+        //   sameSite: isProduction ? 'Strict' : 'Lax', // Production ต้อง Strict เท่านั้น
+        sameSite: isProduction ? 'None' : 'Lax',
           maxAge: expiresIn * 1000
       });
 
