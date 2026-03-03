@@ -8,10 +8,23 @@ const authMiddleware = require('../middlewares/authMiddleware');
 
 router.get('/', authMiddleware, (req, res) => {
   const { degree_level } = req.query;
-  const availableForms = forms.filter(f => !degree_level || f.degree_level.includes(degree_level));
+  
+  // Filter คำร้องตามระดับการศึกษา (ป.ตรี หรือ บัณฑิตศึกษา)
+  let availableForms = forms.filter(f => !degree_level || f.degree_level.includes(degree_level));
+  
+  // แก้ไขข้อ 3: Sort ลำดับฟอร์มตามเลข จท.
+  availableForms.sort((a, b) => {
+    // ใช้ Regular Expression ปอกเอาเฉพาะตัวเลขออกมาจาก form_code (เช่น 'JT31' จะได้ 31)
+    // ถ้าดึงตัวเลขไม่ได้ (เช่น 'CF') จะถูกเซ็ตเป็นค่า Infinity เพื่อให้เด้งไปอยู่ล่างสุดของ List
+    const numA = parseInt(a.form_code.replace(/\D/g, '')) || Infinity;
+    const numB = parseInt(b.form_code.replace(/\D/g, '')) || Infinity;
+    
+    // เรียงจากน้อยไปมาก
+    return numA - numB;
+  });
+
   res.json({ data: availableForms });
 });
-
 
 router.get('/:form_code', authMiddleware, (req, res) => {
   const { form_code } = req.params;
