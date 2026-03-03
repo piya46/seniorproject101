@@ -12,7 +12,7 @@ exports.sessionInitSchema = secureBase; // ไม่ต้องการ field 
 // 2. Chat Recommend Schema
 exports.chatRecommendSchema = secureBase.extend({
     message: z.string().min(1, "Message is required").max(1000, "Message is too long"),
-    degree_level: z.enum(['bachelor', 'master', 'doctorate']).optional().default('bachelor')
+    degree_level: z.enum(['bachelor', 'graduate']).optional().default('bachelor')
 });
 
 // 3. Document Merge Schema
