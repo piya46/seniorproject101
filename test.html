@@ -101,7 +101,7 @@
                             <option value="late_reg">ขอลงทะเบียนเรียนหลังกำหนด</option>
                             <option value="keep_midterm_score">ขอเก็บตัวสอบกลางภาค</option>
                             <option value="missing_midterm">ขอขาดสอบกลางภาค</option>
-                            <option value="review_midterm">ขอทบทวนคะแนนสอบกลางภาค</option>
+                            <option value="review_score">ขอทบทวนคะแนนสอบ</option>
                             <option value="sick_midterm">ลาป่วยสำหรับกลางภาค</option>
                             <option value="postpone_final">ขอเลื่อนสอบปลายภาค</option>
                          </select>
@@ -602,7 +602,7 @@
 
                 const res = await SecureClient.post('/validation/check-completeness', {
                     form_code: formCode,
-                    student_level: degree,
+                    degree_level: degree,
                     sub_type: subType
                 });
 
