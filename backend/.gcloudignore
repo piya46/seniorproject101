@@ -16,3 +16,5 @@ keys/
 # ไม่จำเป็นต้องเอา Scripts ขึ้นไป (เพราะใช้แค่ตอน Dev)
 scripts/
 postman/
+
+deploy.sh

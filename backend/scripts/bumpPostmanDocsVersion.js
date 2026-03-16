@@ -70,4 +70,6 @@ if (!new RegExp(`^## ${nextVersion}$`, 'm').test(changelog)) {
 
 fs.writeFileSync(changelogPath, changelog);
 
+require('./syncApiDocumentationFromPostman');
+
 console.log(`Postman docs version bumped to ${nextVersion}`);

@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const helmet = require('helmet'); 
 const securityMiddleware = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
+const iapMiddleware = require('./middlewares/iapMiddleware');
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
 
 // Swagger Imports
@@ -13,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
+const iapEnabled = String(process.env.IAP_ENABLED || '').toLowerCase() === 'true';
 
 // --- Security Check ---
 const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME', 'Gb_PRIVATE_KEY_BASE64', 'Gb_PUBLIC_KEY_BASE64'];
@@ -61,6 +63,10 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser()); 
 app.use(generalLimiter);
 
+app.get('/healthz', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
 // Swagger Setup
 const swaggerFile = path.join(__dirname, 'swagger.json');
 if (process.env.NODE_ENV === 'development' && fs.existsSync(swaggerFile)) {
@@ -74,6 +80,7 @@ app.use(securityMiddleware);
 const BASE_URL = '/api/v1';
 
 app.use(`${BASE_URL}/auth`, authRoutes);
+app.use(BASE_URL, iapMiddleware);
 app.use(`${BASE_URL}/session`, require('./routes/sessionRoutes'));
 app.use(`${BASE_URL}/departments`, require('./routes/metaRoutes'));
 app.use(`${BASE_URL}/forms`, require('./routes/formRoutes'));
@@ -81,6 +88,7 @@ app.use(`${BASE_URL}/upload`, require('./routes/uploadRoutes'));
 app.use(`${BASE_URL}/validation`, require('./routes/validationRoutes'));
 app.use(`${BASE_URL}/documents`, require('./routes/documentRoutes'));
 app.use(`${BASE_URL}/chat`, require('./routes/chatRoutes'));
+app.use(`${BASE_URL}/support`, require('./routes/supportRoutes'));
 
 // Error Handler
 app.use((err, req, res, next) => {
@@ -96,4 +104,5 @@ app.listen(PORT, () => {
   console.log(`🚀 API running on port ${PORT}`);
   console.log(`🌍 Allowed Origins: ${allowedOrigins.join(', ')}`);
   console.log(`🔒 E2EE Security: ACTIVE`);
+  console.log(`🪪 IAP Enforcement: ${iapEnabled ? 'ENABLED' : 'DISABLED'}`);
 });

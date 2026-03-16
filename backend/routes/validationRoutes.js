@@ -14,7 +14,7 @@ const { validationCheckSchema } = require('../validators/schemas');
 // ✅ เพิ่ม strictLimiter ใน Route
 router.post('/check-completeness', authMiddleware, strictLimiter, validate(validationCheckSchema), async (req, res) => {
   try {
-    const { form_code, degree_level, sub_type } = req.body;
+    const { form_code, degree_level, sub_type, case_key } = req.body;
     const sessionId = req.user.session_id;
 
     // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติจาก Utility)
@@ -48,6 +48,17 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
         });
     }
 
+    const selectedCaseRule = Array.isArray(formConfig.case_rules) && case_key
+      ? formConfig.case_rules.find((rule) => rule.key === case_key)
+      : null;
+
+    if (case_key && !selectedCaseRule) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Case Key "${case_key}" not found for form "${form_code}".`
+      });
+    }
+
     // สร้าง Map เกณฑ์การตรวจรายไฟล์
     const criteriaMap = {};
     if (formConfig.required_documents) {
@@ -55,6 +66,38 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
             criteriaMap[doc.key] = doc.validation_criteria || "ตรวจสอบว่าเป็นเอกสารที่ถูกต้อง ชัดเจน และสมบูรณ์";
         });
     }
+
+    const caseRuleText = selectedCaseRule
+      ? `
+    กรณีที่ผู้ใช้เลือกตรวจ:
+    - case_key: "${selectedCaseRule.key}"
+    - ชื่อกรณี: "${selectedCaseRule.label || selectedCaseRule.key}"
+    - คำอธิบายเพิ่มเติม: "${selectedCaseRule.note || 'ไม่มี'}"
+    ${Array.isArray(selectedCaseRule.approval_requirements) && selectedCaseRule.approval_requirements.length > 0
+      ? `- ข้อกำหนดเรื่องการลงนาม/ความเห็น:\n${selectedCaseRule.approval_requirements.map((item) => `  - ${item}`).join('\n')}`
+      : ''}
+    `
+      : Array.isArray(formConfig.case_rules) && formConfig.case_rules.length > 0
+        ? `
+    ฟอร์มนี้มีกรณีย่อย (case rules) ดังนี้:
+    ${formConfig.case_rules.map((rule) => `- ${rule.key}: ${rule.label || rule.key}${rule.note ? ` (${rule.note})` : ''}`).join('\n')}
+    หากเอกสารหรือรายละเอียดในคำร้องบ่งชี้ชัดว่าเป็นกรณีใด ให้ใช้กรณีนั้นเป็นบริบทในการตรวจ
+    `
+        : '';
+
+    const approvalRequirementText = Array.isArray(formConfig.approval_requirements) && formConfig.approval_requirements.length > 0
+      ? `
+    ข้อกำหนดเรื่องการลงนาม/ความเห็นที่ควรปรากฏในเอกสาร:
+    ${formConfig.approval_requirements.map((item) => `- ${item}`).join('\n')}
+    `
+      : '';
+
+    const requiredFieldHintText = Array.isArray(formConfig.required_fields_hint) && formConfig.required_fields_hint.length > 0
+      ? `
+    รายละเอียดที่ควรมีใน main form หรือคำร้อง:
+    ${formConfig.required_fields_hint.map((item) => `- ${item}`).join('\n')}
+    `
+      : '';
 
     const project = process.env.GCP_PROJECT_ID || "seniorproject101";
     // ✅ ใช้ us-central1 เพื่อความเสถียรและรองรับ model ใหม่ๆ
@@ -119,8 +162,15 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     คุณคือ "เจ้าหน้าที่ทะเบียนผู้เชี่ยวชาญ" (Senior Registrar Officer) ของคณะวิทยาศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย
     หน้าที่ของคุณคือ: ตรวจสอบความถูกต้องและสอดคล้องของเอกสารประกอบคำร้องรหัส "${form_code}" อย่างละเอียดที่สุด
 
+    ระดับการศึกษา: "${degree_level || 'bachelor'}"
+    ${sub_type ? `ประเภทย่อยของคำร้อง: "${sub_type}"` : ''}
+
     รายการเอกสารที่ได้รับและเกณฑ์การตรวจ:
     ${promptRules}
+
+    ${approvalRequirementText}
+    ${requiredFieldHintText}
+    ${caseRuleText}
     
     🛑 ขั้นตอนการตรวจสอบ (Think Step-by-Step):
     
@@ -149,6 +199,7 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     - **กรณีไม่ผ่าน (เอกสารไม่สมบูรณ์):** ระบุจุดที่ขาดให้ชัด เช่น "ไม่พบส่วนลายเซ็นของผู้ปกครองที่มุมขวาล่าง กรุณาตรวจสอบว่าอัปโหลดไฟล์ฉบับที่มีลายเซ็นแล้วหรือไม่"
     - **กรณีไม่ผ่าน (ข้อมูลขัดแย้ง):** "ชื่อผู้ยื่นคำร้องในแบบฟอร์ม (นาย ก.) ไม่ตรงกับชื่อในใบรับรองแพทย์ (นาย ข.) กรุณาตรวจสอบเอกสารอีกครั้ง"
     - **กรณีไม่ผ่าน (ภาพไม่ชัด):** "ภาพถ่ายเอกสารมืดหรือเบลอจนไม่สามารถอ่านรายละเอียดสำคัญ (เช่น รหัสนิสิต) ได้ กรุณาถ่ายใหม่"
+    - หากฟอร์มนี้มี case rule หรือข้อกำหนดการลงนาม ให้ใช้เป็นส่วนหนึ่งของเกณฑ์การประเมินด้วย
     - ใช้ภาษาไทยแบบกึ่งทางการที่เข้าใจง่าย และเป็นมิตรแต่เด็ดขาดในความถูกต้อง
     `;
 

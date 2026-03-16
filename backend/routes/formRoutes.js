@@ -36,8 +36,12 @@ router.get('/:form_code', authMiddleware, (req, res) => {
     return res.status(404).json({ error: "Form not found" });
   }
 
-  // แยก conditions ออกมาเพื่อไม่ให้ส่งไป Frontend
-  const { conditions, required_documents, ...publicInfo } = fullConfig;
+  const {
+    required_documents = [],
+    approval_requirements = [],
+    case_rules = [],
+    ...publicInfo
+  } = fullConfig;
 
   // แยก validation_criteria ออกจากเอกสารแต่ละตัว
   const publicDocuments = required_documents.map(doc => {
@@ -45,9 +49,20 @@ router.get('/:form_code', authMiddleware, (req, res) => {
       return safeDoc;
   });
 
+  const publicCaseRules = case_rules.map((rule) => ({
+      key: rule.key,
+      label: rule.label || rule.key,
+      note: rule.note || null,
+      approval_requirements: Array.isArray(rule.approval_requirements)
+        ? rule.approval_requirements
+        : []
+  }));
+
   // ประกอบ Object ใหม่ที่จะส่งกลับไป
   const publicConfig = {
       ...publicInfo,
+      approval_requirements,
+      case_rules: publicCaseRules,
       required_documents: publicDocuments
   };
 

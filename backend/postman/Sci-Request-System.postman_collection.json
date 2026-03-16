@@ -1,10 +1,10 @@
 {
   "info": {
     "_postman_id": "0f93eb4e-44fa-4f84-87be-cfbb5cf8ca23",
-    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.6.1",
+    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.8.0",
     "description": {
       "type": "text/markdown",
-      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.6.1\n**Last Updated:** 2026-03-16\n\n## Change Summary\n- เปลี่ยน `Validation` ให้ใช้ `degree_level`\n- ปรับพฤติกรรมไฟล์ให้ใช้ไฟล์ล่าสุดต่อ `file_key`\n- ขยาย examples และ docs สำหรับแชร์ทีมภายใน\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ Backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- การดึง Public Key\n- การเริ่มต้น Session\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การแนะนำฟอร์มผ่านระบบแชต AI\n\n## รูปแบบการยืนยันตัวตน\n\nระบบนี้ออกแบบมาสำหรับฝั่ง Frontend ที่ใช้งานผ่าน Browser เป็นหลัก\n\nลำดับการทำงานมาตรฐานคือ\n\n1. เรียก `Get Public Key`\n2. เรียก `Initialize Session`\n3. Backend จะตั้ง cookie ชื่อ `sci_session_token`\n4. Request ถัดไปที่ต้องยืนยันตัวตนจะอาศัย cookie นี้\n\nบน Postman หลักการเดียวกันนี้ยังใช้ได้เช่นเดิม โดยหลังจาก `Initialize Session` สำเร็จ cookie จะถูกเก็บใน cookie jar ของ Postman สำหรับโดเมนเดียวกัน\n\n## รูปแบบการเข้ารหัส\n\nBackend บังคับให้ JSON `POST`, `PUT`, `PATCH` ต้องส่งแบบเข้ารหัส\n\n### Request ที่ Collection นี้จะเข้ารหัสให้อัตโนมัติ\n\n- JSON `POST`\n- JSON `PUT`\n- JSON `PATCH`\n\n### Request ที่ Collection นี้จะไม่เข้ารหัส\n\n- `GET`\n- `multipart/form-data` เช่น `POST /upload`\n\n## วิธีทำงานของสคริปต์เข้ารหัส\n\nสำหรับ endpoint ที่เป็น secure JSON ให้กรอก body แบบ plaintext ตาม business fields ปกติใน Postman จากนั้น collection-level pre-request script จะทำงานดังนี้\n\n1. อ่าน body ที่กรอกไว้\n2. เติม `_ts` และ `nonce`\n3. สร้าง AES key ใหม่สำหรับ request นั้น\n4. เข้ารหัส body ด้วย `AES-256-GCM`\n5. เข้ารหัส AES key ด้วย `RSA-OAEP` และ `SHA-256`\n6. แทนที่ body ก่อนส่งด้วย object ที่เข้ารหัสแล้ว\n\n### Plaintext body ก่อนเข้ารหัส\n\n```json\n{\n  \"...businessFields\": \"...\",\n  \"_ts\": 1710000000000,\n  \"nonce\": \"unique-request-id\"\n}\n```\n\n### รูปแบบ body ที่ถูกส่งจริง\n\n```json\n{\n  \"encKey\": \"base64-rsa-encrypted-aes-key\",\n  \"iv\": \"base64-12-byte-iv\",\n  \"tag\": \"base64-gcm-auth-tag\",\n  \"payload\": \"base64-aes-gcm-ciphertext\"\n}\n```\n\n## มุมมองที่ Frontend ต้องเข้าใจ\n\nสำหรับ frontend จริง ต้องแยกให้ออกระหว่าง business body กับ transport body\n\n- business body คือข้อมูลที่หน้าจอกรอกจริง เช่น `form_code`, `degree_level`, `sub_type`, `message`\n- transport body คือ object ที่ถูกเข้ารหัสแล้วและถูกส่งผ่าน network\n\nลำดับที่ frontend ควรคิดมีดังนี้\n\n1. ดึง public key จาก `GET /auth/public-key`\n2. เริ่ม session ด้วย `POST /session/init`\n3. สร้าง plaintext business body\n4. เติม `_ts` และ `nonce`\n5. สร้าง AES key ใหม่เฉพาะ request นั้น\n6. เข้ารหัส body ด้วย `AES-256-GCM`\n7. เข้ารหัส AES key ด้วย `RSA-OAEP SHA-256`\n8. ส่ง wrapper object ไปยัง backend\n9. ถ้า response ถูกเข้ารหัส ให้ถอดรหัสด้วย AES key ของ request เดิมก่อนส่งต่อให้ UI\n\n## รูปแบบข้อมูลก่อนและหลังเข้ารหัส\n\n### Business body ก่อนเข้ารหัส\n\n```json\n{\n  \"form_code\": \"JT44\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n### Plaintext body ที่ควรนำไปเข้ารหัสจริง\n\n```json\n{\n  \"form_code\": \"JT44\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null,\n  \"_ts\": 1710000000000,\n  \"nonce\": \"req-1710000000000-x8f4ab\"\n}\n```\n\n### Wrapper payload ที่ถูกส่งผ่าน network\n\n```json\n{\n  \"encKey\": \"base64-rsa-encrypted-aes-key\",\n  \"iv\": \"base64-12-byte-iv\",\n  \"tag\": \"base64-gcm-auth-tag\",\n  \"payload\": \"base64-aes-gcm-ciphertext\"\n}\n```\n\nความหมายของแต่ละ field:\n\n- `encKey` คือ AES key ที่ถูกเข้ารหัสด้วย public key ของ backend\n- `iv` คือ initialization vector สำหรับ AES-GCM\n- `tag` คือ authentication tag สำหรับตรวจความถูกต้องของข้อมูล\n- `payload` คือ business JSON ที่ถูกเข้ารหัสแล้ว\n\n## วิธีทำงานของสคริปต์ถอดรหัส Response\n\nสำหรับ secure endpoint ถ้า backend ส่ง response แบบเข้ารหัสกลับมา collection-level test script จะทำงานดังนี้\n\n1. ตรวจว่า response เป็น encrypted payload หรือไม่\n2. ใช้ AES key ของ request เดิม\n3. ถอดรหัส response\n4. เก็บผลลัพธ์ไว้ใน `lastDecryptedResponse`\n5. แสดงผล JSON ที่ถอดรหัสแล้วในแท็บ `Visualize`\n\n## สิ่งที่ Frontend มักทำผิด\n\n- reuse encrypted payload เดิม\n- ใช้ `_ts` เดิมซ้ำ\n- ใช้ `nonce` ซ้ำ\n- ลืมแนบ cookie ข้าม request\n- parse encrypted response เป็น JSON ปกติโดยไม่ถอดรหัสก่อน\n- retry request แต่จับคู่ response กับ AES key ผิดตัว\n\n## ข้อควรระวังเรื่อง Replay Protection\n\nBackend ตรวจทั้ง `_ts` และ `nonce`\n\nดังนั้น\n\n- ห้าม reuse encrypted payload เดิม\n- ทุกครั้งที่ส่ง request ใหม่ต้องมี `_ts` ใหม่\n- ทุกครั้งที่ส่ง request ใหม่ต้องมี `nonce` ใหม่\n- ไม่ควรคัดลอก body ที่เข้ารหัสแล้วมาใช้ซ้ำระหว่าง request\n\nCollection นี้จัดการให้โดยอัตโนมัติ\n\n## ลำดับการใช้งานที่แนะนำ\n\n1. `Get Public Key`\n2. `Initialize Session`\n3. `List Forms`\n4. `Get Form Detail`\n5. `Upload Document`\n6. `Check Completeness`\n7. `Merge Documents`\n8. `Recommend Form`\n\n## รูปแบบเอกสารในแต่ละ Request\n\nแต่ละ request จะมีข้อมูลประกอบดังนี้\n\n- คำอธิบาย endpoint\n- รูปแบบการส่งข้อมูล\n- ตัวอย่าง request หลายกรณี\n- ตัวอย่าง response หลายกรณี\n- ข้อผิดพลาดที่พบบ่อย\n\nCollection นี้ตั้งใจเขียนให้ใช้เป็นเอกสารภายในทีมได้โดยตรง"
+      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.8.0\n**Last Updated:** 2026-03-17\n\n## Change Summary\n- เพิ่ม endpoint `POST /support/technical-email` สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบพร้อมไฟล์แนบ optional\n- harden security ของ support endpoint ด้วย fixed server-side target email, browser origin check, file signature check และการ sanitize ค่า email/subject\n- อัปเดต collection, frontend guide และ test page ให้รองรับ flow ใหม่\n- อัปเดตคำอธิบายให้ตรง implementation ล่าสุดของ upload policy และ server-managed email target\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ Backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- การดึง Public Key\n- การเริ่มต้น Session\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- secure JSON endpoint ยังคงใช้ encryption layer เดิม\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n- endpoint นี้ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้องหลัก แต่เป็นช่องทางแจ้งปัญหาถึงทีมพัฒนา\n"
     },
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -771,7 +771,7 @@
             "header": [],
             "description": {
               "type": "text/markdown",
-              "content": "## สรุป\nดึงรายละเอียดฟอร์มแบบ public-safe สำหรับใช้สร้างหน้า checklist, ขั้นตอนการยื่น, และ upload slots\n\n## Query Parameters\n- `degree_level` optional\n- `sub_type` optional\n\n## หมายเหตุ\nBackend จะตัด field ภายในบางส่วนออก เช่น `validation_criteria` ดังนั้นฝั่ง Frontend ควรใช้เฉพาะข้อมูลที่ได้รับจริงจาก response\n\n## Request Example 1: JT31 ปริญญาตรี\n`GET /forms/JT31?degree_level=bachelor`\n\n## Request Example 2: JT32 บัณฑิตศึกษา\n`GET /forms/JT32?degree_level=graduate`\n\n## Request Example 3: JT34 ปริญญาตรี\n`GET /forms/JT34?degree_level=bachelor`\n\n## Request Example 4: JT35 ปริญญาตรี\n`GET /forms/JT35?degree_level=bachelor`\n\n## Request Example 5: JT41 late_reg\n`GET /forms/JT41?degree_level=bachelor&sub_type=late_reg`\n\n## Request Example 6: JT43 ปริญญาตรี\n`GET /forms/JT43?degree_level=bachelor`\n\n## Request Example 7: JT44 บัณฑิตศึกษา\n`GET /forms/JT44?degree_level=graduate`\n\n## ตาราง Error Code\n| Status | ความหมาย | กรณีที่พบบ่อย |\n| --- | --- | --- |\n| 200 | สำเร็จ | ดึงรายละเอียดฟอร์มได้ |\n| 401 | Unauthorized | ยังไม่มี session cookie |\n| 404 | Not Found | ไม่พบ form_code หรือ config ตาม query |"
+              "content": "## สรุป\nดึงรายละเอียดฟอร์มแบบ public-safe สำหรับใช้สร้างหน้า checklist, ขั้นตอนการยื่น, upload slots, approval checklist และตัวเลือกกรณีย่อย\n\n## Query Parameters\n- `degree_level` optional\n- `sub_type` optional\n\n## Public Fields ที่ควรใช้จาก response\n- `required_documents`\n- `submission_steps`\n- `conditions`\n- `approval_requirements`\n- `case_rules`\n\n## หมายเหตุ\nBackend จะตัด field ภายในบางส่วนออก เช่น `validation_criteria` ดังนั้นฝั่ง Frontend ควรใช้เฉพาะข้อมูลที่ได้รับจริงจาก response\n\n## Request Example 1: JT31 ปริญญาตรี\n`GET /forms/JT31?degree_level=bachelor`\n\n## Request Example 2: JT32 บัณฑิตศึกษา\n`GET /forms/JT32?degree_level=graduate`\n\n## Request Example 3: JT34 ปริญญาตรี\n`GET /forms/JT34?degree_level=bachelor`\n\n## Request Example 4: JT35 ปริญญาตรี\n`GET /forms/JT35?degree_level=bachelor`\n\n## Request Example 5: JT41 late_reg\n`GET /forms/JT41?degree_level=bachelor&sub_type=late_reg`\n\n## Request Example 6: JT43 ปริญญาตรี\n`GET /forms/JT43?degree_level=bachelor`\n\n## Request Example 7: JT44 บัณฑิตศึกษา\n`GET /forms/JT44?degree_level=graduate`\n\n## ตาราง Error Code\n| Status | ความหมาย | กรณีที่พบบ่อย |\n| --- | --- | --- |\n| 200 | สำเร็จ | ดึงรายละเอียดฟอร์มได้ |\n| 401 | Unauthorized | ยังไม่มี session cookie |\n| 404 | Not Found | ไม่พบ form_code หรือ config ตาม query |"
             },
             "url": {
               "raw": "{{baseUrl}}/forms/{{formCode}}?degree_level={{degreeLevel}}&sub_type={{subType}}",
@@ -814,7 +814,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"form_code\": \"JT44\",\n  \"name_th\": \"จท.44 คำร้องขอลาป่วย\",\n  \"submission_location\": \"ทะเบียนภาควิชาที่สังกัด\",\n  \"required_documents\": [\n    {\n      \"key\": \"main_form\",\n      \"label\": \"คำร้อง จท.44\",\n      \"required\": true\n    },\n    {\n      \"key\": \"medical_cert\",\n      \"label\": \"ใบรับรองแพทย์\",\n      \"required\": true\n    }\n  ]\n}"
+              "body": "{\n  \"form_code\": \"JT44\",\n  \"name_th\": \"จท.44 คำร้องขอลาป่วย\",\n  \"submission_location\": \"ทะเบียนภาควิชาที่สังกัด\",\n  \"approval_requirements\": [\n    \"อาจารย์ที่ปรึกษาลงนาม\",\n    \"อาจารย์ผู้สอนประจำวิชาลงนามตามกรณี\",\n    \"ภาควิชาส่งคำร้องผ่านระบบ Lesspaper\"\n  ],\n  \"case_rules\": [\n    {\n      \"key\": \"before_exam\",\n      \"label\": \"ลาป่วยก่อนสอบ\",\n      \"note\": \"กรณียังป่วยต่อเนื่องจนถึงวันสอบและไม่สามารถเข้าสอบได้\",\n      \"approval_requirements\": [\n        \"อาจารย์ที่ปรึกษาลงนาม\",\n        \"อาจารย์ผู้สอนประจำวิชาลงนาม\"\n      ]\n    },\n    {\n      \"key\": \"during_exam\",\n      \"label\": \"ลาป่วยระหว่างสอบ\",\n      \"note\": \"กรณีป่วยระหว่างช่วงสอบหลังสิ้นสุดการเรียนของภาคการศึกษา\",\n      \"approval_requirements\": [\n        \"อาจารย์ที่ปรึกษาลงนาม\"\n      ]\n    }\n  ],\n  \"required_documents\": [\n    {\n      \"key\": \"main_form\",\n      \"label\": \"คำร้อง จท.44\",\n      \"required\": true\n    },\n    {\n      \"key\": \"medical_cert\",\n      \"label\": \"ใบรับรองแพทย์\",\n      \"required\": true\n    }\n  ]\n}"
             },
             {
               "name": "Not Found 404",
@@ -893,7 +893,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"form_code\": \"JT41\",\n  \"name_th\": \"จท.41 คำร้องทั่วไป\",\n  \"submission_location\": \"ทะเบียนภาควิชาที่สังกัด\",\n  \"required_documents\": [\n    {\n      \"key\": \"main_form\",\n      \"label\": \"คำร้อง จท.41\",\n      \"required\": true\n    }\n  ]\n}"
+              "body": "{\n  \"form_code\": \"JT41\",\n  \"name_th\": \"จท.41 คำร้องทั่วไป\",\n  \"sub_type\": \"late_reg\",\n  \"submission_location\": \"ทะเบียนภาควิชาที่สังกัด\",\n  \"approval_requirements\": [\n    \"อาจารย์ที่ปรึกษาลงนาม\",\n    \"อาจารย์ผู้สอนลงนาม\",\n    \"หัวหน้าภาคลงนาม\"\n  ],\n  \"required_documents\": [\n    {\n      \"key\": \"main_form\",\n      \"label\": \"คำร้อง จท.41\",\n      \"required\": true\n    },\n    {\n      \"key\": \"attachment_form\",\n      \"label\": \"ใบแนบคำร้องลงทะเบียนหลังกำหนด\",\n      \"required\": true\n    }\n  ]\n}"
             },
             {
               "name": "ตัวอย่าง Request JT31 bachelor / Response 200",
@@ -1075,7 +1075,7 @@
             "header": [],
             "description": {
               "type": "text/markdown",
-              "content": "## สรุป\nอัปโหลดเอกสารหนึ่งไฟล์เข้าสู่ session ปัจจุบัน\n\n## Transport\nใช้ `multipart/form-data` และจะไม่ถูก collection script เข้ารหัสแบบ JSON wrapper\n\n## Required form-data fields\n- `file`\n- `file_key`\n\n## Optional form-data fields\n- `form_code`\n- `encKey`\n- `iv`\n- `tag`\n\n## Constraints\n- อัปโหลดได้ครั้งละ 1 ไฟล์\n- ขนาดไม่เกิน 10 MB\n- รองรับ `jpg`, `png`, `webp`, `pdf`\n\n## Request Example 1: ใบรับรองแพทย์ของ JT44\n- `file_key = medical_cert`\n- `form_code = JT44`\n\n## Request Example 2: แบบฟอร์มหลักของ JT44\n- `file_key = main_form`\n- `form_code = JT44`\n\n## Request Example 3: เอกสารทั่วไป\n- `file_key = student_id_card`\n- ไม่ส่ง `form_code` หรือส่งเป็น `general`\n\n## พฤติกรรมของ Backend\nBackend จะตรวจ signature ของไฟล์จริง, sanitize รูปภาพและ PDF, อัปโหลดขึ้น cloud storage และบันทึก metadata ผูกกับ session\n\n## พฤติกรรมไฟล์ล่าสุด\n- ถ้าอัปโหลดไฟล์ใหม่ด้วย `file_key` และ `form_code` เดิม ระบบจะถือว่าเป็นการแทนที่ไฟล์เดิม\n- backend จะลบ record/file เก่าของคู่นั้นก่อน แล้วเก็บไว้เฉพาะไฟล์ล่าสุด\n- endpoint ถัดไปอย่าง `Validation` และ `Merge` จะเห็นเฉพาะไฟล์ล่าสุดต่อ `file_key`\n\n## ตาราง Error Code\n| Status | ความหมาย | กรณีที่พบบ่อย |\n| --- | --- | --- |\n| 200 | สำเร็จ | อัปโหลดไฟล์ได้ |\n| 400 | Bad Request | ไม่มีไฟล์, ไม่มี file_key, type ไม่ถูกต้อง |\n| 401 | Unauthorized | ยังไม่มี session cookie |\n| 429 | Too Many Requests | อัปโหลดถี่เกิน limit |\n| 500 | Server Error | storage หรือ database มีปัญหา |"
+              "content": "## สรุป\nอัปโหลดเอกสารหนึ่งไฟล์เข้าสู่ session ปัจจุบัน\n\n## Transport\nใช้ `multipart/form-data` และจะไม่ถูก collection script เข้ารหัสแบบ JSON wrapper\n\n## Required form-data fields\n- `file`\n- `file_key`\n\n## Optional form-data fields\n- `form_code`\n- `encKey`\n- `iv`\n- `tag`\n\n## Constraints\n- อัปโหลดได้ครั้งละ 1 ไฟล์\n- ขนาดไม่เกิน 10 MB\n- รองรับ `jpg`, `png`, `webp`, `pdf`\n- ถ้า request มาจาก browser และมี `Origin` หรือ `Referer` backend จะตรวจให้ตรงกับ frontend allowlist\n\n## Request Example 1: ใบรับรองแพทย์ของ JT44\n- `file_key = medical_cert`\n- `form_code = JT44`\n\n## Request Example 2: แบบฟอร์มหลักของ JT44\n- `file_key = main_form`\n- `form_code = JT44`\n\n## Request Example 3: เอกสารทั่วไป\n- `file_key = student_id_card`\n- ไม่ส่ง `form_code` หรือส่งเป็น `general`\n\n## พฤติกรรมของ Backend\nBackend จะตรวจ signature ของไฟล์จริง, sanitize รูปภาพและ PDF, อัปโหลดขึ้น cloud storage และบันทึก metadata ผูกกับ session\n\n## พฤติกรรมไฟล์ล่าสุด\n- ถ้าอัปโหลดไฟล์ใหม่ด้วย `file_key` และ `form_code` เดิม ระบบจะถือว่าเป็นการแทนที่ไฟล์เดิม\n- backend จะลบ record/file เก่าของคู่นั้นก่อน แล้วเก็บไว้เฉพาะไฟล์ล่าสุด\n- endpoint ถัดไปอย่าง `Validation` และ `Merge` จะเห็นเฉพาะไฟล์ล่าสุดต่อ `file_key`\n\n## ตาราง Error Code\n| Status | ความหมาย | กรณีที่พบบ่อย |\n| --- | --- | --- |\n| 200 | สำเร็จ | อัปโหลดไฟล์ได้ |\n| 400 | Bad Request | ไม่มีไฟล์, ไม่มี file_key, type ไม่ถูกต้อง |\n| 401 | Unauthorized | ยังไม่มี session cookie |\n| 403 | Forbidden | Origin ไม่ได้รับอนุญาต |\n| 429 | Too Many Requests | อัปโหลดถี่เกิน limit |\n| 500 | Server Error | storage หรือ database มีปัญหา |"
             },
             "body": {
               "mode": "formdata",
@@ -1420,7 +1420,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"form_code\": \"{{formCode}}\",\n  \"degree_level\": \"{{degreeLevel}}\",\n  \"sub_type\": null\n}"
+              "raw": "{\n  \"form_code\": \"{{formCode}}\",\n  \"degree_level\": \"{{degreeLevel}}\",\n  \"sub_type\": null,\n  \"case_key\": null\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/validation/check-completeness",
@@ -8114,7 +8114,7 @@
                   "status": "OK",
                   "code": 200,
                   "_postman_previewlanguage": "json",
-                  "body": "{\n  \"form_code\": \"JT44\",\n  \"submission_location\": \"ทะเบียนภาควิชาที่สังกัด\",\n  \"required_documents\": [\n    {\n      \"key\": \"main_form\",\n      \"label\": \"คำร้อง จท.44\",\n      \"required\": true\n    },\n    {\n      \"key\": \"schedule\",\n      \"label\": \"สำเนาตารางสอบรายบุคคล\",\n      \"required\": true\n    },\n    {\n      \"key\": \"medical_cert\",\n      \"label\": \"ใบรับรองแพทย์\",\n      \"required\": true\n    }\n  ]\n}"
+                  "body": "{\n  \"form_code\": \"JT44\",\n  \"submission_location\": \"ทะเบียนภาควิชาที่สังกัด\",\n  \"approval_requirements\": [\n    \"ประธานคณะกรรมการบริหารหลักสูตรลงนาม\",\n    \"ภาควิชาส่งคำร้องผ่านระบบ Lesspaper\"\n  ],\n  \"case_rules\": [\n    {\n      \"key\": \"before_exam\",\n      \"label\": \"ลาป่วยก่อนสอบ\",\n      \"note\": \"แนบตารางสอบรายบุคคลและใบรับรองแพทย์ที่ระบุวันที่ป่วยตรงกับวันสอบ\",\n      \"approval_requirements\": [\n        \"ประธานคณะกรรมการบริหารหลักสูตรลงนาม\"\n      ]\n    },\n    {\n      \"key\": \"during_exam\",\n      \"label\": \"ลาป่วยระหว่างสอบ\",\n      \"note\": \"ใช้ในกรณีป่วยระหว่างช่วงสอบหลังสิ้นสุดการเรียนของภาคการศึกษา\",\n      \"approval_requirements\": [\n        \"ประธานคณะกรรมการบริหารหลักสูตรลงนาม\"\n      ]\n    }\n  ],\n  \"required_documents\": [\n    {\n      \"key\": \"main_form\",\n      \"label\": \"คำร้อง จท.44\",\n      \"required\": true\n    },\n    {\n      \"key\": \"schedule\",\n      \"label\": \"สำเนาตารางสอบรายบุคคล\",\n      \"required\": true\n    },\n    {\n      \"key\": \"medical_cert\",\n      \"label\": \"ใบรับรองแพทย์\",\n      \"required\": true\n    }\n  ]\n}"
                 },
                 {
                   "name": "Response 404",
@@ -8388,6 +8388,607 @@
                   "body": "{\n  \"error\": \"Form configuration not found.\"\n}"
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Support",
+      "description": {
+        "type": "text/markdown",
+        "content": "กลุ่ม endpoint สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบ พร้อมข้อจำกัดด้าน security และใช้สำหรับ internal/QA เป็นหลัก"
+      },
+      "item": [
+        {
+          "name": "Send Technical Support Email",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "## สรุป\nส่งอีเมลแจ้งปัญหาไปยังทีมพัฒนาระบบที่ backend กำหนดไว้ตายตัว พร้อมไฟล์แนบ optional\n\n## ขอบเขตการใช้งาน\n- endpoint นี้ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้อง\n- ใช้สำหรับแจ้งปัญหาเกี่ยวกับระบบไปยังผู้พัฒนา\n- สามารถมีหน้า test/internal tool สำหรับเรียก endpoint นี้ได้ แต่ไม่ควรถูกสื่อเป็น flow หลักของ frontend product\n\n## Transport\nใช้ `multipart/form-data` และไม่ใช้ secure JSON wrapper\n\n## Security Rules\n- ต้องมี session cookie\n- browser request ต้องมาจาก frontend origin ที่ระบบอนุญาต\n- backend จะส่งหาอีเมลปลายทางที่กำหนดใน server เท่านั้น\n- backend จะ sanitize ค่า email/subject ก่อนส่งจริง\n- ถ้าแนบไฟล์ backend จะตรวจ file signature อีกชั้น\n\n## Required form-data fields\n- `reporter_email`\n- `issue_type`\n- `subject`\n- `description`\n\n## Optional form-data fields\n- `attachment`\n\n## Attachment Constraints\n- แนบได้สูงสุด 1 ไฟล์\n- ขนาดไม่เกิน 2 MB\n- รองรับ `jpg`, `png`, `webp`, `pdf` เท่านั้น\n\n## QA Test Scenarios\n- success แบบไม่แนบไฟล์\n- success แบบแนบไฟล์ภาพหรือ PDF\n- missing reporter email\n- invalid attachment signature/type\n- attachment เกิน 2MB\n- no session / unauthorized\n- forbidden origin\n- rate limit\n- SMTP failure\n\n## Response Notes\nresponse สำเร็จจะคืน `message_id` และ metadata ของไฟล์แนบ (ถ้ามี)\n\n## ตาราง Error Code\n| Status | ความหมาย | กรณีที่พบบ่อย |\n| --- | --- | --- |\n| 200 | สำเร็จ | ส่งอีเมลได้ |\n| 400 | Bad Request | ฟิลด์ไม่ครบ, ไฟล์ไม่ผ่าน signature check |\n| 401 | Unauthorized | ยังไม่มี session cookie |\n| 403 | Forbidden | Origin ไม่ได้รับอนุญาต |\n| 429 | Too Many Requests | ยิง support request ถี่เกิน limit |\n| 500 | Server Error | SMTP/config ฝั่ง server มีปัญหา |"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reporter_email",
+                  "value": "student@chula.ac.th",
+                  "type": "text"
+                },
+                {
+                  "key": "issue_type",
+                  "value": "upload problem",
+                  "type": "text"
+                },
+                {
+                  "key": "subject",
+                  "value": "อัปโหลดไฟล์ไม่ได้",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "ระบบแจ้ง error ตอนอัปโหลดเอกสารหลักของคำร้อง JT44",
+                  "type": "text"
+                },
+                {
+                  "key": "attachment",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/support/technical-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "technical-email"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"target_email\": \"tech-support@example.com\",\n    \"issue_type\": \"upload problem\",\n    \"subject\": \"อัปโหลดไฟล์ไม่ได้\",\n    \"attachment\": {\n      \"original_name\": \"evidence.png\",\n      \"mime_type\": \"image/png\",\n      \"size\": 185432\n    },\n    \"message_id\": \"<abc123@example.com>\"\n  }\n}"
+            },
+            {
+              "name": "Success 200 No Attachment",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"target_email\": \"tech-support@example.com\",\n    \"issue_type\": \"validation problem\",\n    \"subject\": \"AI ตรวจเอกสารไม่ตรง\",\n    \"attachment\": null,\n    \"message_id\": \"<def456@example.com>\"\n  }\n}"
+            },
+            {
+              "name": "Bad Request 400 Invalid Target",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Validation Error\",\n  \"message\": \"Invalid data format or missing fields.\",\n  \"details\": [\n    {\n      \"field\": \"reporter_email\",\n      \"message\": \"Reporter email is required.\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "Bad Request 400 Invalid Attachment",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Validation Error\",\n  \"message\": \"Attachment file signature is invalid or file type is not allowed.\"\n}"
+            },
+            {
+              "name": "Bad Request 400 Attachment Too Large",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Validation Error\",\n  \"message\": \"Attachment size must not exceed 2MB.\"\n}"
+            },
+            {
+              "name": "Unauthorized 401 No Session",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Unauthorized: No session token found\"\n}"
+            },
+            {
+              "name": "Forbidden 403 Invalid Origin",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Forbidden\",\n  \"message\": \"Origin is not allowed for technical support requests.\"\n}"
+            },
+            {
+              "name": "Too Many Requests 429",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Too Many Requests",
+              "code": 429,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"error\",\n  \"message\": \"Too many technical support requests. Please wait before trying again.\"\n}"
+            },
+            {
+              "name": "Server Error 500 SMTP Misconfigured",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Failed to send technical support email\",\n  \"message\": \"Missing SMTP configuration. Required: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM_EMAIL\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Support Email - No Attachment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "ตัวอย่าง request สำหรับเคสส่งอีเมล support โดยไม่แนบไฟล์ ใช้เทส success flow เบื้องต้น"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reporter_email",
+                  "value": "student@chula.ac.th",
+                  "type": "text"
+                },
+                {
+                  "key": "issue_type",
+                  "value": "validation problem",
+                  "type": "text"
+                },
+                {
+                  "key": "subject",
+                  "value": "AI ตรวจเอกสารไม่ตรง",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "ระบบแจ้งว่าเอกสารไม่ครบทั้งที่อัปโหลดครบแล้ว",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/support/technical-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "technical-email"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Response 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"target_email\": \"tech-support@example.com\",\n    \"issue_type\": \"validation problem\",\n    \"subject\": \"AI ตรวจเอกสารไม่ตรง\",\n    \"attachment\": null,\n    \"message_id\": \"<example-no-attachment@example.com>\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Support Email - PDF Attachment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "ตัวอย่าง request สำหรับเคสแนบ PDF เป็นหลักฐาน ใช้เทส success flow พร้อม attachment"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reporter_email",
+                  "value": "student@chula.ac.th",
+                  "type": "text"
+                },
+                {
+                  "key": "issue_type",
+                  "value": "merge problem",
+                  "type": "text"
+                },
+                {
+                  "key": "subject",
+                  "value": "รวมเอกสารแล้ว PDF เพี้ยน",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "ดาวน์โหลดไฟล์รวมแล้วพบว่าหน้าบางส่วนหายไป กรุณาตรวจสอบ",
+                  "type": "text"
+                },
+                {
+                  "key": "attachment",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/support/technical-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "technical-email"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Response 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"target_email\": \"tech-support@example.com\",\n    \"issue_type\": \"merge problem\",\n    \"subject\": \"รวมเอกสารแล้ว PDF เพี้ยน\",\n    \"attachment\": {\n      \"original_name\": \"merged-output.pdf\",\n      \"mime_type\": \"application/pdf\",\n      \"size\": 245670\n    },\n    \"message_id\": \"<example-pdf@example.com>\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Support Email - Missing Reporter Email",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "ตัวอย่าง request สำหรับเคสไม่ส่ง reporter email ใช้เทส validation error"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "issue_type",
+                  "value": "account issue",
+                  "type": "text"
+                },
+                {
+                  "key": "subject",
+                  "value": "เข้าใช้งานไม่ได้",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "ต้องการทดสอบกรณีไม่ส่ง reporter email",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/support/technical-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "technical-email"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Response 400",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Validation Error\",\n  \"message\": \"Invalid data format or missing fields.\",\n  \"details\": [\n    {\n      \"field\": \"reporter_email\",\n      \"message\": \"Reporter email is required.\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Support Email - Attachment Too Large",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "ตัวอย่าง request สำหรับเคสไฟล์แนบเกิน 2MB ใช้เทส validation error เรื่องขนาดไฟล์"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reporter_email",
+                  "value": "student@chula.ac.th",
+                  "type": "text"
+                },
+                {
+                  "key": "issue_type",
+                  "value": "upload problem",
+                  "type": "text"
+                },
+                {
+                  "key": "subject",
+                  "value": "ไฟล์แนบใหญ่เกินกำหนด",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "ใช้ทดสอบกรณีแนบไฟล์หลักฐานเกิน 2MB",
+                  "type": "text"
+                },
+                {
+                  "key": "attachment",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/support/technical-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "technical-email"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Response 400",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Validation Error\",\n  \"message\": \"Attachment size must not exceed 2MB.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Support Email - Unauthorized",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "ตัวอย่าง request สำหรับเคสไม่มี session cookie ใช้เทส unauthorized response โดยควรล้าง cookie ก่อนยิงจริง"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reporter_email",
+                  "value": "student@chula.ac.th",
+                  "type": "text"
+                },
+                {
+                  "key": "issue_type",
+                  "value": "account issue",
+                  "type": "text"
+                },
+                {
+                  "key": "subject",
+                  "value": "ทดสอบกรณีไม่มี session",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "ใช้ทดสอบกรณียิง endpoint โดยไม่มี session cookie",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/support/technical-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "technical-email"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Response 401",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/support/technical-email",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "support",
+                    "technical-email"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Unauthorized: No session token found\"\n}"
             }
           ]
         }

@@ -44,6 +44,23 @@ export type InitSessionResponse = {
   session_id: string;
 };
 
+export type FormCaseRule = {
+  key: string;
+  label: string;
+  note?: string;
+  approval_requirements?: string[];
+};
+
+export type FormDetail = JsonObject & {
+  form_code?: string;
+  title?: string;
+  description?: string;
+  conditions?: string[];
+  submission_steps?: string[] | Record<string, string[]>;
+  approval_requirements?: string[];
+  case_rules?: FormCaseRule[];
+};
+
 export class SciRequestApiClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -127,8 +144,8 @@ export class SciRequestApiClient {
   async getFormDetail(
     formCode: string,
     params?: { degreeLevel?: string; subType?: string | null }
-  ): Promise<JsonObject> {
-    return this.get<JsonObject>(`/forms/${encodeURIComponent(formCode)}`, {
+  ): Promise<FormDetail> {
+    return this.get<FormDetail>(`/forms/${encodeURIComponent(formCode)}`, {
       degree_level: params?.degreeLevel,
       sub_type: params?.subType ?? undefined,
     });
@@ -138,11 +155,13 @@ export class SciRequestApiClient {
     formCode: string;
     degreeLevel: string;
     subType?: string | null;
+    caseKey?: string | null;
   }): Promise<JsonObject> {
     return this.postEncrypted<JsonObject>("/validation/check-completeness", {
       form_code: params.formCode,
       degree_level: params.degreeLevel,
       sub_type: params.subType ?? null,
+      case_key: params.caseKey ?? null,
     });
   }
 
@@ -465,6 +484,7 @@ export async function exampleUsage(): Promise<void> {
     formCode: "JT41",
     degreeLevel: "bachelor",
     subType: "late_reg",
+    caseKey: null,
   });
   console.log("validation", validationResult);
 

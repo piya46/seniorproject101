@@ -41,3 +41,5 @@ coverage/
 # 8. GCS/Cloud Local Temp (ถ้ามี)
 *.pdf
 temp_files/
+
+deploy.sh

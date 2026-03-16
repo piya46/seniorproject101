@@ -1,12 +1,12 @@
 # Postman Guide
 
-Version: `v1.6.1`
-Last updated: `2026-03-16`
+Version: `v1.8.0`
+Last updated: `2026-03-17`
 
 Change summary:
-- เปลี่ยน `POST /validation/check-completeness` ให้ใช้ `degree_level`
-- ปรับพฤติกรรมการเลือกไฟล์ให้ใช้ไฟล์ล่าสุดต่อ `file_key`
-- ขยาย examples, onboarding และเอกสารสำหรับแชร์ทีมภายใน
+- เพิ่ม endpoint `POST /support/technical-email` สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบพร้อมไฟล์แนบ optional
+- harden security ของ support endpoint ด้วย fixed server-side target email, browser origin check, file signature check และการ sanitize ค่า email/subject
+- อัปเดต Postman collection, frontend guide และ `test.html` ให้รองรับ flow ใหม่
 
 โฟลเดอร์นี้ประกอบด้วยไฟล์สำหรับใช้งาน Sci-Request System บน Postman:
 
@@ -20,17 +20,19 @@ Change summary:
 - `GITHUB_SECRETS_SETUP.md`
 - `RELEASE_CHECKLIST_POSTMAN_DOCS.md`
 - `FRONTEND_INTEGRATION_GUIDE.md`
+- `../API_DOCUMENTATION.md`
 - `examples/api-client.ts`
 
 ถ้าต้องการคู่มือสั้นมากสำหรับสมาชิกใหม่ ให้เริ่มที่ `TEAM_ONBOARDING_POSTMAN.md` ก่อน แล้วค่อยย้อนมาอ่านไฟล์นี้
 ถ้าต้องการคู่มือเชิง implementation ฝั่ง frontend โดยตรง ให้ต่อที่ `FRONTEND_INTEGRATION_GUIDE.md` และดู sample code ใน `examples/api-client.ts`
+ถ้าต้องการหน้าอ้างอิง API contract แบบย่อของ backend โดยตรง ให้ดู `../API_DOCUMENTATION.md`
 
 ## 1. ไฟล์แต่ละตัวใช้ทำอะไร
 
 ### 1.1 Collection
 
 - `Sci-Request-System.postman_collection.json`
-  ใช้ import request ทั้งหมด, collection-level encryption scripts, examples, และเอกสาร API
+  ใช้ import request ทั้งหมด, collection-level encryption scripts, examples, และเอกสาร API รวม endpoint Technical Support
 
 ### 1.2 Environments
 
@@ -83,11 +85,11 @@ GitHub Secrets ที่ต้องมีตอน publish:
 ตัวอย่าง release แบบเข้ม:
 
 ```bash
-npm run docs:postman:bump -- v1.6.0
+npm run docs:postman:bump -- v1.8.0
 git add backend/postman backend/package.json backend/scripts
-git commit -m "docs: bump Postman API docs to v1.6.0"
-git tag docs/v1.6.0
-git push origin docs/v1.6.0
+git commit -m "docs: bump Postman API docs to v1.8.0"
+git tag docs/v1.8.0
+git push origin docs/v1.8.0
 ```
 
 ## 2. วิธี Import แบบครบชุด
@@ -258,6 +260,67 @@ wrapper payload ที่ถูกส่งผ่าน network:
 - ถ้าอัปโหลดไฟล์ใหม่ด้วย `file_key` และ `form_code` เดิม ระบบจะถือว่าเป็นการแทนที่ไฟล์เดิม
 - backend จะลบ record/file เก่าของคู่นั้น แล้วเก็บไว้เฉพาะไฟล์ล่าสุด
 - `Validation` และ `Merge` จะเลือกใช้ไฟล์ล่าสุดต่อ `file_key` เท่านั้น
+
+## 6.1 Support Endpoint สำหรับ QA
+
+endpoint `POST /support/technical-email` มีไว้สำหรับทดสอบ flow แจ้งปัญหาไปยังทีมพัฒนาระบบโดยเฉพาะ
+
+หมายเหตุสำคัญ:
+
+- endpoint นี้ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้อง
+- ไม่ควรอธิบายเป็น responsibility ของ frontend product หลัก
+- `test.html` สามารถมีไว้เพื่อ internal testing ได้ แต่ควรสื่อว่าเป็นเครื่องมือ QA/dev
+
+สิ่งที่ QA ควรรู้:
+
+- endpoint นี้ใช้ `multipart/form-data`
+- ต้องมี session cookie ก่อน
+- ไม่ใช้ secure JSON wrapper
+- request ต้องมี `Origin` หรือ `Referer`
+- backend จะตรวจ `Origin/Referer` ให้ตรงกับ allowlist
+- backend จะส่งหาอีเมลปลายทางที่กำหนดใน server เท่านั้น โดย resolve จาก `TECH_SUPPORT_TARGET_EMAIL`
+- backend จะตรวจ file signature ของไฟล์แนบจริง ไม่เชื่อแค่ MIME จาก browser
+
+ฟิลด์ที่ต้องส่ง:
+
+- `reporter_email`
+- `issue_type`
+- `subject`
+- `description`
+- `attachment` optional
+
+ข้อจำกัดไฟล์แนบ:
+
+- แนบได้สูงสุด 1 ไฟล์
+- ขนาดไม่เกิน 2MB
+- รองรับเฉพาะ `jpg`, `png`, `webp`, `pdf`
+
+QA test matrix ที่แนะนำ:
+
+- success: ส่งครบทุกฟิลด์โดยไม่แนบไฟล์
+- success: ส่งครบทุกฟิลด์พร้อมแนบไฟล์ภาพที่ถูกต้อง
+- validation: ไม่ส่ง `reporter_email`
+- validation: แนบไฟล์ปลอม MIME/นามสกุลไม่ตรง
+- validation: แนบไฟล์เกิน 2MB
+- auth: ยิงโดยไม่มี session
+- origin/policy: ยิงจาก origin ที่ไม่อยู่ใน allowlist
+- rate limit: ยิงซ้ำเกิน limit
+- server error: ตั้ง SMTP config ผิดเพื่อดูพฤติกรรมตอนส่งเมลไม่สำเร็จ
+
+ผลลัพธ์ที่ QA ควรตรวจ:
+
+- status code ถูกต้องตามกรณี
+- response สำเร็จมี `message_id`
+- response สำเร็จมี metadata ของไฟล์แนบเมื่อมีไฟล์
+- response error มี `message` ที่อธิบายได้
+- ระบบส่งหาอีเมลปลายทางคงที่ของทีมพัฒนาเท่านั้น
+
+หมายเหตุเรื่อง deploy:
+
+- `deploy.sh` จะไม่สร้าง SMTP placeholder ให้ผ่าน deploy อีกแล้ว
+- ถ้า `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` ยังเป็น placeholder หรือยังไม่ตั้งจริง script จะ fail ทันที
+- ค่า SMTP ที่ทีมใช้อยู่ตอนนี้ควรเป็น `SMTP_HOST=pstpyst.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=no-reply@pstpyst.com`, `SMTP_FROM_EMAIL=no-reply@pstpyst.com`
+- ถ้าเจอ `535 authentication failed` แปลว่าต่อถึง SMTP server แล้ว แต่ `SMTP_USER` หรือ `SMTP_PASS` ยังไม่ถูกต้อง
 
 ## 7. วิธีเริ่มใช้งานในแต่ละ Environment
 

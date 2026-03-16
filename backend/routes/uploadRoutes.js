@@ -39,6 +39,52 @@ const sanitizeFormCode = (code) => {
     return code.replace(/[^a-zA-Z0-9-_]/g, '');
 };
 
+const getAllowedOrigins = () => {
+    const rawOrigins =
+        process.env.FRONTEND_URL || 'http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500';
+    return rawOrigins
+        .split(/[,|]/)
+        .map((url) => url.trim())
+        .filter(Boolean);
+};
+
+// Browser uploads use cookie auth, so enforce the frontend allowlist when
+// Origin/Referer headers are present without breaking non-browser tools.
+const checkBrowserOrigin = (req, res, next) => {
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin.trim() : '';
+    const referer = typeof req.headers.referer === 'string' ? req.headers.referer.trim() : '';
+
+    if (!origin && !referer) {
+        return next();
+    }
+
+    const allowedOrigins = getAllowedOrigins();
+    const isAllowed = allowedOrigins.some((allowedOrigin) => {
+        if (origin && origin === allowedOrigin) {
+            return true;
+        }
+
+        if (referer) {
+            try {
+                return new URL(referer).origin === allowedOrigin;
+            } catch (_error) {
+                return false;
+            }
+        }
+
+        return false;
+    });
+
+    if (!isAllowed) {
+        return res.status(403).json({
+            error: 'Forbidden',
+            message: 'Origin is not allowed for uploads.'
+        });
+    }
+
+    return next();
+};
+
 // 🔒 Helper: Decrypt File
 const decryptFileBuffer = (encryptedBuffer, encKey64, iv64, tag64) => {
     try {
@@ -70,7 +116,7 @@ const decryptFileBuffer = (encryptedBuffer, encKey64, iv64, tag64) => {
 };
 
 // Route Handler
-router.post('/', uploadLimiter, authMiddleware, strictLimiter, upload.single('file'), async (req, res) => {
+router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimiter, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 

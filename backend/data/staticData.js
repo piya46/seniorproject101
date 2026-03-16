@@ -534,11 +534,14 @@ exports.forms = [
        { value: "change_section", label: "ขอเปลี่ยนตอนเรียนหลังกำหนด" },
        { value: "cross_faculty", label: "ขอลงทะเบียนเรียนข้ามคณะ" },
        { value: "credit_limit", label: "ขอลงทะเบียนเกิน/ต่ำกว่าจำนวนหน่วยกิตที่กำหนด" },
+       { value: "more_than_two_gened", label: "ขอลงทะเบียนเรียนวิชาศึกษาทั่วไปมากกว่า 2 วิชา" },
        { value: "keep_midterm_score", label: "ขอสอบเก็บตัวกลางภาค (กรณีสอบชน)" },
        { value: "missing_midterm", label: "ขอขาดสอบกลางภาค (เหตุสุดวิสัย)" },
        { value: "sick_midterm", label: "ขอลาป่วยสำหรับการสอบกลางภาค" },
+       { value: "leave_class", label: "ขอลาเรียน" },
        { value: "postpone_final", label: "ขอเลื่อนสอบปลายภาค" },
        { value: "review_score", label: "ขอทบทวนคะแนนสอบกลางภาค / ปลายภาค" },
+       { value: "submit_english_score", label: "ขอส่งคะแนนภาษาอังกฤษ" },
        { value: "tuition_installment", label: "ขอผ่อนผันค่าเล่าเรียน" },
        { value: "transfer_course", label: "ขอเทียบโอนหน่วยกิต" },
        { value: "other", label: "เรื่องอื่นๆ (โปรดระบุในคำร้อง)" }
@@ -637,6 +640,25 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
           "2. ให้อาจารย์ที่ปรึกษาลงนามรับทราบ",
           "3. นำส่งที่ทะเบียนภาควิชาที่สังกัด (ภาควิชาจะดำเนินการส่งต่อให้ทะเบียนคณะ)"
       ],
+      approval_requirements: [
+        "อาจารย์ที่ปรึกษาลงนามรับทราบ",
+        "ภาควิชารับคำร้องและส่งต่อให้ทะเบียนคณะ",
+        "อาจารย์เจ้าของรายวิชาตรวจสอบและแจ้งผล"
+      ],
+      case_rules: [
+        {
+          key: "final_grade_review",
+          label: "ทักท้วงเกรดปลายภาค",
+          note: "ใช้กับการทักท้วงผลการศึกษาหลังประกาศเกรดปลายภาคภายใน 30 วัน"
+        }
+      ],
+      post_submit_flow: [
+        "ทะเบียนคณะเสนอคำร้องและลงนาม",
+        "ทะเบียนคณะส่งออกคำสั่งไปยังสำนักงานการทะเบียนเพื่อระงับผลรายวิชาที่ทักท้วงเป็น X",
+        "อาจารย์ประจำวิชาตรวจสอบผล ทำบันทึกชี้แจงและแนบหลักฐานส่งกลับที่ทะเบียนคณะ",
+        "หากผลไม่เปลี่ยนแปลง ทะเบียนคณะแจ้งภาควิชาที่นิสิตสังกัด",
+        "หากผลมีการเปลี่ยนแปลง จะนำเรื่องเข้าคณะกรรมการบริหารคณะเพื่อพิจารณาและดำเนินการส่งสำนักทะเบียน"
+      ],
       required_documents: [
         { key: "main_form", label: "คำร้อง จท.35", required: true, validation_criteria: "ระบุรายวิชาและเกรดที่ต้องการทักท้วงให้ชัดเจน" }
       ]
@@ -645,14 +667,33 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
 
   // --- JT43: ขอ S/U หรือ V/W ---
   if (formCode === 'JT43') {
+    const isGraduate = degreeLevel === 'graduate';
     return {
       form_code: "JT43",
       conditions: ["ต้องยื่นภายใน 2 สัปดาห์แรกของภาคการศึกษา", "ต้องลงทะเบียนเรียนในรายวิชานั้นสำเร็จแล้ว"],
       submission_location: "ทะเบียนภาควิชาที่สังกัด",
-      submission_steps: [
+      submission_steps: isGraduate ? [
+          "1. กรอกแบบฟอร์ม จท.43",
+          "2. เสนอขอความเห็นและลงนามจากอาจารย์ที่ปรึกษา",
+          "3. ผ่านที่ประชุมคณะกรรมการบริหารหลักสูตรหรือผู้มีอำนาจตามหลักสูตร",
+          "4. นำส่งที่ทะเบียนภาควิชาที่สังกัดเพื่อส่งต่อให้ทะเบียนคณะ"
+      ] : [
           "1. กรอกแบบฟอร์ม จท.43",
           "2. นำไปให้อาจารย์ที่ปรึกษา และอาจารย์ผู้สอนประจำวิชาลงนาม",
           "3. นำส่งที่ทะเบียนภาควิชาที่สังกัด (ภาควิชาจะดำเนินการส่งต่อให้ทะเบียนคณะ)"
+      ],
+      approval_requirements: isGraduate ? [
+        "อาจารย์ที่ปรึกษาให้ความเห็น",
+        "คณะกรรมการบริหารหลักสูตรหรือประธานหลักสูตรให้ความเห็นชอบ",
+        "ทะเบียนคณะเสนออนุมัติและลงนาม"
+      ] : [
+        "อาจารย์ที่ปรึกษาลงนาม",
+        "อาจารย์ผู้สอนประจำวิชาลงนาม",
+        "ทะเบียนคณะเสนออนุมัติและลงนาม"
+      ],
+      post_submit_flow: [
+        "ภาควิชาส่งคำร้องผ่านระบบ lesspaper มาที่ทะเบียนคณะ",
+        "ทะเบียนคณะเสนออนุมัติและส่งออกคำร้องไปยังสำนักงานการทะเบียน"
       ],
       required_documents: [
         { key: "main_form", label: "คำร้อง จท.43", required: true, validation_criteria: "ตรวจสอบความสมบูรณ์ของแบบฟอร์ม" },
@@ -664,14 +705,53 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
 
   // --- JT44: ลาป่วย ---
   if (formCode === 'JT44') {
+    const isGraduate = degreeLevel === 'graduate';
     return {
       form_code: "JT44",
       conditions: ["ใช้สำหรับขาดสอบปลายภาคเท่านั้น", "ต้องส่งยื่นคำร้องภายใน 5 วันทำการนับจากวันที่ขาดสอบ"],
       submission_location: "ทะเบียนภาควิชาที่สังกัด",
-      submission_steps: [
+      submission_steps: isGraduate ? [
+          "1. กรอกแบบฟอร์ม จท.44 และเตรียมใบรับรองแพทย์/หลักฐาน",
+          "2. เสนอความเห็นผ่านประธานคณะกรรมการบริหารหลักสูตร",
+          "3. นำส่งที่ทะเบียนภาควิชาที่สังกัดเพื่อส่งต่อให้ทะเบียนคณะ"
+      ] : [
           "1. กรอกแบบฟอร์ม จท.44 และเตรียมใบรับรองแพทย์",
-          "2. ให้อาจารย์ที่ปรึกษา และอาจารย์ผู้สอนลงนาม",
+          "2. ให้อาจารย์ที่ปรึกษา และอาจารย์ผู้สอนลงนามตามกรณี",
           "3. นำส่งที่ทะเบียนภาควิชาที่สังกัด (ภาควิชาจะดำเนินการส่งต่อให้ทะเบียนคณะ)"
+      ],
+      approval_requirements: isGraduate ? [
+        "อาจารย์ที่ปรึกษาให้ความเห็น",
+        "ประธานคณะกรรมการบริหารหลักสูตรลงนาม",
+        "ทะเบียนคณะเสนออนุมัติและดำเนินการต่อ"
+      ] : [
+        "อาจารย์ที่ปรึกษาลงนาม",
+        "อาจารย์ผู้สอนประจำวิชาลงนามเมื่อเป็นกรณีลาป่วยก่อนสอบ",
+        "ภาควิชาและทะเบียนคณะดำเนินการส่งคำร้องต่อ"
+      ],
+      case_rules: [
+        {
+          key: "before_exam",
+          label: "ลาป่วยก่อนสอบ",
+          note: "ใช้เมื่อป่วยก่อนสิ้นภาคและยังป่วยต่อเนื่องจนถึงวันสอบ",
+          approval_requirements: [
+            "อาจารย์ที่ปรึกษาลงนาม",
+            "อาจารย์ผู้สอนประจำวิชาลงนาม"
+          ]
+        },
+        {
+          key: "during_exam",
+          label: "ลาป่วยระหว่างสอบ",
+          note: "ใช้เมื่อป่วยระหว่างช่วงสอบและบางกรณีอาจไม่ต้องให้อาจารย์ผู้สอนลงนามตามแนวปฏิบัติ",
+          approval_requirements: [
+            "อาจารย์ที่ปรึกษาลงนาม",
+            "แนบหลักฐานตามกรณีและให้ภาควิชาตรวจสอบต่อ"
+          ]
+        }
+      ],
+      post_submit_flow: [
+        "ภาควิชาส่งคำร้องผ่านระบบ lesspaper มาที่ทะเบียนคณะ",
+        "ทะเบียนคณะเสนอคำร้องและลงนาม",
+        "ทะเบียนคณะส่งออกคำร้องไปยังสำนักงานการทะเบียนหรือภาควิชาที่เกี่ยวข้องตามกรณี"
       ],
       required_documents: [
         { key: "main_form", label: "คำร้อง จท.44", required: true, validation_criteria: "ฟอร์มถูกต้องและระบุวิชาที่ขาดสอบ" },
@@ -683,16 +763,33 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
 
   // --- JT48: ถอนรายวิชา (W) ---
   if (formCode === 'JT48') {
+    const isGraduate = degreeLevel === 'graduate';
     return {
       form_code: "JT48",
       conditions: ["เป็นการขอถอนรายวิชาหลังกำหนด (ติด W)", "นิสิตต้องชำระค่าธรรมเนียมวิชาละ 300 บาท"],
-      // 🔧 ข้อยกเว้นพิเศษ: JT48 นิสิตต้องไปยื่นที่ทะเบียนคณะด้วยตัวเอง
-      submission_location: "ทะเบียนคณะวิทยาศาสตร์",
-      submission_steps: [
-          "1. หมายเหตุ: นิสิตต้องชำระค่าถอนรายวิชาหลังกำหนดผ่านระบบที่มหาวิทยาลัยกำหนด",
+      submission_location: "ทะเบียนภาควิชาที่สังกัด",
+      submission_steps: isGraduate ? [
+          "1. ชำระค่าถอนรายวิชาหลังกำหนดผ่านระบบที่มหาวิทยาลัยกำหนด",
+          "2. กรอกแบบฟอร์ม จท.48 พร้อมระบุสาเหตุที่ถอนหลังกำหนด",
+          "3. ให้อาจารย์ที่ปรึกษา และอาจารย์ประจำรายวิชาลงนาม",
+          "4. นำส่งเอกสารที่ภาควิชาที่สังกัด เพื่อให้ภาควิชาส่งผ่านระบบ lesspaper มาที่ทะเบียนคณะ"
+      ] : [
+          "1. ชำระค่าถอนรายวิชาหลังกำหนดผ่านระบบที่มหาวิทยาลัยกำหนด",
           "2. กรอกแบบฟอร์ม จท.48",
           "3. ให้อาจารย์ที่ปรึกษา และอาจารย์ประจำรายวิชาลงนาม",
-          "4. นำส่งเอกสารทั้งหมดที่ทะเบียนคณะวิทยาศาสตร์ด้วยตนเอง"
+          "4. นำส่งเอกสารที่ภาควิชาที่สังกัด เพื่อให้ภาควิชาส่งผ่านระบบ lesspaper มาที่ทะเบียนคณะ"
+      ],
+      approval_requirements: [
+        "อาจารย์ที่ปรึกษาลงนาม",
+        "อาจารย์ประจำรายวิชาลงนาม",
+        "ภาควิชาส่งคำร้องผ่านระบบ lesspaper",
+        "ทะเบียนคณะเสนออนุมัติและลงนาม"
+      ],
+      required_fields_hint: ["reason"],
+      post_submit_flow: [
+        "ภาควิชาส่งคำร้องของนิสิตผ่าน lesspaper มาที่ทะเบียนคณะ",
+        "ทะเบียนคณะเสนอนายทะเบียนคณะและคณบดีลงนาม",
+        "ทะเบียนคณะส่งออกคำร้องไปยังสำนักงานการทะเบียน"
       ],
       required_documents: [
         { key: "main_form", label: "คำร้อง จท.48", required: true, validation_criteria: "ตรวจสอบฟอร์มและลายเซ็นให้ครบทั้ง 3 ส่วน" },
@@ -705,12 +802,27 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
   if (formCode === 'JT49') {
     return {
        form_code: "JT49",
-       conditions: ["ต้องชำระค่ารักษาสถานภาพภายใน 2 สัปดาห์หลังเปิดภาคการศึกษา (กรณีไม่ได้ลงทะเบียน)"],
+       conditions: [
+         "กรณีไม่ได้ลงทะเบียนเรียน ต้องชำระค่ารักษาสถานภาพการเป็นนิสิตและยื่นภายใน 2 สัปดาห์หลังเปิดภาคการศึกษา",
+         "กรณีลงทะเบียนเรียนแล้ว ให้ยื่นก่อนสอบปลายภาค",
+         "เหตุผลที่พิจารณาได้ เช่น ถูกเกณฑ์ทหาร, ทุนแลกเปลี่ยน, เจ็บป่วยต่อเนื่อง, ความจำเป็นส่วนตัว"
+       ],
        submission_location: "ทะเบียนภาควิชาที่สังกัด",
        submission_steps: [
            "1. กรอกแบบฟอร์ม จท.49 และเตรียมหลักฐาน",
            "2. นิสิตและอาจารย์ที่ปรึกษาลงนามให้เรียบร้อย",
            "3. นำส่งที่ทะเบียนภาควิชาที่สังกัด (ภาควิชาจะดำเนินการส่งต่อให้ทะเบียนคณะ)"
+       ],
+       approval_requirements: [
+         "อาจารย์ที่ปรึกษาลงนาม",
+         "ภาควิชาส่งคำร้องผ่าน lesspaper มาที่ทะเบียนคณะ",
+         "ทะเบียนคณะส่งออกคำร้องไปยังสำนักงานการทะเบียน"
+       ],
+       reason_examples: [
+         "ถูกเกณฑ์ทหารหรือระดมเข้ารับราชการทหารกองประจำการ",
+         "ได้รับทุนแลกเปลี่ยนหรือทุนศึกษาระหว่างประเทศ",
+         "เจ็บป่วยจนต้องเข้ารักษาตัวต่อเนื่องเกินกว่า 20 วัน",
+         "ความจำเป็นส่วนตัว"
        ],
        required_documents: [
          { key: "main_form", label: "คำร้อง จท.49", required: true, validation_criteria: "ตรวจสอบความถูกต้องของฟอร์ม" },
@@ -723,12 +835,36 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
   if (formCode === 'JT66') {
       const config = {
           form_code: "JT66",
-          conditions: ["ต้องยื่นภายในภาคการศึกษาแรกที่เข้าศึกษา", "ได้รับผลการประเมินตามเกณฑ์ที่หลักสูตรกำหนด"],
+          conditions: [
+            "ต้องยื่นภายในภาคการศึกษาแรกที่เข้าศึกษา",
+            "ผลการเรียนเดิมต้องไม่เกิน 5 ปีการศึกษาก่อนภาคการศึกษาที่ได้รับการประเมินผลของรายวิชานั้น",
+            "ต้องได้รับผลการประเมินไม่ต่ำกว่า C, S หรือเกณฑ์เทียบเท่าที่หลักสูตรกำหนด",
+            "รายวิชาที่ยกเว้นโดยทั่วไปต้องไม่เกิน 1 ใน 3 ของจำนวนหน่วยกิตรวมของรายวิชาในหลักสูตรที่กำลังศึกษา"
+          ],
           submission_location: "ทะเบียนภาควิชาที่สังกัด",
-          submission_steps: [
+          submission_steps: degreeLevel === 'graduate' ? [
+              "1. กรอกแบบฟอร์ม จท.66",
+              "2. แนบ transcript และเอกสารที่เกี่ยวข้อง",
+              "3. เสนอความเห็นผ่านหลักสูตร/ภาควิชา",
+              "4. นำส่งที่ทะเบียนภาควิชาเพื่อส่งต่อให้คณะ"
+          ] : [
               "1. กรอกแบบฟอร์ม จท.66",
               "2. ให้อาจารย์ที่ปรึกษา และอาจารย์ประจำรายวิชาลงนาม",
               "3. นำส่งที่ทะเบียนภาควิชาที่สังกัด (ภาควิชาจะดำเนินการส่งต่อให้คณะ)"
+          ],
+          approval_requirements: degreeLevel === 'graduate' ? [
+            "อาจารย์ที่ปรึกษาให้ความเห็น",
+            "หลักสูตรหรือภาควิชาให้ความเห็นชอบ",
+            "ทะเบียนคณะเสนอคณะกรรมการบริหารคณะและลงนาม"
+          ] : [
+            "อาจารย์ที่ปรึกษาลงนาม",
+            "อาจารย์ประจำรายวิชาลงนาม",
+            "ทะเบียนคณะเสนอคณะกรรมการบริหารคณะและคณบดีลงนาม"
+          ],
+          special_cases: [
+            "นิสิตเปลี่ยนสาขาวิชา",
+            "นิสิตเข้าศึกษาต่อเนื่องจากปริญญาตรีถึงปริญญาโท หรือปริญญาโทถึงปริญญาเอก",
+            "นิสิตที่เคยเรียนระดับบัณฑิตศึกษาหรือรายวิชาบัณฑิตศึกษาของการศึกษานอกระบบหรือเทียบเท่า"
           ],
           required_documents: [
               { key: "main_form", label: "คำร้อง จท.66", required: true, validation_criteria: "แบบฟอร์มถูกต้องและมีลายเซ็นครบถ้วน" },
@@ -775,12 +911,28 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
             "2. ให้อาจารย์ที่ปรึกษาลงนาม",
             "3. นำส่งที่ทะเบียนภาควิชาที่สังกัด (ภาควิชาจะดำเนินการส่งต่อให้ทะเบียนคณะ)"
         ],
+        approval_requirements: ["อาจารย์ที่ปรึกษาลงนาม", "ภาควิชารับคำร้องและส่งต่อให้ทะเบียนคณะ"],
+        post_submit_flow: ["ภาควิชาส่งคำร้องผ่าน lesspaper มาที่ทะเบียนคณะ", "ทะเบียนคณะดำเนินการส่งต่อไปยังหน่วยงานที่เกี่ยวข้อง"],
+        required_fields_hint: [],
+        reason_examples: [],
+        case_rules: [],
+        attachment_template_required: false,
+        attachment_template_label: null,
         required_documents: []
       };
       
       switch (subType) {
           case 'late_reg':
               config.conditions.push("ต้องส่งภายใน 2 สัปดาห์แรกของภาคการศึกษา");
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "อาจารย์ประจำวิชาลงนาม",
+                "หัวหน้าภาคลงนาม",
+                "ภาควิชาส่งคำร้องผ่าน lesspaper มาที่ทะเบียนคณะ"
+              ];
+              config.required_fields_hint = ["reason", "course_code", "course_name"];
+              config.attachment_template_required = true;
+              config.attachment_template_label = "เอกสารแนบการลงทะเบียนหลังกำหนด";
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอลงทะเบียนหลังกำหนด)", required: true, validation_criteria: "ระบุหัวข้อและรายวิชาให้ชัดเจน" },
                   { key: "faculty_doc", label: "เอกสารแนบจากคณะ", required: true, validation_criteria: "แนบใบคำร้องคณะที่เกี่ยวข้อง" },
@@ -790,6 +942,14 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
               break;
 
           case 'change_section':
+              config.approval_requirements = [
+                "อาจารย์ผู้สอนตอนเดิมลงนาม",
+                "อาจารย์ผู้สอนตอนใหม่ลงนาม",
+                "อาจารย์ที่ปรึกษาลงนาม"
+              ];
+              config.required_fields_hint = ["reason"];
+              config.attachment_template_required = true;
+              config.attachment_template_label = "ใบแนบขอเปลี่ยนตอนเรียน";
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอเปลี่ยนตอนเรียน)", required: true, validation_criteria: "ต้องมีลายเซ็นอาจารย์ผู้สอนทั้งตอนเรียนเดิมและตอนเรียนใหม่" },
                   { key: "cr54", label: "CR54", required: true, validation_criteria: "ผลการลงทะเบียนล่าสุด" }
@@ -797,6 +957,11 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
               break;
 
           case 'cross_faculty':
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "คณะเจ้าของวิชาให้ความยินยอม",
+                "ภาควิชาส่งคำร้องผ่าน lesspaper"
+              ];
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอลงทะเบียนข้ามคณะ)", required: true, validation_criteria: "ระบุวิชาและคณะที่ต้องการไปเรียน" },
                   { key: "faculty_approval", label: "หลักฐานการยินยอมจากคณะเจ้าของวิชา", required: true, validation_criteria: "เช่น อีเมลอนุมัติจากอาจารย์ผู้สอน" },
@@ -806,6 +971,17 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
               break;
 
           case 'credit_limit':
+              config.conditions.push(
+                "นิสิตชั้นปีที่ 1 ภาคการศึกษาแรกไม่อนุญาต",
+                "นิสิตชั้นปีที่ 2 - 3 ควรมี GPAX ตั้งแต่ 3.25 ขึ้นไป",
+                "นิสิตชั้นปีที่ 4 พิจารณาตามเหตุจำเป็นเป็นกรณีพิเศษ"
+              );
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "ภาควิชาพิจารณา",
+                "ทะเบียนคณะรับคำร้องต่อ"
+              ];
+              config.required_fields_hint = ["reason"];
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอลงทะเบียนเกิน/ต่ำกว่าเกณฑ์)", required: true, validation_criteria: "ระบุเหตุผลความจำเป็น" },
                   { key: "transcript", label: "Transcript", required: true, validation_criteria: "เพื่อประกอบการพิจารณา GPAX" },
@@ -814,8 +990,30 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
               );
               break;
 
+          case 'more_than_two_gened':
+              config.conditions.push("ใช้สำหรับขอลงทะเบียนเรียนวิชาศึกษาทั่วไปมากกว่า 2 วิชา");
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "อาจารย์ผู้สอนหรือหน่วยงานที่เกี่ยวข้องให้ความเห็น",
+                "ภาควิชาส่งคำร้องผ่าน lesspaper มาที่ทะเบียนคณะ"
+              ];
+              config.attachment_template_required = true;
+              config.attachment_template_label = "ใบแนบลงทะเบียนวิชาศึกษาทั่วไปมากกว่า 2 วิชา";
+              config.required_fields_hint = ["reason", "course_table"];
+              config.required_documents.push(
+                  { key: "main_form", label: "คำร้อง จท.41 (ขอลงทะเบียนวิชาศึกษาทั่วไปมากกว่า 2 วิชา)", required: true, validation_criteria: "ระบุความประสงค์และเหตุผลให้ชัดเจน" },
+                  { key: "attachment_form", label: "เอกสารแนบตารางรายวิชา", required: true, validation_criteria: "กรอกรายวิชาในตารางให้ครบถ้วน" }
+              );
+              break;
+
           case 'keep_midterm_score':
               config.conditions.push("วิชาบังคับชนบังคับ (ทุกปี), วิชาเลือกชนเลือก (เฉพาะปี 4)");
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาแสดงความเห็นชอบ",
+                "หัวหน้าภาควิชาลงนาม",
+                "อาจารย์ผู้สอนลงนาม",
+                "หากมีผู้คุมสอบแทน ต้องระบุชื่อผู้ได้รับมอบหมาย"
+              ];
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอสอบเก็บตัวกลางภาค)", required: true, validation_criteria: "ระบุหัวข้อชัดเจน" },
                   { key: "schedule_class", label: "ตารางเรียนส่วนบุคคล", required: true, validation_criteria: "แสดงรายวิชาที่เวลาชนกัน" },
@@ -824,21 +1022,56 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
               break;
 
           case 'missing_midterm':
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "อาจารย์ผู้สอนประจำวิชาลงนาม",
+                "หัวหน้าภาคหรือประธานหลักสูตรลงนาม"
+              ];
+              config.required_fields_hint = ["reason"];
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอขาดสอบกลางภาค)", required: true, validation_criteria: "ระบุหัวข้อชัดเจน" },
-                  { key: "evidence", label: "หลักฐานเหตุสุดวิสัย", required: true, validation_criteria: "หลักฐานรับรองเหตุผลการขาดสอบที่เป็นรูปธรรม" }
+                  { key: "evidence", label: "หลักฐานเหตุสุดวิสัย", required: true, validation_criteria: "หลักฐานรับรองเหตุผลการขาดสอบที่เป็นรูปธรรม" },
+                  { key: "cr54", label: "ผลการลงทะเบียนเรียนหรือวันเวลาสอบ", required: true, validation_criteria: "ต้องระบุวันเวลาสอบของรายวิชาที่ขาดสอบ" }
               );
               break;
 
           case 'sick_midterm':
               config.conditions.push("ต้องยื่นคำร้องภายใน 5 วันทำการหลังจากที่ขาดสอบ");
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "อาจารย์ผู้สอนหรือภาควิชาตรวจสอบตามกรณี",
+                "ภาควิชาส่งคำร้องผ่าน lesspaper"
+              ];
+              config.post_submit_flow = [
+                "ภาควิชาส่งคำร้องผ่านระบบ lesspaper มาที่ทะเบียนคณะ",
+                "ทะเบียนคณะเสนอคำร้องให้คณะกรรมการหรือหน่วยงานที่เกี่ยวข้องพิจารณาต่อ",
+                "ส่งผลการพิจารณากลับภาควิชาที่เกี่ยวข้อง"
+              ];
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ลาป่วยกลางภาค)", required: true, validation_criteria: "ระบุหัวข้อชัดเจน" },
-                  { key: "medical_cert", label: "ใบรับรองแพทย์ฉบับจริง", required: true, validation_criteria: "ระบุวันป่วยครอบคลุมวันที่ขาดสอบ" }
+                  { key: "medical_cert", label: "ใบรับรองแพทย์ฉบับจริง", required: true, validation_criteria: "ระบุวันป่วยครอบคลุมวันที่ขาดสอบ" },
+                  { key: "cr54", label: "CR54 พร้อมวันเวลาสอบ", required: true, validation_criteria: "ต้องระบุวันเวลาสอบกลางภาคของรายวิชาที่ขาดสอบ" }
+              );
+              break;
+
+          case 'leave_class':
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "อาจารย์ผู้สอนหรือหัวหน้าภาคให้ความเห็นตามกรณี"
+              ];
+              config.required_documents.push(
+                  { key: "main_form", label: "คำร้อง จท.41 (ขอลาเรียน)", required: true, validation_criteria: "ระบุรายวิชาและช่วงเวลาที่ต้องการลาเรียนให้ชัดเจน" },
+                  { key: "supporting_doc", label: "เอกสารประกอบการลาเรียน", required: true, validation_criteria: "เอกสารต้องสอดคล้องกับเหตุผลที่ขอลาเรียน" }
               );
               break;
           
           case 'postpone_final':
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "อาจารย์ประจำวิชาลงนาม",
+                "หัวหน้าภาคหรือประธานหลักสูตรลงนาม"
+              ];
+              config.required_fields_hint = ["course_code", "course_name", "section", "exam_datetime"];
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอเลื่อนสอบปลายภาค)", required: true, validation_criteria: "ต้องให้อาจารย์ประจำรายวิชาลงนามด้วย" },
                   { key: "reason_doc", label: "เอกสารระบุเหตุผลประกอบ", required: true, validation_criteria: "เหตุผลสอดคล้องกับคำร้อง" }
@@ -846,12 +1079,50 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
               break;
               
           case 'review_score':
+              config.case_rules = [
+                {
+                  key: "midterm_review",
+                  label: "ขอทบทวนคะแนนสอบกลางภาค",
+                  note: "ใช้เมื่อประสงค์ขอทบทวนคะแนนสอบกลางภาค"
+                },
+                {
+                  key: "final_review",
+                  label: "ขอทบทวนคะแนนสอบปลายภาค",
+                  note: "ใช้เมื่อประสงค์ขอทบทวนคะแนนสอบปลายภาค"
+                }
+              ];
+              config.post_submit_flow = [
+                "ทะเบียนคณะเสนอคำร้องและลงนาม",
+                "ส่งคำร้องให้อาจารย์เจ้าของรายวิชาตรวจสอบคะแนน",
+                "อาจารย์แจ้งผลกลับพร้อมบันทึกชี้แจง"
+              ];
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอทบทวนคะแนนสอบ)", required: true, validation_criteria: "ระบุวิชาและคะแนนที่ต้องการทบทวน" }
               );
               break;
+
+          case 'submit_english_score':
+              config.conditions.push(
+                "นิสิตต้องยื่นคะแนนภาษาอังกฤษอย่างใดอย่างหนึ่งก่อนสำเร็จการศึกษา"
+              );
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "ภาควิชาหรือหลักสูตรตรวจสอบเอกสารและลงนาม",
+                "ทะเบียนคณะจัดเก็บและดำเนินการต่อ"
+              ];
+              config.required_documents.push(
+                  { key: "main_form", label: "คำร้อง จท.41 (ขอส่งคะแนนภาษาอังกฤษ)", required: true, validation_criteria: "ระบุประเภทผลสอบและคะแนนให้ชัดเจน" },
+                  { key: "english_score_report", label: "สำเนาผลสอบภาษาอังกฤษ", required: true, validation_criteria: "ต้องเห็นคะแนนและชื่อผู้สอบชัดเจน" }
+              );
+              break;
               
           case 'tuition_installment':
+              config.conditions.push("ส่งทะเบียนคณะไม่เกินสัปดาห์ที่ 2 ของภาคการศึกษา");
+              config.approval_requirements = [
+                "อาจารย์ที่ปรึกษาลงนาม",
+                "ภาควิชาพิจารณาและส่งต่อทะเบียนคณะ"
+              ];
+              config.required_fields_hint = ["reason", "planned_payment_date"];
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอผ่อนผันค่าเล่าเรียน)", required: true, validation_criteria: "ระบุหัวข้อชัดเจน" }
               );
