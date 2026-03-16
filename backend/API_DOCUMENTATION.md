@@ -1,7 +1,7 @@
 # API Documentation
 
 Version: `v1.8.0`
-Last updated: `2026-03-17`
+Last updated: `2026-03-16`
 
 เอกสารนี้เป็นสรุป API contract ฝั่ง backend แบบย่อสำหรับทีมที่ต้องการดูภาพรวมเร็ว โดยรายละเอียดเชิง integration, encryption flow, Postman examples และ frontend behavior แบบเต็มอยู่ที่:
 

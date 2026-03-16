@@ -1,7 +1,7 @@
 # Changelog Postman Docs
 
 Current version: `v1.8.0`
-Last updated: `2026-03-17`
+Last updated: `2026-03-16`
 
 ## v1.8.0
 
