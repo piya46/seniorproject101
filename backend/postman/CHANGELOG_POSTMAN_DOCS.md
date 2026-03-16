@@ -1,6 +1,6 @@
 # Changelog Postman Docs
 
-Current version: `v1.6.0`
+Current version: `v1.6.1`
 Last updated: `2026-03-16`
 
 ## v1.6.1

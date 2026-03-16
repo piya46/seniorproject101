@@ -1,6 +1,6 @@
 # Postman Guide
 
-Version: `v1.6.0`
+Version: `v1.6.1`
 Last updated: `2026-03-16`
 
 Change summary:
