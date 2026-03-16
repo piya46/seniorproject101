@@ -13,7 +13,10 @@ on:
       - "docs/v*"
     paths:
       - "backend/postman/**"
+      - "backend/API_DOCUMENTATION.md"
+      - "backend/scripts/bumpPostmanDocsVersion.js"
       - "backend/scripts/getPostmanDocsVersion.js"
+      - "backend/scripts/syncApiDocumentationFromPostman.js"
       - "backend/scripts/validatePostmanDocs.js"
       - "backend/scripts/publishPostmanCollection.js"
       - "backend/package.json"
@@ -22,7 +25,10 @@ on:
   pull_request:
     paths:
       - "backend/postman/**"
+      - "backend/API_DOCUMENTATION.md"
+      - "backend/scripts/bumpPostmanDocsVersion.js"
       - "backend/scripts/getPostmanDocsVersion.js"
+      - "backend/scripts/syncApiDocumentationFromPostman.js"
       - "backend/scripts/validatePostmanDocs.js"
       - "backend/scripts/publishPostmanCollection.js"
       - "backend/package.json"

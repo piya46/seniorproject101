@@ -1,7 +1,25 @@
 # Changelog Postman Docs
 
-Current version: `v1.8.0`
-Last updated: `2026-03-16`
+Current version: `v1.8.1`
+Last updated: `2026-03-17`
+
+## v1.8.1
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- ปรับเอกสาร Postman และ API summary ให้ตรงกับ implementation ล่าสุดของ `upload` และ `support`
+- อัปเดตคำอธิบายว่า browser upload request ที่มี `Origin` หรือ `Referer` จะถูกตรวจ frontend allowlist
+- เปลี่ยนตัวอย่าง `target_email` ของ support endpoint ให้เป็นค่า placeholder กลาง และอธิบายชัดว่า server resolve จาก `TECH_SUPPORT_TARGET_EMAIL`
+- แก้ success contract ของ `POST /upload` ให้ตรง response จริงเป็น `{ status, data: { file_key, form_code } }`
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็นการแก้ docs ให้ตรง behavior จริงและชัดขึ้นสำหรับ QA/frontend
+
+ผลกระทบฝั่งทีม:
+
+- ถ้าอ้างอิง release/tag เพื่อ publish Postman docs ให้ใช้ `v1.8.1` แทน `v1.8.0`
+- QA และ frontend ควรอ้าง success shape ของ `upload` จาก docs ชุดใหม่นี้
 
 ## v1.8.0
 
