@@ -169,7 +169,9 @@ jobs:
     needs:
       - validate
       - version-change
-    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/docs/') && needs.version-change.outputs.changed == 'true' && needs.version-change.outputs.tag_matches == 'true' && secrets.POSTMAN_API_KEY != ''
+    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/docs/') && needs.version-change.outputs.changed == 'true' && needs.version-change.outputs.tag_matches == 'true'
+    outputs:
+      can_publish: ${{ steps.check-secrets.outputs.can_publish }}
 
     steps:
       - name: Checkout repository
@@ -180,7 +182,25 @@ jobs:
         with:
           node-version: 20
 
+      - name: Check publish secrets
+        id: check-secrets
+        shell: bash
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+        run: |
+          if [[ -n "$POSTMAN_API_KEY" ]]; then
+            echo "can_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "can_publish=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Postman Publish"
+              echo
+              echo "- Skipped because \`POSTMAN_API_KEY\` is not configured"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Publish collection to Postman
+        if: steps.check-secrets.outputs.can_publish == 'true'
         working-directory: backend
         env:
           POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
@@ -189,6 +209,7 @@ jobs:
         run: node scripts/publishPostmanCollection.js
 
       - name: Write publish summary
+        if: steps.check-secrets.outputs.can_publish == 'true'
         shell: bash
         run: |
           {
@@ -205,7 +226,7 @@ jobs:
     needs:
       - version-change
       - publish
-    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/docs/') && needs.version-change.outputs.changed == 'true' && needs.version-change.outputs.tag_matches == 'true'
+    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/docs/') && needs.version-change.outputs.changed == 'true' && needs.version-change.outputs.tag_matches == 'true' && needs.publish.outputs.can_publish == 'true'
 
     steps:
       - name: Checkout repository
