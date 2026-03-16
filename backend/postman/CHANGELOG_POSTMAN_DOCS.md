@@ -1,7 +1,24 @@
 # Changelog Postman Docs
 
-Current version: `v1.8.1`
+Current version: `v1.8.2`
 Last updated: `2026-03-17`
+
+## v1.8.2
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- bump เวอร์ชัน docs เพื่อให้งาน publish/release ตรงกับ tag ใหม่หลังแก้เอกสารและ workflow แล้ว
+- คงการอัปเดต docs ที่ทำให้ `upload` และ `support` ตรงกับ implementation ล่าสุด
+- คงการปรับ workflow path filters ให้ครอบคลุม `API_DOCUMENTATION.md` และ scripts ที่ใช้ sync/bump docs
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime หรือ Postman contract
+
+ผลกระทบฝั่งทีม:
+
+- ใช้ tag `docs/v1.8.2` กับ commit ที่มี collection version `v1.8.2` จริง
+- ถ้ามีการ bump docs ครั้งถัดไป release notes จะถูก generate จาก section นี้
 
 ## v1.8.1
 
