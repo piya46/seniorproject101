@@ -5,6 +5,7 @@ const { PDFDocument } = require('pdf-lib');
 const { departments, getFormConfig } = require('../data/staticData');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
+const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
 const { validate } = require('../middlewares/validationMiddleware');
 const { docMergeSchema } = require('../validators/schemas');
 
@@ -28,22 +29,17 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
 
     // 3. Match & Sort (จัดระเบียบไฟล์ตามกฎ)
     const requiredKeys = formConfig.required_documents.map(d => d.key);
+    const latestFiles = selectLatestFilesByKey(filterFilesForForm(allFiles, form_code));
     const filesToMerge = [];
     const missingFiles = [];
 
     for (const key of requiredKeys) {
-        // หาไฟล์ล่าสุดที่ตรง Key และ Form Code
-        const candidates = allFiles.filter(f => 
-            f.file_key === key && 
-            (f.form_code === form_code || f.form_code === 'general') // อนุญาตให้ใช้ไฟล์ General ร่วมได้
-        );
+        const latestFile = latestFiles.find((file) => file.file_key === key);
 
-        if (candidates.length === 0) {
+        if (!latestFile) {
             missingFiles.push(key);
         } else {
-            // Sort by Date Desc -> Take First
-            candidates.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
-            filesToMerge.push(candidates[0]);
+            filesToMerge.push(latestFile);
         }
     }
 

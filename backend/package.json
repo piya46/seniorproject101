@@ -5,7 +5,10 @@
   "scripts": {
     "start": "node app.js",
     "deploy": "sh deploy.sh",
-    "docs:build": "node scripts/buildDocs.js"
+    "docs:build": "node scripts/buildDocs.js",
+    "docs:postman:version": "node scripts/getPostmanDocsVersion.js",
+    "docs:postman:bump": "node scripts/bumpPostmanDocsVersion.js",
+    "docs:postman:validate": "node scripts/validatePostmanDocs.js"
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.0.0",

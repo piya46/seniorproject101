@@ -3,15 +3,18 @@ const router = express.Router();
 const { VertexAI } = require('@google-cloud/vertexai');
 const { Storage } = require('@google-cloud/storage');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { validate } = require('../middlewares/validationMiddleware');
 // ✅ เพิ่ม Rate Limiter ป้องกันการยิงถล่ม
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { getFormConfig } = require('../data/staticData'); 
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
+const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
+const { validationCheckSchema } = require('../validators/schemas');
 
 // ✅ เพิ่ม strictLimiter ใน Route
-router.post('/check-completeness', authMiddleware, strictLimiter, async (req, res) => {
+router.post('/check-completeness', authMiddleware, strictLimiter, validate(validationCheckSchema), async (req, res) => {
   try {
-    const { form_code, student_level, sub_type } = req.body;
+    const { form_code, degree_level, sub_type } = req.body;
     const sessionId = req.user.session_id;
 
     // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติจาก Utility)
@@ -23,18 +26,20 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
 
    // ✅ OPTIMIZATION: ไม่ต้องวนลูปหาล่าสุดแล้ว เพราะ Upload Route ลบตัวเก่าให้แล้ว
     // กรองเอาเฉพาะไฟล์ของ Form นี้ หรือไฟล์ General (เช่น บัตร ปชช.)
-    const userFiles = allFiles.filter(f => f.form_code === form_code || f.form_code === 'general');
+    const userFiles = filterFilesForForm(allFiles, form_code);
 
     if (userFiles.length === 0) {
         return res.status(400).json({ error: 'No relevant files found for this form.' });
     }
 
-    console.log(`🔍 Validation: Checking ${userFiles.length} files for form ${form_code}`);
+    const latestUserFiles = selectLatestFilesByKey(userFiles);
+
+    console.log(`🔍 Validation: Checking ${latestUserFiles.length} latest files for form ${form_code}`);
 
     
 
     // ดึง Config ของฟอร์มเพื่อดูว่าต้องตรวจอะไรบ้าง
-    const formConfig = getFormConfig(form_code, student_level, sub_type);
+    const formConfig = getFormConfig(form_code, degree_level, sub_type);
     
     if (!formConfig) {
         return res.status(404).json({ 
@@ -68,7 +73,7 @@ router.post('/check-completeness', authMiddleware, strictLimiter, async (req, re
     });
 
     // 2. เตรียมข้อมูลไฟล์ส่งให้ AI
-    const fileProcessingPromises = userFiles.map(async (file) => {
+    const fileProcessingPromises = latestUserFiles.map(async (file) => {
         const gcsFile = bucket.file(file.gcs_path);
         
         const [exists] = await gcsFile.exists();

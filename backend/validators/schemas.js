@@ -21,3 +21,10 @@ exports.docMergeSchema = secureBase.extend({
     degree_level: z.string().optional(),
     sub_type: z.string().optional().nullable()
 });
+
+// 4. Validation Check Schema
+exports.validationCheckSchema = secureBase.extend({
+    form_code: z.string().min(1, "Form Code is required").regex(/^[a-zA-Z0-9-_]+$/, "Invalid Form Code format"),
+    degree_level: z.enum(['bachelor', 'graduate']).optional().default('bachelor'),
+    sub_type: z.string().optional().nullable()
+});

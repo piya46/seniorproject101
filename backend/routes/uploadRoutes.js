@@ -10,7 +10,8 @@ const forge = require('node-forge');
 
 const authMiddleware = require('../middlewares/authMiddleware');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
-const { addFileToSession, deleteFileRecord, getFileRecordByKey } = require('../utils/dbUtils');
+const { addFileToSession, deleteFileRecord, getDecryptedSessionFiles } = require('../utils/dbUtils');
+const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc } = require('../utils/fileSelection');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -154,6 +155,21 @@ router.post('/', uploadLimiter, authMiddleware, strictLimiter, upload.single('fi
 
     blobStream.on('finish', async () => {
       try {
+          const existingFiles = await getDecryptedSessionFiles(sessionId);
+          const obsoleteFiles = sortFilesByUploadedAtDesc(
+              findFilesByKeyAndForm(existingFiles, file_key, safeFormCode)
+          );
+
+          for (const obsoleteFile of obsoleteFiles) {
+              try {
+                  await bucket.file(obsoleteFile.gcs_path).delete({ ignoreNotFound: true });
+              } catch (storageDeleteError) {
+                  console.warn(`⚠️ Skip deleting old GCS file ${obsoleteFile.gcs_path}:`, storageDeleteError.message);
+              }
+
+              await deleteFileRecord(sessionId, obsoleteFile.id);
+          }
+
           await addFileToSession(sessionId, {
               file_key, gcs_path: gcsPath, file_type: finalMimeType, form_code: safeFormCode
           });
