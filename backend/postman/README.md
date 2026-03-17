@@ -1,6 +1,6 @@
 # Postman Guide
 
-Version: `v1.8.2`
+Version: `v1.8.3`
 Last updated: `2026-03-17`
 
 Change summary:
@@ -22,10 +22,16 @@ Change summary:
 - `FRONTEND_INTEGRATION_GUIDE.md`
 - `../API_DOCUMENTATION.md`
 - `examples/api-client.ts`
+- `examples/react-examples.tsx`
+- `examples/react-query-examples.tsx`
+- `printable-api-docs.html`
 
 ถ้าต้องการคู่มือสั้นมากสำหรับสมาชิกใหม่ ให้เริ่มที่ `TEAM_ONBOARDING_POSTMAN.md` ก่อน แล้วค่อยย้อนมาอ่านไฟล์นี้
 ถ้าต้องการคู่มือเชิง implementation ฝั่ง frontend โดยตรง ให้ต่อที่ `FRONTEND_INTEGRATION_GUIDE.md` และดู sample code ใน `examples/api-client.ts`
+ถ้าต้องการตัวอย่าง React แบบหยิบไปใช้ต่อได้เร็ว ให้ดู `examples/react-examples.tsx`
+ถ้าทีมใช้ `axios` หรือ `@tanstack/react-query` ให้ดู `examples/react-query-examples.tsx`
 ถ้าต้องการหน้าอ้างอิง API contract แบบย่อของ backend โดยตรง ให้ดู `../API_DOCUMENTATION.md`
+ถ้าต้องการไฟล์สำหรับเปิดใน browser แล้ว `Print -> Save as PDF` ให้ generate `printable-api-docs.html`
 
 ## 1. ไฟล์แต่ละตัวใช้ทำอะไร
 
@@ -33,6 +39,11 @@ Change summary:
 
 - `Sci-Request-System.postman_collection.json`
   ใช้ import request ทั้งหมด, collection-level encryption scripts, examples, และเอกสาร API รวม endpoint Technical Support
+
+### 1.1.1 Printable/PDF Export
+
+- `printable-api-docs.html`
+  ใช้เปิดใน browser แล้ว `Print -> Save as PDF` เพื่อเอาเอกสาร API summary ออกเป็น PDF ได้ง่าย
 
 ### 1.2 Environments
 
@@ -67,6 +78,7 @@ GitHub Actions จะทำงานดังนี้:
 
 - `docs:postman:bump` อัปเดต version ใน collection, README และ changelog พร้อมกัน
 - `docs:postman:validate` ตรวจ JSON, script syntax และ version consistency
+- `docs:api:printable` สร้าง `postman/printable-api-docs.html` จาก `API_DOCUMENTATION.md`
 
 GitHub Secrets ที่ต้องมีตอน publish:
 

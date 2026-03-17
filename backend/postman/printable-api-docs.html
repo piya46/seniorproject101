@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sci-Request API Docs Printable</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18202b;
+      --muted: #5d6b7a;
+      --line: #d6dce3;
+      --panel: #f5f7fa;
+      --accent: #113f67;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background: white;
+      line-height: 1.6;
+    }
+
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 32px 72px;
+    }
+
+    .hero {
+      border-bottom: 2px solid var(--accent);
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      color: var(--accent);
+      line-height: 1.25;
+      margin-top: 1.6em;
+      margin-bottom: 0.6em;
+      page-break-after: avoid;
+    }
+
+    p, ul, table, pre {
+      margin: 0 0 1rem;
+    }
+
+    ul {
+      padding-left: 1.3rem;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.92em;
+      background: #f1f4f8;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+
+    pre {
+      overflow-x: auto;
+      background: var(--panel);
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: var(--panel);
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .page {
+        max-width: none;
+        padding: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      pre, table {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Sci-Request API Docs</h1>
+      <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
+    </section>
+    <h1>API Documentation</h1>
+<p>Version: `v1.8.2` Last updated: `2026-03-17`</p>
+<p>เอกสารนี้เป็นสรุป API contract ฝั่ง backend แบบย่อสำหรับทีมที่ต้องการดูภาพรวมเร็ว โดยรายละเอียดเชิง integration, encryption flow, Postman examples และ frontend behavior แบบเต็มอยู่ที่:</p>
+<ul>
+<li>[README.md](/Users/pst./senior/backend/postman/README.md)</li>
+<li>[FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)</li>
+<li>[Sci-Request-System.postman_collection.json](/Users/pst./senior/backend/postman/Sci-Request-System.postman_collection.json)</li>
+</ul>
+<h2>Overview</h2>
+<ul>
+<li>Base URL: `/api/v1`</li>
+<li>Authentication: session cookie, and optionally Google Cloud IAP as an outer access gate for `@chula.ac.th` and `@student.chula.ac.th`</li>
+<li>Secure JSON endpoints ใช้ encryption transport</li>
+<li>`GET` และ `multipart/form-data` ไม่ใช้ secure JSON wrapper</li>
+<li>`GET /healthz` เป็น service-level health endpoint ที่อยู่นอก `/api/v1`</li>
+<li>`POST /support/technical-email` เป็น multipart endpoint สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบ</li>
+</ul>
+<h2>Endpoint Matrix</h2>
+<table>
+<thead><tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>ต้อง Auth</th>
+<th>ต้อง Encryption</th>
+<th>Request fields หลัก</th>
+<th>Response หลัก</th>
+</tr></thead><tbody>
+<tr>
+<td>`/healthz`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>-</td>
+<td>`{ status: &quot;ok&quot; }`</td>
+</tr>
+<tr>
+<td>`/auth/public-key`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>-</td>
+<td>`{ publicKey }`</td>
+</tr>
+<tr>
+<td>`/session/init`</td>
+<td>`POST`</td>
+<td>ไม่ต้อง</td>
+<td>ต้อง</td>
+<td>-</td>
+<td>`{ message, session_id }`</td>
+</tr>
+<tr>
+<td>`/departments`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>-</td>
+<td>`{ data: Department[] }`</td>
+</tr>
+<tr>
+<td>`/forms`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>`degree_level`</td>
+<td>`{ data: FormSummary[] }`</td>
+</tr>
+<tr>
+<td>`/forms/:form_code`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>`degree_level`, `sub_type`</td>
+<td>`FormDetail` พร้อม `required_documents`, `approval_requirements`, `case_rules`</td>
+</tr>
+<tr>
+<td>`/upload`</td>
+<td>`POST multipart/form-data`</td>
+<td>ต้อง</td>
+<td>ไม่ใช้ secure JSON wrapper</td>
+<td>`file`, `file_key`, `form_code?`, `encKey`, `iv`, `tag`</td>
+<td>`{ status, data: { file_key, form_code } }`</td>
+</tr>
+<tr>
+<td>`/validation/check-completeness`</td>
+<td>`POST`</td>
+<td>ต้อง</td>
+<td>ต้อง</td>
+<td>`form_code`, `degree_level`, `sub_type`, `case_key?`</td>
+<td>ผลตรวจราย `file_key`</td>
+</tr>
+<tr>
+<td>`/documents/merge`</td>
+<td>`POST`</td>
+<td>ต้อง</td>
+<td>ต้อง</td>
+<td>`form_code`, `degree_level`, `sub_type`</td>
+<td>`{ status, download_url, instruction }`</td>
+</tr>
+<tr>
+<td>`/chat/recommend`</td>
+<td>`POST`</td>
+<td>ต้อง</td>
+<td>ต้อง</td>
+<td>`message`, `degree_level`</td>
+<td>`{ reply?, text?, recommended_form? }`</td>
+</tr>
+<tr>
+<td>`/support/technical-email`</td>
+<td>`POST multipart/form-data`</td>
+<td>ต้อง</td>
+<td>ไม่ใช้ secure JSON wrapper</td>
+<td>`reporter_email`, `issue_type`, `subject`, `description`, `attachment?`</td>
+<td>`{ status, message, data }`</td>
+</tr>
+</tbody></table>
+<h2>Support Endpoint</h2>
+<h3>`POST /support/technical-email`</h3>
+<p>ใช้สำหรับส่งอีเมลแจ้งปัญหาไปยังทีมพัฒนาระบบโดยตรง ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้อง</p>
+<p>ฟิลด์ที่รับ:</p>
+<ul>
+<li>`reporter_email`</li>
+<li>`issue_type`</li>
+<li>`subject`</li>
+<li>`description`</li>
+<li>`attachment` optional</li>
+</ul>
+<p>ข้อจำกัด:</p>
+<ul>
+<li>ต้องมี session cookie (`sci_session_token`) ที่ถูกสร้างจาก `POST /session/init`</li>
+<li>ใช้ `multipart/form-data`</li>
+<li>แนบได้สูงสุด 1 ไฟล์</li>
+<li>ขนาดไฟล์ไม่เกิน 2MB</li>
+<li>รองรับเฉพาะ `jpg`, `png`, `webp`, `pdf`</li>
+<li>request ต้องมี `Origin` หรือ `Referer`</li>
+<li>backend จะตรวจ `Origin/Referer` ให้ตรงกับ allowlist</li>
+<li>ปลายทางอีเมลถูกกำหนดจาก server ผ่าน `TECH_SUPPORT_TARGET_EMAIL` ไม่รับจาก client</li>
+<li>backend จะตรวจ file signature จริง ไม่เชื่อแค่ MIME จาก browser</li>
+</ul>
+<p>Success response:</p>
+<pre><code>
+{
+
+  &quot;status&quot;: &quot;success&quot;,
+
+  &quot;message&quot;: &quot;Technical support email sent successfully.&quot;,
+
+  &quot;data&quot;: {
+
+    &quot;reporter_email&quot;: &quot;student@chula.ac.th&quot;,
+
+    &quot;target_email&quot;: &quot;tech-support@example.com&quot;,
+
+    &quot;issue_type&quot;: &quot;upload problem&quot;,
+
+    &quot;subject&quot;: &quot;อัปโหลดไฟล์ไม่ได้&quot;,
+
+    &quot;attachment&quot;: {
+
+      &quot;original_name&quot;: &quot;evidence.png&quot;,
+
+      &quot;mime_type&quot;: &quot;image/png&quot;,
+
+      &quot;size&quot;: 185432
+
+    },
+
+    &quot;message_id&quot;: &quot;&lt;abc123@example.com&gt;&quot;
+
+  }
+
+}
+
+</code></pre>
+<h2>Error Response Contract กลาง</h2>
+<p>backend ไม่ได้ตอบ error ทุก endpoint ด้วย schema เดียวกัน 100% แต่ client และ QA ควรรองรับรูปแบบหลักดังนี้</p>
+<p>รูปแบบทั่วไป:</p>
+<pre><code>
+{
+
+  &quot;error&quot;: &quot;ข้อความสรุปสั้น&quot;,
+
+  &quot;message&quot;: &quot;ข้อความอธิบายเพิ่มเติม&quot;
+
+}
+
+</code></pre>
+<p>บาง endpoint อาจมี field เฉพาะ:</p>
+<pre><code>
+{
+
+  &quot;error&quot;: &quot;Incomplete documents&quot;,
+
+  &quot;missing_keys&quot;: [&quot;main_form&quot;, &quot;citizen_id_copy&quot;]
+
+}
+
+</code></pre>
+<h3>Status ที่ควรรองรับ</h3>
+<table>
+<thead><tr>
+<th>Status</th>
+<th>ความหมาย</th>
+<th>ตัวอย่างกรณี</th>
+</tr></thead><tbody>
+<tr>
+<td>`400`</td>
+<td>request ไม่ถูกต้องหรือข้อมูลไม่ครบ</td>
+<td>ไม่มีฟิลด์, ไฟล์แนบเกิน 2MB</td>
+</tr>
+<tr>
+<td>`401`</td>
+<td>ไม่มี session หรือ auth ไม่ผ่าน</td>
+<td>ไม่ส่ง cookie, cookie หมดอายุ</td>
+</tr>
+<tr>
+<td>`403`</td>
+<td>policy/security check ไม่ผ่าน</td>
+<td>origin ไม่อยู่ใน allowlist</td>
+</tr>
+<tr>
+<td>`404`</td>
+<td>ไม่พบ resource/config</td>
+<td>form code หรือ subtype ไม่ถูกต้อง</td>
+</tr>
+<tr>
+<td>`429`</td>
+<td>ยิงถี่เกิน rate limit</td>
+<td>support endpoint หรือ upload ถูกเรียกซ้ำเร็วเกินไป</td>
+</tr>
+<tr>
+<td>`500`</td>
+<td>backend ล้มเหลว</td>
+<td>SMTP config ผิด, merge/storage ล้มเหลว</td>
+</tr>
+</tbody></table>
+<h3>Support Endpoint Error Examples</h3>
+<p>กรณีไฟล์แนบเกินขนาด:</p>
+<pre><code>
+{
+
+  &quot;error&quot;: &quot;Validation Error&quot;,
+
+  &quot;message&quot;: &quot;Attachment size must not exceed 2MB.&quot;
+
+}
+
+</code></pre>
+<p>กรณีไม่มี session:</p>
+<pre><code>
+{
+
+  &quot;error&quot;: &quot;Unauthorized: No session token found&quot;
+
+}
+
+</code></pre>
+<p>กรณี origin ไม่ผ่าน policy:</p>
+<pre><code>
+{
+
+  &quot;error&quot;: &quot;Forbidden&quot;,
+
+  &quot;message&quot;: &quot;Origin is not allowed for technical support requests.&quot;
+
+}
+
+</code></pre>
+<p>กรณี SMTP login ไม่ผ่าน:</p>
+<pre><code>
+{
+
+  &quot;error&quot;: &quot;Failed to send technical support email&quot;,
+
+  &quot;message&quot;: &quot;Invalid login: 535 5.7.8 Error: authentication failed: authentication failure&quot;
+
+}
+
+</code></pre>
+<h2>Upload Endpoint Notes</h2>
+<h3>`POST /upload`</h3>
+<ul>
+<li>ต้องมี session cookie (`sci_session_token`)</li>
+<li>ใช้ `multipart/form-data`</li>
+<li>รองรับไฟล์ `jpg`, `png`, `webp`, `pdf`</li>
+<li>ขนาดไฟล์ไม่เกิน 10MB</li>
+<li>ถ้าเป็น browser request และมี `Origin` หรือ `Referer` backend จะตรวจให้ตรงกับ frontend allowlist</li>
+<li>ถ้าส่ง `encKey`, `iv`, `tag` มาด้วย backend จะถอดรหัสไฟล์ก่อนตรวจ signature และ sanitize</li>
+<li>ถ้าอัปโหลดไฟล์ใหม่ด้วย `file_key` และ `form_code` เดิม ระบบจะเก็บเฉพาะไฟล์ล่าสุดของคู่นั้น</li>
+</ul>
+<h2>Field Notes</h2>
+<ul>
+<li>`approval_requirements` ใช้บอกว่าคำร้องต้องมีความเห็นหรือการลงนามจากใครบ้าง</li>
+<li>`case_rules` ใช้บอกกรณีย่อยของ form เดิม โดย public response จะส่งเฉพาะ field ที่ frontend ใช้ได้อย่างปลอดภัย</li>
+<li>`case_key` ใช้ใน `POST /validation/check-completeness` เมื่อ form นั้นมี `case_rules`</li>
+<li>`target_email` ของ support endpoint เป็นค่า server-managed ไม่ได้มาจากผู้ใช้ และถูก resolve จาก `TECH_SUPPORT_TARGET_EMAIL`</li>
+<li>`POST /session/init` จะคืน `session_id` และ set cookie `sci_session_token` ให้ client ใช้กับ endpoint ที่ต้อง auth</li>
+<li>การเปิด Google Cloud IAP เป็น outer gate เป็น infra policy เพิ่มเติม ไม่ได้แทน session auth ภายใน API</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li>[README.md](/Users/pst./senior/backend/postman/README.md)</li>
+<li>[FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)</li>
+<li>[Sci-Request-System.postman_collection.json](/Users/pst./senior/backend/postman/Sci-Request-System.postman_collection.json)</li>
+</ul>
+  </main>
+</body>
+</html>

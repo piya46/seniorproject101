@@ -9,6 +9,7 @@
     "test:support": "node --test tests/supportRoutes.test.js",
     "docs:build": "node scripts/buildDocs.js",
     "docs:api:sync": "node scripts/syncApiDocumentationFromPostman.js",
+    "docs:api:printable": "node scripts/buildPrintableApiDocs.js",
     "docs:postman:version": "node scripts/getPostmanDocsVersion.js",
     "docs:postman:bump": "node scripts/bumpPostmanDocsVersion.js",
     "docs:postman:validate": "node scripts/validatePostmanDocs.js"

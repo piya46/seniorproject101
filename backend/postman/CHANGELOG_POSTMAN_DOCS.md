@@ -1,7 +1,25 @@
 # Changelog Postman Docs
 
-Current version: `v1.8.2`
+Current version: `v1.8.3`
 Last updated: `2026-03-17`
+
+## v1.8.3
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เพิ่มตัวอย่าง React เพิ่มเติมสำหรับการใช้งาน API ฝั่ง frontend
+- เพิ่มตัวอย่าง `axios + @tanstack/react-query` เพื่อให้ทีม frontend หยิบไปใช้กับ data layer ได้เร็วขึ้น
+- เพิ่ม script สร้างไฟล์ `printable-api-docs.html` สำหรับเปิดใน browser แล้ว `Print -> Save as PDF`
+- อัปเดต README ของโฟลเดอร์ Postman ให้ชี้ไปยังไฟล์ตัวอย่างและ workflow ใหม่ครบขึ้น
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime หรือ Postman contract
+
+ผลกระทบฝั่งทีม:
+
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.8.3`
+- ทีม frontend สามารถเริ่มจาก `examples/react-examples.tsx` หรือ `examples/react-query-examples.tsx` ได้ทันที
 
 ## v1.8.2
 
