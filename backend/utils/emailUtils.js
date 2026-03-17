@@ -85,7 +85,6 @@ const buildTechnicalSupportMail = ({
   issueType,
   subject,
   description,
-  targetEmail,
   attachment
 }) => {
   const lines = [
@@ -93,7 +92,6 @@ const buildTechnicalSupportMail = ({
     '',
     `Reporter Email: ${reporterEmail}`,
     `Issue Type: ${issueType}`,
-    `Target Email: ${targetEmail}`,
     `Subject: ${subject}`,
     '',
     'Description:',
@@ -111,10 +109,6 @@ const buildTechnicalSupportMail = ({
         <tr>
           <td style="padding: 6px 12px 6px 0; font-weight: 700;">Issue Type</td>
           <td style="padding: 6px 0;">${escapeHtml(issueType)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 6px 12px 6px 0; font-weight: 700;">Target Email</td>
-          <td style="padding: 6px 0;">${escapeHtml(targetEmail)}</td>
         </tr>
         <tr>
           <td style="padding: 6px 12px 6px 0; font-weight: 700;">Subject</td>
@@ -153,7 +147,6 @@ const sendTechnicalSupportEmail = async ({
     issueType,
     subject,
     description,
-    targetEmail,
     attachment
   });
 
@@ -161,7 +154,7 @@ const sendTechnicalSupportEmail = async ({
     from: smtpConfig.from,
     to: targetEmail,
     replyTo: reporterEmail,
-    subject: `[Technical Support] ${subject}`,
+    subject: `แจ้งปัญหา: ${issueType}`,
     text: mailContent.text,
     html: mailContent.html,
     attachments: attachment

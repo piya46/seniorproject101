@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Storage } = require('@google-cloud/storage');
 const { PDFDocument } = require('pdf-lib');
+const sharp = require('sharp');
 const { departments, getFormConfig } = require('../data/staticData');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
@@ -52,25 +53,37 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
 
     // 4. Merge PDF
     const mergedPdf = await PDFDocument.create();
+    let mergedPageCount = 0;
+    const mergeFailures = [];
 
     for (const fileRecord of filesToMerge) {
       const fileRef = bucket.file(fileRecord.gcs_path);
       const [exists] = await fileRef.exists();
-      if (!exists) continue; // ข้ามถ้าไฟล์หาย (Edge Case)
+      if (!exists) {
+        mergeFailures.push(`Missing file in storage: ${fileRecord.file_key}`);
+        continue;
+      }
 
       const [fileBuffer] = await fileRef.download();
       const [metadata] = await fileRef.getMetadata();
-      const contentType = metadata.contentType;
+      const contentType = metadata.contentType || fileRecord.file_type;
 
       try {
         if (contentType === 'application/pdf') {
-            const pdf = await PDFDocument.load(fileBuffer);
+            const pdf = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
             const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
             copiedPages.forEach((page) => mergedPdf.addPage(page));
+            mergedPageCount += copiedPages.length;
         } else if (['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
             let image;
-            if (contentType === 'image/jpeg') image = await mergedPdf.embedJpg(fileBuffer);
-            else if (contentType === 'image/png') image = await mergedPdf.embedPng(fileBuffer);
+            if (contentType === 'image/jpeg') {
+              image = await mergedPdf.embedJpg(fileBuffer);
+            } else if (contentType === 'image/png') {
+              image = await mergedPdf.embedPng(fileBuffer);
+            } else if (contentType === 'image/webp') {
+              const jpegBuffer = await sharp(fileBuffer).jpeg({ quality: 90 }).toBuffer();
+              image = await mergedPdf.embedJpg(jpegBuffer);
+            }
             
             if (image) {
                 // Resize to fit A4
@@ -79,9 +92,23 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
                 page.drawImage(image, { 
                     x: (595 - width) / 2, y: (842 - height) / 2, width, height 
                 });
+                mergedPageCount += 1;
             }
+        } else {
+            mergeFailures.push(`Unsupported content type for ${fileRecord.file_key}: ${contentType || 'unknown'}`);
         }
-      } catch (err) { console.warn('Merge skip:', err); }
+      } catch (err) {
+        console.warn(`Merge skip for ${fileRecord.file_key}:`, err);
+        mergeFailures.push(`Failed to merge ${fileRecord.file_key}`);
+      }
+    }
+
+    if (mergedPageCount === 0) {
+      return res.status(400).json({
+        error: 'Merge validation failed.',
+        message: 'No document pages could be merged. Please re-upload the files and try again.',
+        details: mergeFailures
+      });
     }
 
     // 5. Save & Return URL

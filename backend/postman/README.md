@@ -1,7 +1,7 @@
 # Postman Guide
 
-Version: `v1.8.3`
-Last updated: `2026-03-17`
+Version: `v1.8.4`
+Last updated: `2026-03-18`
 
 Change summary:
 - เพิ่ม endpoint `POST /support/technical-email` สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบพร้อมไฟล์แนบ optional

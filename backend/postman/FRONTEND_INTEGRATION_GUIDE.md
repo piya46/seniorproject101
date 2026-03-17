@@ -422,6 +422,7 @@ frontend ควร:
 
 - แสดงปุ่มดาวน์โหลดจาก `download_url`
 - แสดงข้อมูลส่งต่อจาก `instruction.target_email` และ `instruction.email_subject`
+- ถ้า merge ตอบ `400` พร้อม `details` ให้ถือว่าไฟล์ใน session มีปัญหาเชิง parse/merge และควรให้ผู้ใช้ re-upload เอกสารที่เกี่ยวข้อง
 
 #### f. Chat result
 

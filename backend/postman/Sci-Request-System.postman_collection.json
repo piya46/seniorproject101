@@ -1,10 +1,10 @@
 {
   "info": {
     "_postman_id": "0f93eb4e-44fa-4f84-87be-cfbb5cf8ca23",
-    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.8.3",
+    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.8.4",
     "description": {
       "type": "text/markdown",
-      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.8.3\n**Last Updated:** 2026-03-17\n\n## Change Summary\n- เพิ่ม endpoint `POST /support/technical-email` สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบพร้อมไฟล์แนบ optional\n- harden security ของ support endpoint ด้วย fixed server-side target email, browser origin check, file signature check และการ sanitize ค่า email/subject\n- อัปเดต collection, frontend guide และ test page ให้รองรับ flow ใหม่\n- อัปเดตคำอธิบายให้ตรง implementation ล่าสุดของ upload policy และ server-managed email target\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ Backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- การดึง Public Key\n- การเริ่มต้น Session\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- secure JSON endpoint ยังคงใช้ encryption layer เดิม\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n- endpoint นี้ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้องหลัก แต่เป็นช่องทางแจ้งปัญหาถึงทีมพัฒนา\n"
+      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.8.4\n**Last Updated:** 2026-03-18\n\n## Change Summary\n- เพิ่ม endpoint `POST /support/technical-email` สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบพร้อมไฟล์แนบ optional\n- harden security ของ support endpoint ด้วย fixed server-side target email, browser origin check, file signature check และการ sanitize ค่า email/subject\n- อัปเดต collection, frontend guide และ test page ให้รองรับ flow ใหม่\n- อัปเดตคำอธิบายให้ตรง implementation ล่าสุดของ upload policy และ server-managed email target\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ Backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- การดึง Public Key\n- การเริ่มต้น Session\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- secure JSON endpoint ยังคงใช้ encryption layer เดิม\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n- endpoint นี้ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้องหลัก แต่เป็นช่องทางแจ้งปัญหาถึงทีมพัฒนา\n"
     },
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -1715,7 +1715,7 @@
             ],
             "description": {
               "type": "text/markdown",
-              "content": "## สรุป\nรวมเอกสารทั้งหมดของฟอร์มให้เป็น PDF เดียวและคืน signed URL สำหรับดาวน์โหลด พร้อมข้อมูลการส่งต่อ\n\n## Request Example 1: JT31 ปริญญาตรี\n```json\n{\n  \"form_code\": \"JT31\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 2: JT32 บัณฑิตศึกษา\n```json\n{\n  \"form_code\": \"JT32\",\n  \"degree_level\": \"graduate\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 3: JT34 ปริญญาตรี\n```json\n{\n  \"form_code\": \"JT34\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 4: JT35 ปริญญาตรี\n```json\n{\n  \"form_code\": \"JT35\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 5: JT41 late_reg\n```json\n{\n  \"form_code\": \"JT41\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": \"late_reg\"\n}\n```\n\n## Request Example 6: JT43 ปริญญาตรี\n```json\n{\n  \"form_code\": \"JT43\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 7: JT44 บัณฑิตศึกษา\n```json\n{\n  \"form_code\": \"JT44\",\n  \"degree_level\": \"graduate\",\n  \"sub_type\": null\n}\n```\n\n## พฤติกรรมไฟล์ล่าสุด\nระบบจะ merge จากไฟล์ล่าสุดต่อ `file_key` ของฟอร์มนั้นเท่านั้น รวมถึงไฟล์ `general` ที่เกี่ยวข้อง\n\n## การใช้งานฝั่ง Frontend\nใช้ `download_url` สำหรับปุ่มดาวน์โหลด และใช้ `instruction.target_email` กับ `instruction.email_subject` สำหรับแสดงขั้นตอนส่งเอกสารต่อ\n\n## ตาราง Error Code\n| Status | ความหมาย | กรณีที่พบบ่อย |\n| --- | --- | --- |\n| 200 | สำเร็จ | รวมเอกสารเสร็จและได้ลิงก์ดาวน์โหลด |\n| 400 | Bad Request | เอกสารไม่ครบ หรือ schema ไม่ผ่าน |\n| 404 | Not Found | ไม่พบ form configuration |\n| 500 | Server Error | merge หรือ storage มีปัญหา |"
+              "content": "## สรุป\nรวมเอกสารทั้งหมดของฟอร์มให้เป็น PDF เดียวและคืน signed URL สำหรับดาวน์โหลด พร้อมข้อมูลการส่งต่อ\n\n## Request Example 1: JT31 ปริญญาตรี\n```json\n{\n  \"form_code\": \"JT31\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 2: JT32 บัณฑิตศึกษา\n```json\n{\n  \"form_code\": \"JT32\",\n  \"degree_level\": \"graduate\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 3: JT34 ปริญญาตรี\n```json\n{\n  \"form_code\": \"JT34\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 4: JT35 ปริญญาตรี\n```json\n{\n  \"form_code\": \"JT35\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 5: JT41 late_reg\n```json\n{\n  \"form_code\": \"JT41\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": \"late_reg\"\n}\n```\n\n## Request Example 6: JT43 ปริญญาตรี\n```json\n{\n  \"form_code\": \"JT43\",\n  \"degree_level\": \"bachelor\",\n  \"sub_type\": null\n}\n```\n\n## Request Example 7: JT44 บัณฑิตศึกษา\n```json\n{\n  \"form_code\": \"JT44\",\n  \"degree_level\": \"graduate\",\n  \"sub_type\": null\n}\n```\n\n## พฤติกรรมไฟล์ล่าสุด\nระบบจะ merge จากไฟล์ล่าสุดต่อ `file_key` ของฟอร์มนั้นเท่านั้น รวมถึงไฟล์ `general` ที่เกี่ยวข้อง\n\n## พฤติกรรมเมื่อ merge ไม่ได้จริง\nถ้าไฟล์อยู่ใน session แต่ไม่มีหน้าใดสามารถ parse/merge ได้ ระบบจะตอบ `400` พร้อม `message` และ `details` แทนการคืน PDF เปล่า\n\n## การใช้งานฝั่ง Frontend\nใช้ `download_url` สำหรับปุ่มดาวน์โหลด และใช้ `instruction.target_email` กับ `instruction.email_subject` สำหรับแสดงขั้นตอนส่งเอกสารต่อ\n\n## ตาราง Error Code\n| Status | ความหมาย | กรณีที่พบบ่อย |\n| --- | --- | --- |\n| 200 | สำเร็จ | รวมเอกสารเสร็จและได้ลิงก์ดาวน์โหลด |\n| 400 | Bad Request | เอกสารไม่ครบ, schema ไม่ผ่าน, หรือไฟล์ทุกใบ parse/merge ไม่ผ่าน |\n| 404 | Not Found | ไม่พบ form configuration |\n| 500 | Server Error | merge หรือ storage มีปัญหาภายใน |"
             },
             "body": {
               "mode": "raw",
@@ -1962,7 +1962,7 @@
               "body": "{\n  \"error\": \"Incomplete documents\",\n  \"missing_keys\": [\"parent_consent\", \"parent_id_card\"]\n}"
             },
             {
-              "name": "ตัวอย่าง JT35 bachelor / Response 500 merge ล้มเหลว",
+              "name": "ตัวอย่าง JT35 bachelor / Response 400 merge ไม่ผ่าน",
               "originalRequest": {
                 "method": "POST",
                 "header": [
@@ -1986,10 +1986,10 @@
                   ]
                 }
               },
-              "status": "Internal Server Error",
-              "code": 500,
+              "status": "Bad Request",
+              "code": 400,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"error\": \"Merge process failed.\"\n}"
+              "body": "{\n  \"error\": \"Merge validation failed.\",\n  \"message\": \"No document pages could be merged. Please re-upload the files and try again.\",\n  \"details\": [\"Failed to merge main_form\", \"Unsupported content type for transcript: unknown\"]\n}"
             }
           ]
         }
@@ -8470,7 +8470,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"target_email\": \"tech-support@example.com\",\n    \"issue_type\": \"upload problem\",\n    \"subject\": \"อัปโหลดไฟล์ไม่ได้\",\n    \"attachment\": {\n      \"original_name\": \"evidence.png\",\n      \"mime_type\": \"image/png\",\n      \"size\": 185432\n    },\n    \"message_id\": \"<abc123@example.com>\"\n  }\n}"
+              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"issue_type\": \"upload problem\",\n    \"subject\": \"อัปโหลดไฟล์ไม่ได้\",\n    \"attachment\": {\n      \"original_name\": \"evidence.png\",\n      \"mime_type\": \"image/png\",\n      \"size\": 185432\n    },\n    \"message_id\": \"<abc123@example.com>\"\n  }\n}"
             },
             {
               "name": "Success 200 No Attachment",
@@ -8491,7 +8491,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"target_email\": \"tech-support@example.com\",\n    \"issue_type\": \"validation problem\",\n    \"subject\": \"AI ตรวจเอกสารไม่ตรง\",\n    \"attachment\": null,\n    \"message_id\": \"<def456@example.com>\"\n  }\n}"
+              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"issue_type\": \"validation problem\",\n    \"subject\": \"AI ตรวจเอกสารไม่ตรง\",\n    \"attachment\": null,\n    \"message_id\": \"<def456@example.com>\"\n  }\n}"
             },
             {
               "name": "Bad Request 400 Invalid Target",
@@ -8707,7 +8707,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"target_email\": \"tech-support@example.com\",\n    \"issue_type\": \"validation problem\",\n    \"subject\": \"AI ตรวจเอกสารไม่ตรง\",\n    \"attachment\": null,\n    \"message_id\": \"<example-no-attachment@example.com>\"\n  }\n}"
+              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"issue_type\": \"validation problem\",\n    \"subject\": \"AI ตรวจเอกสารไม่ตรง\",\n    \"attachment\": null,\n    \"message_id\": \"<example-no-attachment@example.com>\"\n  }\n}"
             }
           ]
         },
@@ -8781,7 +8781,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"target_email\": \"tech-support@example.com\",\n    \"issue_type\": \"merge problem\",\n    \"subject\": \"รวมเอกสารแล้ว PDF เพี้ยน\",\n    \"attachment\": {\n      \"original_name\": \"merged-output.pdf\",\n      \"mime_type\": \"application/pdf\",\n      \"size\": 245670\n    },\n    \"message_id\": \"<example-pdf@example.com>\"\n  }\n}"
+              "body": "{\n  \"status\": \"success\",\n  \"message\": \"Technical support email sent successfully.\",\n  \"data\": {\n    \"reporter_email\": \"student@chula.ac.th\",\n    \"issue_type\": \"merge problem\",\n    \"subject\": \"รวมเอกสารแล้ว PDF เพี้ยน\",\n    \"attachment\": {\n      \"original_name\": \"merged-output.pdf\",\n      \"mime_type\": \"application/pdf\",\n      \"size\": 245670\n    },\n    \"message_id\": \"<example-pdf@example.com>\"\n  }\n}"
             }
           ]
         },

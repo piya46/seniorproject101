@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
-const { fileTypeFromBuffer } = require('file-type');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { sendTechnicalSupportEmail } = require('../utils/emailUtils');
 
@@ -107,6 +106,20 @@ const resolveTargetEmail = () => {
   return defaultTarget;
 };
 
+const detectFileType = async (buffer) => {
+  const fileTypeModule = await import('file-type');
+  const detector =
+    fileTypeModule.fileTypeFromBuffer ||
+    fileTypeModule.fromBuffer ||
+    fileTypeModule.default?.fromBuffer;
+
+  if (!detector) {
+    throw new Error('file-type library mismatch');
+  }
+
+  return detector(buffer);
+};
+
 router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrigin, (req, res, next) => {
   upload.single('attachment')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
@@ -199,7 +212,7 @@ router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrig
     }
 
     if (req.file) {
-      const detectedType = await fileTypeFromBuffer(req.file.buffer);
+      const detectedType = await detectFileType(req.file.buffer);
 
       if (
         !detectedType ||
@@ -225,7 +238,6 @@ router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrig
     console.info('Technical support email sent', {
       session_id: req.user?.session_id || null,
       reporter_email: reporterEmail,
-      target_email: resolvedTargetEmail,
       issue_type: issueType,
       attachment: req.file
         ? {
@@ -242,7 +254,6 @@ router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrig
       message: 'Technical support email sent successfully.',
       data: {
         reporter_email: reporterEmail,
-        target_email: resolvedTargetEmail,
         issue_type: issueType,
         subject,
         attachment: req.file

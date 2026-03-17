@@ -1,7 +1,24 @@
 # Changelog Postman Docs
 
-Current version: `v1.8.3`
-Last updated: `2026-03-17`
+Current version: `v1.8.4`
+Last updated: `2026-03-18`
+
+## v1.8.4
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- อัปเดต support endpoint ให้ไม่ส่ง `target_email` กลับใน success response เพราะอีเมลปลายทางเป็นค่า server-managed
+- ปรับเอกสารให้ตรงกับ email format ใหม่ที่ซ่อนปลายทางและใช้ subject ส่งจริงเป็นแนว `แจ้งปัญหา`
+- bump docs version เพื่อสะท้อนการเปลี่ยนแปลงของ support contract และตัวอย่าง response
+
+Breaking change:
+
+- success response ของ `POST /support/technical-email` ไม่มี field `target_email` แล้ว
+
+ผลกระทบฝั่งทีม:
+
+- frontend/QA ที่อ่าน response ของ support endpoint ต้องเลิกอ้างอิง `data.target_email`
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.8.4`
 
 ## v1.8.3
 

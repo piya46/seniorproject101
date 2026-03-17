@@ -1,7 +1,7 @@
 # API Documentation
 
-Version: `v1.8.3`
-Last updated: `2026-03-17`
+Version: `v1.8.4`
+Last updated: `2026-03-18`
 
 เอกสารนี้เป็นสรุป API contract ฝั่ง backend แบบย่อสำหรับทีมที่ต้องการดูภาพรวมเร็ว โดยรายละเอียดเชิง integration, encryption flow, Postman examples และ frontend behavior แบบเต็มอยู่ที่:
 
@@ -33,6 +33,25 @@ Last updated: `2026-03-17`
 | `/documents/merge` | `POST` | ต้อง | ต้อง | `form_code`, `degree_level`, `sub_type` | `{ status, download_url, instruction }` |
 | `/chat/recommend` | `POST` | ต้อง | ต้อง | `message`, `degree_level` | `{ reply?, text?, recommended_form? }` |
 | `/support/technical-email` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | `reporter_email`, `issue_type`, `subject`, `description`, `attachment?` | `{ status, message, data }` |
+
+## Merge Endpoint Notes
+
+### `POST /documents/merge`
+
+- ใช้รวมเอกสารที่เกี่ยวข้องกับฟอร์มให้เป็น PDF เดียว
+- ระบบจะเลือกใช้ไฟล์ล่าสุดต่อ `file_key` ของฟอร์มนั้น รวมถึงไฟล์ `general` ที่เกี่ยวข้อง
+- ถ้า merge ได้สำเร็จ จะคืน `download_url` และ `instruction`
+- ถ้าไฟล์อยู่ใน session แต่ไม่มีหน้าใด merge ได้จริง ระบบจะ `400` พร้อม `message` และ `details` แทนการคืน PDF เปล่า
+
+ตัวอย่างกรณี merge ไม่ได้:
+
+```json
+{
+  "error": "Merge validation failed.",
+  "message": "No document pages could be merged. Please re-upload the files and try again.",
+  "details": ["Failed to merge main_form", "Unsupported content type for transcript: unknown"]
+}
+```
 
 ## Support Endpoint
 
@@ -68,7 +87,6 @@ Success response:
   "message": "Technical support email sent successfully.",
   "data": {
     "reporter_email": "student@chula.ac.th",
-    "target_email": "tech-support@example.com",
     "issue_type": "upload problem",
     "subject": "อัปโหลดไฟล์ไม่ได้",
     "attachment": {
@@ -168,7 +186,7 @@ backend ไม่ได้ตอบ error ทุก endpoint ด้วย schema
 - `approval_requirements` ใช้บอกว่าคำร้องต้องมีความเห็นหรือการลงนามจากใครบ้าง
 - `case_rules` ใช้บอกกรณีย่อยของ form เดิม โดย public response จะส่งเฉพาะ field ที่ frontend ใช้ได้อย่างปลอดภัย
 - `case_key` ใช้ใน `POST /validation/check-completeness` เมื่อ form นั้นมี `case_rules`
-- `target_email` ของ support endpoint เป็นค่า server-managed ไม่ได้มาจากผู้ใช้ และถูก resolve จาก `TECH_SUPPORT_TARGET_EMAIL`
+- อีเมลปลายทางของ support endpoint เป็นค่า server-managed ถูก resolve จาก `TECH_SUPPORT_TARGET_EMAIL` และไม่ถูกส่งกลับใน success response
 - `POST /session/init` จะคืน `session_id` และ set cookie `sci_session_token` ให้ client ใช้กับ endpoint ที่ต้อง auth
 - การเปิด Google Cloud IAP เป็น outer gate เป็น infra policy เพิ่มเติม ไม่ได้แทน session auth ภายใน API
 
