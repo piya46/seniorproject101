@@ -1,10 +1,10 @@
 {
   "info": {
     "_postman_id": "0f93eb4e-44fa-4f84-87be-cfbb5cf8ca23",
-    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.8.4",
+    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.8.5",
     "description": {
       "type": "text/markdown",
-      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.8.4\n**Last Updated:** 2026-03-18\n\n## Change Summary\n- เพิ่ม endpoint `POST /support/technical-email` สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบพร้อมไฟล์แนบ optional\n- harden security ของ support endpoint ด้วย fixed server-side target email, browser origin check, file signature check และการ sanitize ค่า email/subject\n- อัปเดต collection, frontend guide และ test page ให้รองรับ flow ใหม่\n- อัปเดตคำอธิบายให้ตรง implementation ล่าสุดของ upload policy และ server-managed email target\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ Backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- การดึง Public Key\n- การเริ่มต้น Session\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- secure JSON endpoint ยังคงใช้ encryption layer เดิม\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n- endpoint นี้ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้องหลัก แต่เป็นช่องทางแจ้งปัญหาถึงทีมพัฒนา\n"
+      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.8.5\n**Last Updated:** 2026-03-18\n\n## Change Summary\n- เพิ่ม backend-first login completion flow ผ่าน `GET /iap/complete`\n- เพิ่ม `GET /iap/me` สำหรับให้ frontend ตรวจ session/email หลัง redirect กลับจาก IAP\n- อัปเดต production docs ให้ใช้ `api.pstpyst.com` แทน `run.app`\n- คง hardening เดิมของ support endpoint, upload policy และ server-managed email target\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ Backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- การดึง Public Key\n- การจบ IAP login ที่ backend แล้วค่อยกลับ frontend\n- การเริ่มต้น Session\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- secure JSON endpoint ยังคงใช้ encryption layer เดิม\n- `GET /iap/complete` เป็น flow ที่แนะนำสำหรับ production เมื่อ frontend และ backend อยู่คนละ host\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n- endpoint นี้ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้องหลัก แต่เป็นช่องทางแจ้งปัญหาถึงทีมพัฒนา\n"
     },
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -386,6 +386,136 @@
               "code": 200,
               "_postman_previewlanguage": "json",
               "body": "{\n  \"publicKey\": \"-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A...\\n-----END PUBLIC KEY-----\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "IAP",
+      "description": {
+        "type": "text/markdown",
+        "content": "กลุ่ม endpoint สำหรับ production flow เมื่อ backend อยู่หลัง Google IAP โดยแนะนำให้ frontend ใช้ `/iap/complete` เพื่อให้ backend domain จบ login และสร้าง session ก่อน redirect กลับ"
+      },
+      "item": [
+        {
+          "name": "IAP Complete",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "## สรุป\nflow ที่แนะนำสำหรับ production เมื่อ frontend อยู่ที่ `pstpyst.com` และ backend อยู่ที่ `api.pstpyst.com`\n\n## วิธีทำงาน\n1. ผู้ใช้ถูกบังคับ login ผ่าน IAP บน backend domain\n2. backend route นี้สร้างหรือ reuse `sci_session_token`\n3. backend redirect กลับ frontend พร้อม `auth=ok`\n4. frontend ควรเรียก `GET /iap/me` ต่อด้วย `credentials: include`\n\n## ตัวอย่าง\n```text\nGET /iap/complete?return_to=https://pstpyst.com\n```\n"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/iap/complete?return_to=https://pstpyst.com",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iap",
+                "complete"
+              ],
+              "query": [
+                {
+                  "key": "return_to",
+                  "value": "https://pstpyst.com"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Redirect 302 Back To Frontend",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/iap/complete?return_to=https://pstpyst.com",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "iap",
+                    "complete"
+                  ],
+                  "query": [
+                    {
+                      "key": "return_to",
+                      "value": "https://pstpyst.com"
+                    }
+                  ]
+                }
+              },
+              "status": "Found",
+              "code": 302,
+              "_postman_previewlanguage": "text",
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "IAP Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "## สรุป\nใช้ตรวจว่า backend session พร้อมหรือยังหลัง IAP completion flow และอ่าน email/hosted domain จาก backend อย่างปลอดภัย\n\n## หมายเหตุ\n- ต้องมี session cookie ที่ backend สร้างไว้แล้ว\n- สำหรับ browser/frontend จริงควรเรียกด้วย `credentials: 'include'`\n\n## Response Example\n```json\n{\n  \"authenticated\": true,\n  \"email\": \"student@chula.ac.th\",\n  \"hosted_domain\": \"student.chula.ac.th\"\n}\n```\n"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/iap/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "iap",
+                "me"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/iap/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "iap",
+                    "me"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"authenticated\": true,\n  \"email\": \"student@chula.ac.th\",\n  \"hosted_domain\": \"student.chula.ac.th\"\n}"
+            },
+            {
+              "name": "Unauthorized 401",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/iap/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "iap",
+                    "me"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"No token provided\"\n}"
             }
           ]
         }

@@ -5,8 +5,10 @@ const cookieParser = require('cookie-parser');
 const helmet = require('helmet'); 
 const securityMiddleware = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
+const iapAuthRoutes = require('./routes/iapAuthRoutes');
 const iapMiddleware = require('./middlewares/iapMiddleware');
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
+const { getKeyStatus } = require('./utils/cryptoUtils');
 
 // Swagger Imports
 const swaggerUi = require('swagger-ui-express');
@@ -81,6 +83,7 @@ const BASE_URL = '/api/v1';
 
 app.use(`${BASE_URL}/auth`, authRoutes);
 app.use(BASE_URL, iapMiddleware);
+app.use(`${BASE_URL}/iap`, iapAuthRoutes);
 app.use(`${BASE_URL}/session`, require('./routes/sessionRoutes'));
 app.use(`${BASE_URL}/departments`, require('./routes/metaRoutes'));
 app.use(`${BASE_URL}/forms`, require('./routes/formRoutes'));
@@ -101,8 +104,14 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
+  const keyStatus = getKeyStatus();
   console.log(`🚀 API running on port ${PORT}`);
   console.log(`🌍 Allowed Origins: ${allowedOrigins.join(', ')}`);
   console.log(`🔒 E2EE Security: ACTIVE`);
   console.log(`🪪 IAP Enforcement: ${iapEnabled ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`🔑 Active Key Slot: ${keyStatus.activeLabel || 'unavailable'}`);
+  console.log(`🔄 Key Rotation Fallback: ${keyStatus.rotationEnabled ? 'ENABLED' : 'DISABLED'}`);
+  if (keyStatus.activeCertificateValidTo) {
+    console.log(`📅 Active Certificate Valid To: ${keyStatus.activeCertificateValidTo}`);
+  }
 });

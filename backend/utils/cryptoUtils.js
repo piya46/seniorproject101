@@ -1,40 +1,171 @@
 // backend/utils/cryptoUtils.js
 const crypto = require('crypto');
 
-let PRIVATE_KEY, PUBLIC_KEY;
+const decodeBase64Pem = (base64Value) => Buffer.from(base64Value, 'base64').toString('utf8').trim();
 
-if (process.env.Gb_PRIVATE_KEY_BASE64 && process.env.Gb_PUBLIC_KEY_BASE64) {
-    try {
-        PRIVATE_KEY = Buffer.from(process.env.Gb_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
-        PUBLIC_KEY = Buffer.from(process.env.Gb_PUBLIC_KEY_BASE64, 'base64').toString('utf8');
-    } catch (e) {
-        console.error("❌ Error loading keys from Env:", e.message);
-        // ใน Production ถ้า Key โหลดไม่ได้ ควร Crash App ไปเลยเพื่อความปลอดภัย
-        if (process.env.NODE_ENV === 'production') process.exit(1);
+const normalizePublicMaterial = (value) => {
+    if (!value) return { publicKeyPem: value, certificateInfo: null };
+
+    const trimmedValue = String(value).trim();
+
+    if (trimmedValue.includes('BEGIN CERTIFICATE')) {
+        const certificate = new crypto.X509Certificate(trimmedValue);
+        return {
+            publicKeyPem: certificate.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+            certificateInfo: {
+                subject: certificate.subject,
+                issuer: certificate.issuer,
+                validFrom: certificate.validFrom,
+                validTo: certificate.validTo
+            }
+        };
     }
-} else {
-    if (process.env.NODE_ENV === 'production') {
-        console.error("❌ CRITICAL: Missing Keys in Production!");
-        process.exit(1);
+
+    if (trimmedValue.includes('BEGIN PUBLIC KEY')) {
+        return { publicKeyPem: trimmedValue, certificateInfo: null };
     }
+
+    const derivedPublicKey = crypto.createPublicKey(trimmedValue);
+    return {
+        publicKeyPem: derivedPublicKey.export({ type: 'spki', format: 'pem' }).toString(),
+        certificateInfo: null
+    };
+};
+
+const validateKeyPair = (privateKeyPem, publicKeyPem, label) => {
+    const probe = crypto.randomBytes(32);
+    const encrypted = crypto.publicEncrypt(
+        {
+            key: publicKeyPem,
+            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+            oaepHash: 'sha256'
+        },
+        probe
+    );
+
+    const decrypted = crypto.privateDecrypt(
+        {
+            key: privateKeyPem,
+            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+            oaepHash: 'sha256'
+        },
+        encrypted
+    );
+
+    if (!crypto.timingSafeEqual(probe, decrypted)) {
+        throw new Error(`Key validation failed for ${label}: public/private key pair mismatch.`);
+    }
+};
+
+const buildKeySlot = (label, privateKeyBase64, publicMaterialBase64) => {
+    if (!privateKeyBase64 || !publicMaterialBase64) {
+        return null;
+    }
+
+    const privateKeyPem = decodeBase64Pem(privateKeyBase64);
+    const { publicKeyPem, certificateInfo } = normalizePublicMaterial(decodeBase64Pem(publicMaterialBase64));
+
+    validateKeyPair(privateKeyPem, publicKeyPem, label);
+
+    if (certificateInfo?.validTo) {
+        const expiryTime = Date.parse(certificateInfo.validTo);
+        if (!Number.isNaN(expiryTime) && expiryTime <= Date.now()) {
+            throw new Error(`Certificate for ${label} is expired at ${certificateInfo.validTo}.`);
+        }
+    }
+
+    return {
+        label,
+        privateKeyPem,
+        publicKeyPem,
+        certificateInfo
+    };
+};
+
+const loadKeySlots = () => {
+    const currentSlot = buildKeySlot(
+        'current',
+        process.env.Gb_PRIVATE_KEY_BASE64,
+        process.env.Gb_PUBLIC_KEY_BASE64
+    );
+
+    const previousSlot = buildKeySlot(
+        'previous',
+        process.env.Gb_PREVIOUS_PRIVATE_KEY_BASE64,
+        process.env.Gb_PREVIOUS_PUBLIC_KEY_BASE64
+    );
+
+    return {
+        currentSlot,
+        allSlots: [currentSlot, previousSlot].filter(Boolean)
+    };
+};
+
+let CURRENT_KEY_SLOT = null;
+let ALL_KEY_SLOTS = [];
+
+try {
+    const { currentSlot, allSlots } = loadKeySlots();
+    CURRENT_KEY_SLOT = currentSlot;
+    ALL_KEY_SLOTS = allSlots;
+
+    if (CURRENT_KEY_SLOT?.certificateInfo) {
+        console.log(
+            `🔑 Active public certificate loaded. Valid to: ${CURRENT_KEY_SLOT.certificateInfo.validTo}`
+        );
+    }
+
+    if (ALL_KEY_SLOTS.length > 1) {
+        console.log(`🔄 Key rotation enabled with ${ALL_KEY_SLOTS.length} private key slot(s).`);
+    }
+} catch (e) {
+    console.error("❌ Error loading keys from Env:", e.message);
+    if (process.env.NODE_ENV === 'production') process.exit(1);
 }
 
-exports.getPublicKey = () => PUBLIC_KEY;
+if (!CURRENT_KEY_SLOT && process.env.NODE_ENV === 'production') {
+    console.error("❌ CRITICAL: Missing Keys in Production!");
+    process.exit(1);
+}
+
+const tryDecryptWithPrivateKey = (slot, encKey) =>
+    crypto.privateDecrypt(
+        {
+            key: slot.privateKeyPem,
+            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+            oaepHash: "sha256",
+        },
+        Buffer.from(encKey, 'base64')
+    );
+
+exports.getPublicKey = () => CURRENT_KEY_SLOT?.publicKeyPem || null;
+exports.getKeyStatus = () => ({
+    activeLabel: CURRENT_KEY_SLOT?.label || null,
+    rotationEnabled: ALL_KEY_SLOTS.length > 1,
+    activeCertificateValidTo: CURRENT_KEY_SLOT?.certificateInfo?.validTo || null
+});
 
 exports.decryptHybridPayload = (encryptedPackage) => {
     try {
         const { encKey, iv, tag, payload } = encryptedPackage;
         if (!encKey || !iv || !tag || !payload) return null; // Validate structure
 
+        let aesKeyBuffer = null;
+        let lastDecryptError = null;
+
         // ขั้นที่ 1: ใช้ Private Key แกะ AES Key ออกมา
-        const aesKeyBuffer = crypto.privateDecrypt(
-            {
-                key: PRIVATE_KEY,
-                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-                oaepHash: "sha256",
-            },
-            Buffer.from(encKey, 'base64')
-        );
+        for (const slot of ALL_KEY_SLOTS) {
+            try {
+                aesKeyBuffer = tryDecryptWithPrivateKey(slot, encKey);
+                break;
+            } catch (error) {
+                lastDecryptError = error;
+            }
+        }
+
+        if (!aesKeyBuffer) {
+            throw lastDecryptError || new Error('No private key could decrypt the payload.');
+        }
 
         // ขั้นที่ 2: ใช้ AES Key แกะข้อมูลจริง
         const decipher = crypto.createDecipheriv('aes-256-gcm', aesKeyBuffer, Buffer.from(iv, 'base64'));

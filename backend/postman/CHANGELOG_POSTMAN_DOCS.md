@@ -1,7 +1,25 @@
 # Changelog Postman Docs
 
-Current version: `v1.8.4`
+Current version: `v1.8.5`
 Last updated: `2026-03-18`
+
+## v1.8.5
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เพิ่ม `GET /iap/complete` สำหรับ flow ที่ให้ backend จบ IAP login และสร้าง session ก่อน redirect กลับ frontend
+- อัปเดต API summary และ runbook ให้รองรับสถาปัตยกรรม `frontend = pstpyst.com`, `backend = api.pstpyst.com`
+- อัปเดต QA scaffold และ production Postman environment ให้ใช้ `api.pstpyst.com` หลัง IAP
+- ลด docs ให้เหลือเฉพาะ production flow ที่ใช้งานจริง และถอด compatibility route ออกจากชุดเอกสารหลัก
+
+Breaking change:
+
+- ไม่มี breaking change ของ endpoint เดิม แต่มี endpoint ใหม่สำหรับ frontend login gate
+
+ผลกระทบฝั่งทีม:
+
+- frontend ที่ต้องการบังคับ login ก่อนใช้งาน ควร redirect ไป `GET /api/v1/iap/complete?return_to=<frontend-url>` และใช้ `GET /api/v1/iap/me` เพื่อตรวจสถานะหลังกลับมา
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.8.5`
 
 ## v1.8.4
 
@@ -79,7 +97,7 @@ Breaking change:
 
 - เพิ่มเอกสารของ `POST /support/technical-email` สำหรับส่งอีเมลแจ้งปัญหาไปยังทีมพัฒนาระบบพร้อมไฟล์แนบ optional
 - อัปเดตคำอธิบาย security ว่า support endpoint ใช้ `multipart/form-data` และ harden ด้วย session auth, origin check, fixed server-side target email, file signature check
-- อัปเดต `test.html` ให้มีฟอร์มทดสอบ Technical Support email
+- อัปเดต QA page ให้มีฟอร์มทดสอบ Technical Support email
 - อัปเดต collection และ frontend guide ให้สะท้อนข้อจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB และการส่งหาอีเมลปลายทางคงที่ของทีมพัฒนา
 
 Breaking change:

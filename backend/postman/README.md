@@ -1,12 +1,13 @@
 # Postman Guide
 
-Version: `v1.8.4`
+Version: `v1.8.5`
 Last updated: `2026-03-18`
 
 Change summary:
-- เพิ่ม endpoint `POST /support/technical-email` สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบพร้อมไฟล์แนบ optional
-- harden security ของ support endpoint ด้วย fixed server-side target email, browser origin check, file signature check และการ sanitize ค่า email/subject
-- อัปเดต Postman collection, frontend guide และ `test.html` ให้รองรับ flow ใหม่
+- เพิ่ม backend-first IAP completion flow ผ่าน `GET /iap/complete`
+- เพิ่ม `GET /iap/me` สำหรับให้ frontend ตรวจ session/email หลัง redirect กลับจาก IAP
+- อัปเดต QA scaffold ใน `Testwebbackend/` ให้สอดคล้องกับ production API domain หลัง IAP
+- คง hardening เดิมของ support endpoint และ security flow อื่นไว้
 
 โฟลเดอร์นี้ประกอบด้วยไฟล์สำหรับใช้งาน Sci-Request System บน Postman:
 
@@ -21,6 +22,7 @@ Change summary:
 - `RELEASE_CHECKLIST_POSTMAN_DOCS.md`
 - `FRONTEND_INTEGRATION_GUIDE.md`
 - `../API_DOCUMENTATION.md`
+- `../SECURITY_OVERVIEW.md`
 - `examples/api-client.ts`
 - `examples/react-examples.tsx`
 - `examples/react-query-examples.tsx`
@@ -31,6 +33,7 @@ Change summary:
 ถ้าต้องการตัวอย่าง React แบบหยิบไปใช้ต่อได้เร็ว ให้ดู `examples/react-examples.tsx`
 ถ้าทีมใช้ `axios` หรือ `@tanstack/react-query` ให้ดู `examples/react-query-examples.tsx`
 ถ้าต้องการหน้าอ้างอิง API contract แบบย่อของ backend โดยตรง ให้ดู `../API_DOCUMENTATION.md`
+ถ้าต้องการมุม security posture และ hardening checklist ล่าสุด ให้ดู `../SECURITY_OVERVIEW.md`
 ถ้าต้องการไฟล์สำหรับเปิดใน browser แล้ว `Print -> Save as PDF` ให้ generate `printable-api-docs.html`
 
 ## 1. ไฟล์แต่ละตัวใช้ทำอะไร
@@ -143,12 +146,17 @@ git push origin docs/v1.8.0
 
 ### 3.3 Production
 
-- `baseUrl = https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1`
+- `baseUrl = https://api.pstpyst.com/api/v1`
 
 เหมาะสำหรับ:
 
 - ตรวจสอบ behavior บนระบบจริง
 - อ่าน docs และดู examples เทียบกับของจริง
+
+หมายเหตุ:
+
+- production จริงของระบบนี้อยู่หลัง HTTPS Load Balancer + IAP
+- ไม่ควรใช้งาน `run.app` เป็น production base URL อีก เพราะ deploy แบบ IAP จริงใช้ `--no-default-url`
 
 ## 4. วิธีสลับ Environment ใน Postman
 
@@ -281,7 +289,7 @@ endpoint `POST /support/technical-email` มีไว้สำหรับทด
 
 - endpoint นี้ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้อง
 - ไม่ควรอธิบายเป็น responsibility ของ frontend product หลัก
-- `test.html` สามารถมีไว้เพื่อ internal testing ได้ แต่ควรสื่อว่าเป็นเครื่องมือ QA/dev
+- `Testwebbackend/index.php` ควรใช้เพื่อ internal QA/dev เท่านั้น
 
 สิ่งที่ QA ควรรู้:
 

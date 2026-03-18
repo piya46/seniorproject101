@@ -1,6 +1,6 @@
 # API Documentation
 
-Version: `v1.8.4`
+Version: `v1.8.5`
 Last updated: `2026-03-18`
 
 เอกสารนี้เป็นสรุป API contract ฝั่ง backend แบบย่อสำหรับทีมที่ต้องการดูภาพรวมเร็ว โดยรายละเอียดเชิง integration, encryption flow, Postman examples และ frontend behavior แบบเต็มอยู่ที่:
@@ -8,6 +8,7 @@ Last updated: `2026-03-18`
 - [README.md](/Users/pst./senior/backend/postman/README.md)
 - [FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)
 - [Sci-Request-System.postman_collection.json](/Users/pst./senior/backend/postman/Sci-Request-System.postman_collection.json)
+- [SECURITY_OVERVIEW.md](/Users/pst./senior/backend/SECURITY_OVERVIEW.md)
 
 ## Overview
 
@@ -18,12 +19,21 @@ Last updated: `2026-03-18`
 - `GET /healthz` เป็น service-level health endpoint ที่อยู่นอก `/api/v1`
 - `POST /support/technical-email` เป็น multipart endpoint สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบ
 
+## Security Posture Summary
+
+- production backend ถูกออกแบบให้วางหลัง `HTTPS Load Balancer -> IAP -> Serverless NEG -> Cloud Run`
+- secure JSON encryption layer เดิมยังอยู่ครบสำหรับ endpoint ที่กำหนด
+- flow ที่แนะนำสำหรับ IAP คือ `GET /iap/complete` แล้วให้ frontend อ่านสถานะผ่าน `GET /iap/me`
+- ไม่แนะนำให้ส่ง identity ผ่าน query string หลัง login
+
 ## Endpoint Matrix
 
 | Endpoint | Method | ต้อง Auth | ต้อง Encryption | Request fields หลัก | Response หลัก |
 | --- | --- | --- | --- | --- | --- |
 | `/healthz` | `GET` | ไม่ต้อง | ไม่ต้อง | - | `{ status: "ok" }` |
 | `/auth/public-key` | `GET` | ไม่ต้อง | ไม่ต้อง | - | `{ publicKey }` |
+| `/iap/complete` | `GET` | ต้องผ่าน IAP | ไม่ต้อง | `return_to` | `302` redirect กลับ frontend หลัง backend ตั้ง session cookie แล้ว |
+| `/iap/me` | `GET` | ต้อง | ไม่ต้อง | - | `{ authenticated, email, hosted_domain }` |
 | `/session/init` | `POST` | ไม่ต้อง | ต้อง | - | `{ message, session_id }` |
 | `/departments` | `GET` | ต้อง | ไม่ต้อง | - | `{ data: Department[] }` |
 | `/forms` | `GET` | ต้อง | ไม่ต้อง | `degree_level` | `{ data: FormSummary[] }` |
@@ -35,6 +45,36 @@ Last updated: `2026-03-18`
 | `/support/technical-email` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | `reporter_email`, `issue_type`, `subject`, `description`, `attachment?` | `{ status, message, data }` |
 
 ## Merge Endpoint Notes
+
+### `GET /iap/complete`
+
+ใช้สำหรับ flow ที่ต้องการให้ IAP login จบที่ backend domain ก่อน จากนั้น backend จะสร้าง session cookie ของระบบ แล้วค่อย redirect กลับ frontend
+
+ฟิลด์ที่รับ:
+
+- `return_to` optional แต่แนะนำให้ส่ง
+
+พฤติกรรม:
+
+- route นี้อยู่หลัง IAP middleware
+- backend จะสร้างหรือ reuse `sci_session_token`
+- backend จะ redirect กลับ `return_to` พร้อม query `auth=ok`
+- ไม่ส่ง email หรือ token ผ่าน query string
+- flow นี้เหมาะกับสถาปัตยกรรม `frontend = pstpyst.com`, `backend = api.pstpyst.com` มากกว่าการ redirect ข้าม host ตรงจาก IAP
+
+### `GET /iap/me`
+
+ใช้ให้ frontend ตรวจว่า backend session พร้อมหรือยังหลัง redirect กลับจาก IAP completion flow
+
+response ตัวอย่าง:
+
+```json
+{
+  "authenticated": true,
+  "email": "student@chula.ac.th",
+  "hosted_domain": "student.chula.ac.th"
+}
+```
 
 ### `POST /documents/merge`
 
@@ -69,7 +109,7 @@ Last updated: `2026-03-18`
 
 ข้อจำกัด:
 
-- ต้องมี session cookie (`sci_session_token`) ที่ถูกสร้างจาก `POST /session/init`
+- ต้องมี session cookie (`sci_session_token`) ที่ถูกสร้างจาก `POST /session/init` หรือ flow `GET /iap/complete`
 - ใช้ `multipart/form-data`
 - แนบได้สูงสุด 1 ไฟล์
 - ขนาดไฟล์ไม่เกิน 2MB
@@ -188,6 +228,7 @@ backend ไม่ได้ตอบ error ทุก endpoint ด้วย schema
 - `case_key` ใช้ใน `POST /validation/check-completeness` เมื่อ form นั้นมี `case_rules`
 - อีเมลปลายทางของ support endpoint เป็นค่า server-managed ถูก resolve จาก `TECH_SUPPORT_TARGET_EMAIL` และไม่ถูกส่งกลับใน success response
 - `POST /session/init` จะคืน `session_id` และ set cookie `sci_session_token` ให้ client ใช้กับ endpoint ที่ต้อง auth
+- ใน production ที่มี IAP หน้า load balancer แนะนำให้ใช้ `GET /iap/complete` เพื่อให้ backend สร้าง session หลัง IAP แล้วค่อย redirect กลับ frontend
 - การเปิด Google Cloud IAP เป็น outer gate เป็น infra policy เพิ่มเติม ไม่ได้แทน session auth ภายใน API
 
 ## References

@@ -19,7 +19,7 @@ const swaggerOptions = {
         description: 'Local Development',
       },
       {
-        url: 'https://sci-request-system-466086429766.asia-southeast1.run.app/api/v1',
+        url: 'https://api.pstpyst.com/api/v1',
         description: 'Production Server',
       },
     ],

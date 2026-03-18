@@ -63,6 +63,27 @@ backend แบ่งรูปแบบการรับส่งข้อมู
 - upload จะไม่ผูกกับ session ที่ถูกต้อง
 - validation / merge / chat / forms บาง endpoint จะตอบ `401` หรือ `403`
 
+### 3.1 Production Flow เมื่อมี IAP อยู่หน้า `api.pstpyst.com`
+
+ถ้าสถาปัตยกรรมเป็น:
+
+- frontend = `https://pstpyst.com`
+- backend = `https://api.pstpyst.com`
+
+ให้ใช้ flow นี้:
+
+1. frontend พาผู้ใช้ไป `GET /iap/complete?return_to=<frontend-url>`
+2. IAP login จะเกิดบน backend domain (`api.pstpyst.com`)
+3. backend จะสร้าง `sci_session_token`
+4. backend redirect กลับ frontend พร้อม query `auth=ok`
+5. frontend เรียก `GET /iap/me` ด้วย `credentials: 'include'`
+6. backend ตอบ `authenticated`, `email`, `hosted_domain`
+
+ข้อสำคัญ:
+
+- ไม่ควรส่ง email, token หรือ session id ผ่าน query string
+- ไม่ควรใช้ flow ที่ให้ IAP redirect ข้าม host ไป frontend ตรงโดยไม่มีขั้น backend completion
+
 ## 4. Session และ Cookie
 
 backend ใช้ cookie-based session โดยตั้ง cookie ชื่อ `sci_session_token`
@@ -964,7 +985,7 @@ frontend ควร:
 
 - [api-client.ts](/Users/pst./senior/backend/postman/examples/api-client.ts)
 - [README.md](/Users/pst./senior/backend/postman/README.md)
-- [test.html](/Users/pst./senior/test.html)
+- [Testwebbackend index.php](/Users/pst./senior/Testwebbackend/index.php)
 
 ## 16. Checklist สำหรับทีม Frontend
 
