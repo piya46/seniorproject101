@@ -128,7 +128,7 @@
       <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
     </section>
     <h1>API Documentation</h1>
-<p>Version: `v1.9.2` Last updated: `2026-03-26`</p>
+<p>Version: `v1.9.3` Last updated: `2026-03-27`</p>
 <p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
 <p>เอกสารที่เกี่ยวข้อง:</p>
 <ul>
@@ -153,6 +153,7 @@
 <li>ใช้ Google OIDC เป็น identity provider</li>
 <li>backend verify Google `id_token`, `state`, `nonce`, `email_verified`, และ allowed domains</li>
 <li>backend ออก session cookie แบบ `HttpOnly` และ `Secure` ใน production</li>
+<li>backend ออก anti-CSRF token ผ่าน `sci_csrf_token` + `x-csrf-token` สำหรับ state-changing requests ที่ใช้ session cookie</li>
 <li>backend regenerate `session_id` ใหม่หลัง OIDC login callback</li>
 <li>`POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist</li>
 <li>endpoint ธุรกิจหลักยังต้องผ่าน session-based auth</li>
@@ -160,7 +161,7 @@
 </ul>
 <h2>Authentication Flow</h2>
 <p>flow ที่แนะนำ:</p>
-<p>1. frontend หรือ browser เปิด `GET /oidc/google/login?return_to=&lt;frontend-url&gt;` 2. Google login เสร็จแล้ว redirect กลับ `GET /oidc/google/callback` 3. backend verify Google identity และสร้าง `sci_session_token` 4. backend redirect กลับ frontend พร้อม `auth=ok` และ `oidc=done` 5. frontend เรียก `GET /oidc/me` ด้วย `credentials: &#39;include&#39;` 6. จากนั้นค่อยเรียก `POST /session/init` และ endpoint อื่น</p>
+<p>1. frontend หรือ browser เปิด `GET /oidc/google/login?return_to=&lt;frontend-url&gt;` 2. Google login เสร็จแล้ว redirect กลับ `GET /oidc/google/callback` 3. backend verify Google identity และสร้าง `sci_session_token` 4. backend redirect กลับ frontend พร้อม `auth=ok` และ `oidc=done` 5. frontend เรียก `GET /oidc/me` ด้วย `credentials: &#39;include&#39;` 6. frontend เรียก `GET /auth/csrf-token` 7. จากนั้นค่อยเรียก `POST /session/init` และ endpoint อื่น</p>
 <p>ข้อสำคัญ:</p>
 <ul>
 <li>ไม่ส่ง token หรือ email ผ่าน query string</li>
@@ -173,6 +174,7 @@
 <p>  `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`</p>
 <ul>
 <li>`POST /session/init` ตอนนี้ต้องมี OIDC-backed session ก่อนแล้ว</li>
+<li>state-changing requests ที่ใช้ session cookie ต้องแนบ `x-csrf-token` ให้ตรงกับ token ปัจจุบัน</li>
 </ul>
 <h2>Endpoint Matrix</h2>
 <table>
@@ -203,6 +205,13 @@
 <td>ไม่ต้อง</td>
 <td>ไม่ต้อง</td>
 <td>public key สำหรับ secure JSON</td>
+</tr>
+<tr>
+<td>`/auth/csrf-token`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>ดึง/refresh anti-CSRF token สำหรับ browser client</td>
 </tr>
 <tr>
 <td>`/oidc/google/login`</td>
@@ -347,6 +356,7 @@
 <p>เงื่อนไขเพิ่มเติม:</p>
 <ul>
 <li>request ต้องมาจาก browser origin ที่อยู่ใน frontend allowlist</li>
+<li>ต้องแนบ `x-csrf-token` ถ้าเรียกผ่าน session cookie จาก browser</li>
 <li>ใช้สำหรับทดสอบ negative-path ได้โดยเรียก `GET /oidc/me` ซ้ำหลัง logout</li>
 </ul>
 <p>response ตัวอย่าง:</p>
@@ -360,12 +370,31 @@
 }
 
 </code></pre>
+<h2>CSRF Token</h2>
+<h3>`GET /auth/csrf-token`</h3>
+<p>ใช้สำหรับดึงหรือ refresh anti-CSRF token หลัง login สำเร็จแล้ว</p>
+<p>response ตัวอย่าง:</p>
+<pre><code>
+{
+
+  &quot;csrf_token&quot;: &quot;random-token-value&quot;
+
+}
+
+</code></pre>
+<p>หมายเหตุ:</p>
+<ul>
+<li>frontend ควรเรียก endpoint นี้หลัง `GET /oidc/me`</li>
+<li>token นี้ต้องถูกส่งกลับมาใน header `x-csrf-token`</li>
+<li>ใช้กับทุก `POST`, `PUT`, `PATCH`, `DELETE` ที่อาศัย `sci_session_token`</li>
+</ul>
 <h2>Session Init</h2>
 <h3>`POST /session/init`</h3>
 <p>ใช้เริ่ม secure JSON flow หรือ reuse session record ของระบบ</p>
 <p>ตอนนี้ endpoint นี้:</p>
 <ul>
 <li>ต้องมี OIDC-backed session ก่อน</li>
+<li>ต้องมี anti-CSRF token ก่อน</li>
 <li>ใช้ secure JSON transport</li>
 <li>จะคืน `session_id` ที่ผูกกับระบบภายใน</li>
 </ul>
@@ -375,7 +404,9 @@
 
   &quot;message&quot;: &quot;Session initialized&quot;,
 
-  &quot;session_id&quot;: &quot;sess_abc123&quot;
+  &quot;session_id&quot;: &quot;sess_abc123&quot;,
+
+  &quot;csrf_token&quot;: &quot;random-token-value&quot;
 
 }
 
@@ -385,6 +416,7 @@
 <p>ข้อจำกัด:</p>
 <ul>
 <li>ต้องมี session cookie</li>
+<li>ต้องแนบ `x-csrf-token`</li>
 <li>ใช้ `multipart/form-data`</li>
 <li>แนบไฟล์ได้สูงสุด 1 ไฟล์</li>
 <li>ขนาดไฟล์ไม่เกิน 2MB</li>
@@ -437,6 +469,13 @@
 <td>backend internal failure</td>
 </tr>
 </tbody></table>
+<h2>AI Usage Retention</h2>
+<ul>
+<li>backend เก็บ AI usage รายวันไว้ใน Firestore collection `AI_USAGE_DAILY`</li>
+<li>ใช้ข้อมูลนี้ทั้งสำหรับ daily token limit และ usage analytics</li>
+<li>retention กำหนดผ่าน env `AI_USAGE_RETENTION_DAYS`</li>
+<li>TTL field ที่ใช้คือ `expire_at`</li>
+</ul>
 <h2>Notes</h2>
 <ul>
 <li>การเอา IAP ออกทำให้ชั้น outer access gate หายไป แต่ app-layer auth, domain enforcement, session policy, validation, encryption, และ rate limiting ยังอยู่</li>
