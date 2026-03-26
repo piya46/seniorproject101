@@ -706,6 +706,18 @@
         return JSON.parse(jsonText);
       }
 
+      async function tryDecryptErrorPayload(data, aesKey) {
+        if (!aesKey || !isEncryptedResponse(data)) {
+          return data;
+        }
+
+        try {
+          return await decryptJsonResponse(data, aesKey);
+        } catch (_error) {
+          return data;
+        }
+      }
+
       function ApiClientError(status, data, nonce) {
         var message = "API request failed with status " + status;
         if (data && typeof data === "object" && typeof data.message === "string") {
@@ -782,7 +794,11 @@
 
         var parsedBody = await safeParseJson(response);
         if (!response.ok) {
-          throw new ApiClientError(response.status, parsedBody, requestContext.nonce);
+          throw new ApiClientError(
+            response.status,
+            await tryDecryptErrorPayload(parsedBody, requestContext.aesKey),
+            requestContext.nonce
+          );
         }
 
         if (isEncryptedResponse(parsedBody)) {
@@ -796,15 +812,7 @@
       };
 
       QaClient.prototype.logout = async function () {
-        var response = await fetch(this.baseUrl() + "/oidc/logout", {
-          method: "POST",
-          credentials: "include"
-        });
-        var data = await safeParseJson(response);
-        if (!response.ok) {
-          throw new ApiClientError(response.status, data);
-        }
-        return data;
+        return this.postEncrypted("/oidc/logout", {});
       };
 
       QaClient.prototype.uploadEncryptedFile = async function (file, fileKey, formCode) {
@@ -939,9 +947,9 @@
       });
 
       document.getElementById("oidcLoginBtn").addEventListener("click", function () {
+        localStorage.setItem("testwebbackend.baseUrl", getBackend());
         var returnUrl = new URL(window.location.origin + window.location.pathname);
         returnUrl.searchParams.set("oidc", "done");
-        returnUrl.searchParams.set("backend", getBackend());
         window.location.href = buildUrl(getBackend() + "/api/v1/oidc/google/login", {
           return_to: returnUrl.toString()
         });
@@ -1077,9 +1085,7 @@
 
       var savedBackend = localStorage.getItem("testwebbackend.baseUrl");
       var query = new URLSearchParams(window.location.search);
-      if (query.get("backend")) {
-        backendInput.value = query.get("backend");
-      } else if (savedBackend) {
+      if (savedBackend) {
         backendInput.value = savedBackend;
       } else {
         backendInput.value = DEFAULT_BACKEND;
@@ -1091,6 +1097,11 @@
       if (oidcDone) {
         badgeOidc.className = "badge ok";
         badgeOidcText.textContent = "detected";
+        if (window.history && typeof window.history.replaceState === "function") {
+          var cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete("backend");
+          window.history.replaceState({}, "", cleanUrl.toString());
+        }
         setStatus("OIDC return detected. Checking backend session...", "warn");
         refreshSessionState().then(function (me) {
           if (me && me.authenticated) {

@@ -17,6 +17,39 @@ function isOidcEnabled() {
   return String(process.env.OIDC_ENABLED || 'true').toLowerCase() === 'true';
 }
 
+function getAllowedOrigins() {
+  return String(process.env.FRONTEND_URL || 'http://localhost:5173|http://127.0.0.1:5500')
+    .split(/[,|]/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function isAllowedBrowserOrigin(req) {
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin.trim() : '';
+  const referer = typeof req.headers.referer === 'string' ? req.headers.referer.trim() : '';
+  const allowedOrigins = getAllowedOrigins();
+
+  if (!origin && !referer) {
+    return false;
+  }
+
+  return allowedOrigins.some((allowedOrigin) => {
+    if (origin && origin === allowedOrigin) {
+      return true;
+    }
+
+    if (referer) {
+      try {
+        return new URL(referer).origin === allowedOrigin;
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    return false;
+  });
+}
+
 router.get('/google/login', (req, res) => {
   if (!isOidcEnabled()) {
     return res.status(503).json({
@@ -95,6 +128,13 @@ router.get('/me', authMiddleware, (req, res) => {
 
 router.post('/logout', async (req, res) => {
   try {
+    if (!isAllowedBrowserOrigin(req)) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Origin is not allowed for logout requests.'
+      });
+    }
+
     if (req.cookies?.sci_session_token) {
       try {
         const decoded = jwt.verify(req.cookies.sci_session_token, process.env.JWT_SECRET, {

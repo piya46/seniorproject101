@@ -15,6 +15,17 @@ const strictLimiter = rateLimit({
     max: 20, 
     standardHeaders: true, 
     legacyHeaders: false,
+    keyGenerator: (req) => {
+        const sessionId = req.user?.session_id;
+        const email = req.user?.email;
+        if (sessionId) {
+            return `session:${sessionId}`;
+        }
+        if (email) {
+            return `email:${String(email).trim().toLowerCase()}`;
+        }
+        return `ip:${req.ip}`;
+    },
     message: { status: 'error', message: 'Too many upload attempts, please slow down.' }
 });
 

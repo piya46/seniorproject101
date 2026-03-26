@@ -27,7 +27,7 @@ Last updated: `2026-03-26`
 - ใช้ Google OIDC เป็น identity provider
 - backend verify Google `id_token`, `state`, `nonce`, `email_verified`, และ allowed domains
 - backend ออก session cookie แบบ `HttpOnly` และ `Secure` ใน production
-- `POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server
+- `POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist
 - endpoint ธุรกิจหลักยังต้องผ่าน session-based auth
 - secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด
 
@@ -61,7 +61,7 @@ flow ที่แนะนำ:
 | `/oidc/google/login` | `GET` | ไม่ต้อง | ไม่ต้อง | เริ่ม Google OIDC login |
 | `/oidc/google/callback` | `GET` | ไม่ต้อง | ไม่ต้อง | backend callback หลัง Google login |
 | `/oidc/me` | `GET` | ต้อง | ไม่ต้อง | อ่านสถานะ session และ identity ปัจจุบัน |
-| `/oidc/logout` | `POST` | ไม่ต้อง | ไม่ต้อง | ลบ app session cookie |
+| `/oidc/logout` | `POST` | ไม่ต้อง | ไม่ต้อง | ลบ app session cookie และ revoke session record |
 | `/session/init` | `POST` | ต้อง | ต้อง | bootstrap secure JSON flow/reuse session |
 | `/departments` | `GET` | ต้อง | ไม่ต้อง | โหลด metadata คณะ/ภาควิชา |
 | `/forms` | `GET` | ต้อง | ไม่ต้อง | โหลดรายการฟอร์ม |
@@ -121,6 +121,11 @@ response ตัวอย่าง:
 
 ลบ `sci_session_token` และ revoke session record ฝั่ง server
 
+เงื่อนไขเพิ่มเติม:
+
+- request ต้องมาจาก browser origin ที่อยู่ใน frontend allowlist
+- ใช้สำหรับทดสอบ negative-path ได้โดยเรียก `GET /oidc/me` ซ้ำหลัง logout
+
 response ตัวอย่าง:
 
 ```json
@@ -163,6 +168,7 @@ response ตัวอย่าง:
 - ขนาดไฟล์ไม่เกิน 2MB
 - รองรับ `jpg`, `png`, `webp`, `pdf`
 - backend ตรวจ `Origin/Referer`
+- backend รับ `multipart/form-data` เฉพาะ endpoint ที่ออกแบบไว้จริง เช่น `/upload` และ `/support/technical-email`
 - ปลายทางอีเมลกำหนดจาก `TECH_SUPPORT_TARGET_EMAIL`
 
 ## Error Model
