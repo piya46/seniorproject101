@@ -161,7 +161,7 @@ const sendTechnicalSupportEmail = async ({
       ? [
           {
             filename: attachment.originalname,
-            content: attachment.buffer,
+            ...(attachment.path ? { path: attachment.path } : { content: attachment.buffer }),
             contentType: attachment.mimetype
           }
         ]

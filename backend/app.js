@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const { Storage } = require('@google-cloud/storage');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet'); 
@@ -17,6 +18,7 @@ const path = require('path');
 
 const app = express();
 const oidcEnabled = String(process.env.OIDC_ENABLED !== undefined ? process.env.OIDC_ENABLED : 'true').toLowerCase() === 'true';
+const storage = new Storage();
 
 // --- Security Check ---
 const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME', 'Gb_PRIVATE_KEY_BASE64', 'Gb_PUBLIC_KEY_BASE64'];
@@ -67,6 +69,29 @@ app.use(generalLimiter);
 
 const BASE_URL = '/api/v1';
 
+const probeSignedUrlGeneration = async () => {
+    const bucketName = process.env.GCS_BUCKET_NAME;
+
+    if (!bucketName) {
+        throw new Error('GCS_BUCKET_NAME is missing.');
+    }
+
+    const bucket = storage.bucket(bucketName);
+    const probeFile = bucket.file(`healthchecks/signed-url-probe-${Date.now()}.txt`);
+    const expiresAt = Date.now() + (5 * 60 * 1000);
+
+    await probeFile.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: expiresAt,
+    });
+
+    return {
+        bucket_name: bucketName,
+        expires_at: new Date(expiresAt).toISOString()
+    };
+};
+
 app.get(`${BASE_URL}/system/status`, (req, res) => {
     const keyStatus = getKeyStatus();
     const serviceName = process.env.K_SERVICE || 'sci-request-system';
@@ -91,6 +116,36 @@ app.get(`${BASE_URL}/system/status`, (req, res) => {
     };
 
     res.status(healthy ? 200 : 503).json(status);
+});
+
+app.get(`${BASE_URL}/system/status/storage-signing`, async (req, res) => {
+    try {
+        const probe = await probeSignedUrlGeneration();
+
+        return res.status(200).json({
+            status: 'ok',
+            checks: {
+                storage_signing: {
+                    status: 'ok'
+                }
+            },
+            probe,
+            now: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Storage signing probe failed:', error);
+        return res.status(503).json({
+            status: 'degraded',
+            checks: {
+                storage_signing: {
+                    status: 'degraded'
+                }
+            },
+            error: 'Storage signing probe failed',
+            message: process.env.NODE_ENV === 'development' ? error.message : 'Storage signing is unavailable.',
+            now: new Date().toISOString()
+        });
+    }
 });
 
 app.get(`${BASE_URL}/system/status/details`, authMiddleware, (req, res) => {

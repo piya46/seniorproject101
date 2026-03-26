@@ -13,8 +13,56 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 ## Prerequisites
 
 - มีสิทธิ์ใช้ Cloud Run, Cloud Build, Secret Manager, Storage, IAM, Scheduler
+- มีสิทธิ์ใช้ Firestore database/TTL administration
 - มี Google OAuth client สำหรับ web application
 - มี Google OAuth client สำหรับ backend ตัวนี้
+
+## Auto Bootstrap By `deploy.sh`
+
+สิ่งที่ `deploy.sh` จัดการให้เองในฝั่ง Google Cloud:
+
+- enable APIs ที่ใช้ใน deployment/runtime เช่น Cloud Run, Cloud Build, Artifact Registry, Secret Manager, Firestore, Storage, IAM, Cloud Scheduler
+- enable APIs ที่ใช้กับ signed URL และ service-account-based signing เช่น IAM Credentials API
+- create/update Cloud Run service หลัก
+- create bucket ถ้ายังไม่มี
+- apply bucket lifecycle policy ถ้าเปิด flag ที่เกี่ยวข้อง
+- create/check Firestore database ที่ app ใช้งาน
+- enable Firestore TTL policies สำหรับ `used_nonces.expire_at` และ `RATE_LIMITS.expireAt`
+- create/update app service account และ cleanup service account
+- grant IAM bindings ที่ backend และ cleanup service ต้องใช้
+- create/update secrets สำหรับ JWT, DB encryption key, SMTP, OIDC client secret values, และ key pair
+- deploy cleanup service และ create/update Cloud Scheduler job
+
+ข้อควรทราบ:
+
+- Cloud Run service ถ้ายังไม่มี สคริปต์จะสร้างให้ตอน `gcloud run deploy`
+- bucket ถ้ายังไม่มี สคริปต์จะสร้างให้ แต่ถ้ามี bucket ชื่อเดิมอยู่คนละ location จะไม่ย้าย location แบบเงียบ ๆ และต้องใช้ migration flow ของสคริปต์แทน
+- Firestore database ไม่ควรหวังให้ runtime สร้างเอง ตอนนี้ `deploy.sh` จะเช็ก/สร้างก่อน deploy app
+- Firestore TTL เป็น eventual rollout ของ Google Cloud หลังเปิด policy แล้ว สถานะอาจใช้เวลาสักพักกว่าจะสะท้อนครบ
+- app service account ตอนนี้ใช้ secret-level access สำหรับ secrets ที่ runtime ใช้จริง แทน project-wide `secretmanager.secretAccessor`
+- app และ cleanup service account ถูกลด bucket role ลงมาเป็น `roles/storage.objectUser` ซึ่งยังพอสำหรับ read/write/delete object ตาม flow ปัจจุบัน
+- app service account มี self `roles/iam.serviceAccountTokenCreator` เพื่อรองรับ `getSignedUrl()` ผ่าน `signBlob`
+
+## Manual OAuth Provider Setup
+
+สิ่งที่ยังต้องทำเองฝั่ง Google OAuth provider / Google Cloud Console:
+
+- สร้าง Google OAuth client ที่จะใช้กับ frontend/web application
+- สร้าง Google OAuth client สำหรับ backend ตัวนี้ ถ้ายังไม่มี
+- ใส่ Authorized redirect URI ให้ตรงกับ backend callback URL แบบ exact match
+- ถ้ามีการเปลี่ยน domain, region, หรือ callback URL ต้องอัปเดตรายการ redirect URI ใน OAuth client เอง
+
+`deploy.sh` ทำได้แค่:
+
+- เก็บ `GOOGLE_OIDC_CLIENT_ID` และ `GOOGLE_OIDC_CLIENT_SECRET` เข้า Secret Manager
+- inject ค่าเหล่านี้เข้า Cloud Run
+- default `GOOGLE_OIDC_CALLBACK_URL` ให้ตรง canonical `run.app` URL ถ้าไม่ได้ override
+
+`deploy.sh` ยังไม่ได้:
+
+- สร้าง OAuth client ให้อัตโนมัติ
+- แก้ Authorized redirect URIs ใน provider ให้อัตโนมัติ
+- แก้ consent screen / publishing status / branding ฝั่ง OAuth provider
 
 ## Required OIDC Config
 
@@ -66,8 +114,16 @@ cd /Users/pst./senior/backend
 - deploy Cloud Run service
 - update SMTP and OIDC secrets in Secret Manager
 - inject production env vars
+- ensure Firestore database ที่ app ใช้งานมีอยู่จริง
+- ensure Firestore TTL policies สำหรับ `used_nonces.expire_at` และ `RATE_LIMITS.expireAt`
 - keep cleanup service/scheduler flow เดิม
 - ไม่สร้าง domain mapping หรือ LB resources ระหว่าง deploy
+
+หมายเหตุ:
+
+- `deploy.sh` ตอนนี้ไม่รอให้ runtime ไปสร้าง Firestore เอง แต่จะเช็ก/สร้าง `FIRESTORE_DATABASE_ID` ให้ก่อน deploy
+- `Cloud Run service` และ `Cloud Storage bucket` ถ้ายังไม่มี สคริปต์จะสร้างให้
+- Firestore TTL เป็น eventual rollout ของ Google Cloud หลังเปิด policy แล้ว เอกสาร/สถานะอาจใช้เวลาสักพักกว่าจะสะท้อนครบ
 
 ตัวอย่างเพิ่ม dev local ชั่วคราว:
 

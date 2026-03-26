@@ -1,17 +1,18 @@
 const express = require('express');
+const fs = require('fs/promises');
 const multer = require('multer');
-const rateLimit = require('express-rate-limit');
+const os = require('os');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { createScopedLimiter } = require('../middlewares/rateLimitMiddleware');
 const { sendTechnicalSupportEmail } = require('../utils/emailUtils');
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 
 const router = express.Router();
 
-const supportLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+const supportLimiter = createScopedLimiter('support', {
   max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: {
     status: 'error',
     message: 'Too many technical support requests. Please wait before trying again.'
@@ -26,9 +27,14 @@ const ALLOWED_ATTACHMENT_MIMES = [
   'application/pdf'
 ];
 const ALLOWED_ATTACHMENT_EXTS = ['jpg', 'png', 'webp', 'pdf'];
+const TEMP_UPLOAD_DIR = os.tmpdir();
 
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, TEMP_UPLOAD_DIR),
+    filename: (req, file, cb) =>
+      cb(null, `support-${uuidv4()}${path.extname(file.originalname || '') || '.bin'}`)
+  }),
   limits: {
     fileSize: MAX_ATTACHMENT_SIZE,
     files: 1
@@ -70,18 +76,24 @@ const resolveTargetEmail = () => {
   return defaultTarget;
 };
 
-const detectFileType = async (buffer) => {
+const detectFileType = async (filePath) => {
   const fileTypeModule = await import('file-type');
-  const detector =
-    fileTypeModule.fileTypeFromBuffer ||
-    fileTypeModule.fromBuffer ||
-    fileTypeModule.default?.fromBuffer;
+  const source = fileTypeModule.default || fileTypeModule;
+  const detector = source.fileTypeFromFile || source.fromFile;
 
   if (!detector) {
     throw new Error('file-type library mismatch');
   }
 
-  return detector(buffer);
+  return detector(filePath);
+};
+
+const cleanupTempFile = async (filePath) => {
+  if (!filePath) {
+    return;
+  }
+
+  await fs.rm(filePath, { force: true }).catch(() => {});
 };
 
 router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrigin, (req, res, next) => {
@@ -176,7 +188,7 @@ router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrig
     }
 
     if (req.file) {
-      const detectedType = await detectFileType(req.file.buffer);
+      const detectedType = await detectFileType(req.file.path);
 
       if (
         !detectedType ||
@@ -236,6 +248,8 @@ router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrig
       error: 'Failed to send technical support email',
       message: error.message
     });
+  } finally {
+    await cleanupTempFile(req.file?.path);
   }
 });
 

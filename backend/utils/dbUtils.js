@@ -1,11 +1,12 @@
 const { Firestore } = require('@google-cloud/firestore');
 const crypto = require('crypto');
 
+const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || 'sessiondd';
 const firestore = new Firestore({
-    databaseId: 'sessiondd' 
+    databaseId: FIRESTORE_DATABASE_ID
 });
-const COLLECTION_NAME = 'SESSION';
-const SUB_COLLECTION_NAME = 'files';
+const COLLECTION_NAME = process.env.FIRESTORE_COLLECTION_NAME || 'SESSION';
+const SUB_COLLECTION_NAME = process.env.FIRESTORE_FILES_SUBCOLLECTION || 'files';
 
 const getDbKey = (keyBuffer) => {
     if (keyBuffer) return keyBuffer;

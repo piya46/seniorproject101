@@ -1,34 +1,40 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const fs = require('fs');
+const fsp = require('fs/promises');
+const os = require('os');
+const path = require('path');
+const { pipeline } = require('stream/promises');
 const { Storage } = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
-const rateLimit = require('express-rate-limit');
 
 const authMiddleware = require('../middlewares/authMiddleware');
-const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
+const { strictLimiter, createScopedLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { addFileToSession, deleteFileRecord, getDecryptedSessionFiles } = require('../utils/dbUtils');
 const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc } = require('../utils/fileSelection');
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+const TEMP_UPLOAD_DIR = os.tmpdir();
 
 // Rate Limiter
-const uploadLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
-    max: 10, 
+const uploadLimiter = createScopedLimiter('upload', {
+    max: 10,
     message: { error: 'Too many uploads', message: 'Upload limit exceeded. Please wait.' },
-    standardHeaders: true,
-    legacyHeaders: false,
 });
 
 // Config Multer
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+      destination: (req, file, cb) => cb(null, TEMP_UPLOAD_DIR),
+      filename: (req, file, cb) =>
+          cb(null, `upload-${uuidv4()}${path.extname(file.originalname || '') || '.bin'}`)
+  }),
   limits: { 
       fileSize: 10 * 1024 * 1024, // 10MB
       files: 1 
@@ -52,14 +58,20 @@ const checkBrowserOrigin = (req, res, next) => {
     return next();
 };
 
-// 🔒 Helper: Decrypt File
-const decryptFileBuffer = (encryptedBuffer, encKey64, iv64, tag64) => {
+const getFileTypeDetector = async () => {
+    const fileTypeModule = await import('file-type');
+    const source = fileTypeModule.default || fileTypeModule;
+
+    return source.fileTypeFromFile || source.fromFile || null;
+};
+
+const decryptFileToPath = async (encryptedPath, outputPath, encKey64, iv64, tag64) => {
     try {
-        if (!process.env.Gb_PRIVATE_KEY_BASE64) throw new Error('Server Private Key missing');
+        if (!process.env.Gb_PRIVATE_KEY_BASE64) {
+            throw new Error('Server Private Key missing');
+        }
 
         const privateKeyPem = Buffer.from(process.env.Gb_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
-
-        // 1. Decrypt AES key with native OpenSSL-backed crypto.
         const aesKey = crypto.privateDecrypt(
             {
                 key: privateKeyPem,
@@ -69,59 +81,81 @@ const decryptFileBuffer = (encryptedBuffer, encKey64, iv64, tag64) => {
             Buffer.from(encKey64, 'base64')
         );
 
-        // 2. Decrypt file content (AES-256-GCM) with native crypto.
         const iv = Buffer.from(iv64, 'base64');
         const authTag = Buffer.from(tag64, 'base64');
         const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, iv);
         decipher.setAuthTag(authTag);
 
-        const decrypted = Buffer.concat([
-            decipher.update(encryptedBuffer),
-            decipher.final()
-        ]);
+        await pipeline(
+            fs.createReadStream(encryptedPath),
+            decipher,
+            fs.createWriteStream(outputPath)
+        );
 
-        return decrypted;
+        return outputPath;
     } catch (err) {
         console.error('🔐 Decryption Failed:', err.message);
         throw err;
     }
 };
 
+const cleanupTempFile = async (filePath) => {
+    if (!filePath) {
+        return;
+    }
+
+    await fsp.rm(filePath, { force: true }).catch(() => {});
+};
+
+const uploadProcessedFileToGcs = async (blob, filePath, contentType, sessionId) =>
+    new Promise((resolve, reject) => {
+        const blobStream = blob.createWriteStream({
+            resumable: false,
+            contentType,
+            metadata: { metadata: { originalName: 'secure_upload', uploadedBy: sessionId } }
+        });
+
+        blobStream.on('error', reject);
+        blobStream.on('finish', resolve);
+        fs.createReadStream(filePath).on('error', reject).pipe(blobStream);
+    });
+
 // Route Handler
 router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimiter, upload.single('file'), async (req, res) => {
+  let verifiedInputPath = null;
+  let decryptedPath = null;
+  let processedPath = null;
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
-    let finalBuffer = req.file.buffer;
+    verifiedInputPath = req.file.path;
 
-    // ✅ Decryption Logic
     if (req.body.encKey && req.body.iv && req.body.tag) {
         console.log(`🔐 Decrypting file: ${req.body.file_key || 'unknown'}`);
         try {
-            finalBuffer = decryptFileBuffer(
-                req.file.buffer, 
+            decryptedPath = path.join(TEMP_UPLOAD_DIR, `decrypted-${uuidv4()}.bin`);
+            await decryptFileToPath(
+                req.file.path,
+                decryptedPath,
                 req.body.encKey, 
                 req.body.iv, 
                 req.body.tag
             );
+            verifiedInputPath = decryptedPath;
             console.log('✅ Decryption Successful');
         } catch (decryptErr) {
             return res.status(400).json({ error: 'Security Error: Cannot decrypt file.', details: decryptErr.message });
         }
     }
 
-    // ✅ FIX BUG 500: แก้ไขการเรียกใช้ file-type ให้ถูกต้อง
-    const fileTypeModule = await import('file-type');
-    
-    // ตรวจสอบว่าใช้คำสั่งไหนได้ (รองรับทั้ง v16 และ v17+)
-    const detector = fileTypeModule.fileTypeFromBuffer || fileTypeModule.fromBuffer || fileTypeModule.default?.fromBuffer;
-    
+    const detector = await getFileTypeDetector();
+
     if (!detector) {
         console.error('❌ File Type Library Error: No detection method found');
         return res.status(500).json({ error: 'Internal Configuration Error: file-type library mismatch' });
     }
 
-    const detectedType = await detector(finalBuffer);
+    const detectedType = await detector(verifiedInputPath);
     
     const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     const ALLOWED_EXTS = ['jpg', 'png', 'webp', 'pdf'];
@@ -137,18 +171,23 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
     const safeFormCode = sanitizeFormCode(form_code);
 
     // Sanitize Logic
-    let processedBuffer;
     let finalMimeType = detectedType.mime;
     let fileExtension = `.${detectedType.ext}`;
 
     try {
         if (['image/jpeg', 'image/png', 'image/webp'].includes(finalMimeType)) {
-            processedBuffer = await sharp(finalBuffer).rotate().toFormat('jpeg', { quality: 80 }).toBuffer();
+            processedPath = path.join(TEMP_UPLOAD_DIR, `processed-${uuidv4()}.jpg`);
+            await sharp(verifiedInputPath).rotate().toFormat('jpeg', { quality: 80 }).toFile(processedPath);
             finalMimeType = 'image/jpeg';
             fileExtension = '.jpg';
         } else if (finalMimeType === 'application/pdf') {
+            const finalBuffer = await fsp.readFile(verifiedInputPath);
             const pdfDoc = await PDFDocument.load(finalBuffer, { ignoreEncryption: true });
-            processedBuffer = Buffer.from(await pdfDoc.save()); 
+            processedPath = path.join(TEMP_UPLOAD_DIR, `processed-${uuidv4()}.pdf`);
+            await fsp.writeFile(processedPath, Buffer.from(await pdfDoc.save()));
+        } else {
+            processedPath = path.join(TEMP_UPLOAD_DIR, `processed-${uuidv4()}${fileExtension}`);
+            await fsp.copyFile(verifiedInputPath, processedPath);
         }
     } catch (processErr) {
         console.error('Sanitization Error:', processErr);
@@ -159,50 +198,35 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
     const uniqueFileName = `${uuidv4()}${fileExtension}`;
     const gcsPath = `${sessionId}/${safeFormCode}/${uniqueFileName}`;
     const blob = bucket.file(gcsPath);
+    await uploadProcessedFileToGcs(blob, processedPath, finalMimeType, sessionId);
 
-    const blobStream = blob.createWriteStream({
-      resumable: false,
-      contentType: finalMimeType,
-      metadata: { metadata: { originalName: 'secure_upload', uploadedBy: sessionId } }
+    const existingFiles = await getDecryptedSessionFiles(sessionId);
+    const obsoleteFiles = sortFilesByUploadedAtDesc(
+        findFilesByKeyAndForm(existingFiles, file_key, safeFormCode)
+    );
+
+    for (const obsoleteFile of obsoleteFiles) {
+        try {
+            await bucket.file(obsoleteFile.gcs_path).delete({ ignoreNotFound: true });
+        } catch (storageDeleteError) {
+            console.warn(`⚠️ Skip deleting old GCS file ${obsoleteFile.gcs_path}:`, storageDeleteError.message);
+        }
+
+        await deleteFileRecord(sessionId, obsoleteFile.id);
+    }
+
+    await addFileToSession(sessionId, {
+        file_key, gcs_path: gcsPath, file_type: finalMimeType, form_code: safeFormCode
     });
-
-    blobStream.on('error', (err) => {
-        console.error('GCS Upload Error:', err);
-        res.status(500).json({ error: 'Storage upload failed.' });
-    });
-
-    blobStream.on('finish', async () => {
-      try {
-          const existingFiles = await getDecryptedSessionFiles(sessionId);
-          const obsoleteFiles = sortFilesByUploadedAtDesc(
-              findFilesByKeyAndForm(existingFiles, file_key, safeFormCode)
-          );
-
-          for (const obsoleteFile of obsoleteFiles) {
-              try {
-                  await bucket.file(obsoleteFile.gcs_path).delete({ ignoreNotFound: true });
-              } catch (storageDeleteError) {
-                  console.warn(`⚠️ Skip deleting old GCS file ${obsoleteFile.gcs_path}:`, storageDeleteError.message);
-              }
-
-              await deleteFileRecord(sessionId, obsoleteFile.id);
-          }
-
-          await addFileToSession(sessionId, {
-              file_key, gcs_path: gcsPath, file_type: finalMimeType, form_code: safeFormCode
-          });
-          res.json({ status: 'success', data: { file_key, form_code: safeFormCode } });
-      } catch (dbError) {
-          console.error('DB Error:', dbError);
-          res.status(500).json({ error: 'Database error' });
-      }
-    });
-
-    blobStream.end(processedBuffer);
+    res.json({ status: 'success', data: { file_key, form_code: safeFormCode } });
 
   } catch (error) {
     console.error('❌ Upload Handler Error:', error);
     res.status(500).json({ error: 'Internal Server Error.' });
+  } finally {
+    await cleanupTempFile(req.file?.path);
+    await cleanupTempFile(decryptedPath);
+    await cleanupTempFile(processedPath);
   }
 });
 
