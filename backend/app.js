@@ -11,6 +11,7 @@ const authRoutes = require('./routes/authRoutes');
 const oidcAuthRoutes = require('./routes/oidcAuthRoutes');
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
 const { getKeyStatus } = require('./utils/cryptoUtils');
+const { cleanupStaleTempFilesOnStartup } = require('./utils/tempFileCleanup');
 
 // Swagger Imports
 const swaggerUi = require('swagger-ui-express');
@@ -255,15 +256,31 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  const keyStatus = getKeyStatus();
-  console.log(`🚀 API running on port ${PORT}`);
-  console.log(`🌍 Allowed Origins: ${allowedOrigins.join(', ')}`);
-  console.log(`🔒 E2EE Security: ACTIVE`);
-  console.log(`🪪 Google OIDC: ${oidcEnabled ? 'ENABLED' : 'DISABLED'}`);
-  console.log(`🔑 Active Key Slot: ${keyStatus.activeLabel || 'unavailable'}`);
-  console.log(`🔄 Key Rotation Fallback: ${keyStatus.rotationEnabled ? 'ENABLED' : 'DISABLED'}`);
-  if (keyStatus.activeCertificateValidTo) {
-    console.log(`📅 Active Certificate Valid To: ${keyStatus.activeCertificateValidTo}`);
-  }
+
+const startServer = async () => {
+    const tempCleanupResult = await cleanupStaleTempFilesOnStartup();
+
+    if (tempCleanupResult.removedFiles > 0 || tempCleanupResult.scannedFiles > 0) {
+        console.log(
+            `🧹 Startup temp cleanup scanned ${tempCleanupResult.scannedFiles} file(s) and removed ${tempCleanupResult.removedFiles} stale file(s) from ${tempCleanupResult.tempDir}`
+        );
+    }
+
+    app.listen(PORT, () => {
+      const keyStatus = getKeyStatus();
+      console.log(`🚀 API running on port ${PORT}`);
+      console.log(`🌍 Allowed Origins: ${allowedOrigins.join(', ')}`);
+      console.log(`🔒 E2EE Security: ACTIVE`);
+      console.log(`🪪 Google OIDC: ${oidcEnabled ? 'ENABLED' : 'DISABLED'}`);
+      console.log(`🔑 Active Key Slot: ${keyStatus.activeLabel || 'unavailable'}`);
+      console.log(`🔄 Key Rotation Fallback: ${keyStatus.rotationEnabled ? 'ENABLED' : 'DISABLED'}`);
+      if (keyStatus.activeCertificateValidTo) {
+        console.log(`📅 Active Certificate Valid To: ${keyStatus.activeCertificateValidTo}`);
+      }
+    });
+};
+
+startServer().catch((error) => {
+    console.error('❌ Failed to start server:', error.message);
+    process.exit(1);
 });

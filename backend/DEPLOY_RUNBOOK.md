@@ -4,6 +4,10 @@ Last updated: `2026-03-27`
 
 runbook นี้อธิบายการ deploy backend ในโหมด Google OIDC แบบไม่ใช้ IAP/LB auth gate โดยให้ `run.app` เป็น entrypoint หลัก
 
+เอกสารประกอบ:
+
+- incident/threat model แบบย่ออยู่ที่ [INCIDENT_RUNBOOK.md](/Users/pst./senior/backend/INCIDENT_RUNBOOK.md)
+
 หมายเหตุสำคัญ:
 
 - production path ที่แนะนำตอนนี้คือ Cloud Run `run.app` URL แบบ regional โดยตรง
