@@ -145,14 +145,15 @@
 <li>Allowed account domains: กำหนดผ่าน `OIDC_ALLOWED_DOMAINS`</li>
 <li>Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`</li>
 <li>Secure JSON endpoints ใช้ application-level encryption transport</li>
-<li>`GET /healthz` อยู่นอก `/api/v1`</li>
+<li>`GET /api/v1/system/status` ใช้เป็น system status endpoint หลัก</li>
 </ul>
 <h2>Security Posture Summary</h2>
 <ul>
 <li>ใช้ Google OIDC เป็น identity provider</li>
 <li>backend verify Google `id_token`, `state`, `nonce`, `email_verified`, และ allowed domains</li>
 <li>backend ออก session cookie แบบ `HttpOnly` และ `Secure` ใน production</li>
-<li>`POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server</li>
+<li>backend regenerate `session_id` ใหม่หลัง OIDC login callback</li>
+<li>`POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist</li>
 <li>endpoint ธุรกิจหลักยังต้องผ่าน session-based auth</li>
 <li>secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด</li>
 </ul>
@@ -182,11 +183,11 @@
 <th>คำอธิบาย</th>
 </tr></thead><tbody>
 <tr>
-<td>`/healthz`</td>
+<td>`/api/v1/system/status`</td>
 <td>`GET`</td>
 <td>ไม่ต้อง</td>
 <td>ไม่ต้อง</td>
-<td>service health</td>
+<td>service health + runtime/config status</td>
 </tr>
 <tr>
 <td>`/auth/public-key`</td>
@@ -221,7 +222,7 @@
 <td>`POST`</td>
 <td>ไม่ต้อง</td>
 <td>ไม่ต้อง</td>
-<td>ลบ app session cookie</td>
+<td>ลบ app session cookie และ revoke session record</td>
 </tr>
 <tr>
 <td>`/session/init`</td>
@@ -335,6 +336,11 @@
 </code></pre>
 <h3>`POST /oidc/logout`</h3>
 <p>ลบ `sci_session_token` และ revoke session record ฝั่ง server</p>
+<p>เงื่อนไขเพิ่มเติม:</p>
+<ul>
+<li>request ต้องมาจาก browser origin ที่อยู่ใน frontend allowlist</li>
+<li>ใช้สำหรับทดสอบ negative-path ได้โดยเรียก `GET /oidc/me` ซ้ำหลัง logout</li>
+</ul>
 <p>response ตัวอย่าง:</p>
 <pre><code>
 {
@@ -376,6 +382,8 @@
 <li>ขนาดไฟล์ไม่เกิน 2MB</li>
 <li>รองรับ `jpg`, `png`, `webp`, `pdf`</li>
 <li>backend ตรวจ `Origin/Referer`</li>
+<li>backend รับ `multipart/form-data` เฉพาะ endpoint ที่ออกแบบไว้จริง เช่น `/upload` และ `/support/technical-email`</li>
+<li>multipart browser requests ต้องมาจาก frontend origin ที่อยู่ใน allowlist</li>
 <li>ปลายทางอีเมลกำหนดจาก `TECH_SUPPORT_TARGET_EMAIL`</li>
 </ul>
 <h2>Error Model</h2>

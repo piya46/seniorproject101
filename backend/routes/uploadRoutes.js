@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const { Storage } = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
 const rateLimit = require('express-rate-limit');
-const forge = require('node-forge');
 
 const authMiddleware = require('../middlewares/authMiddleware');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
@@ -56,26 +56,31 @@ const checkBrowserOrigin = (req, res, next) => {
 const decryptFileBuffer = (encryptedBuffer, encKey64, iv64, tag64) => {
     try {
         if (!process.env.Gb_PRIVATE_KEY_BASE64) throw new Error('Server Private Key missing');
-        
+
         const privateKeyPem = Buffer.from(process.env.Gb_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
-        const rsaPrivateKey = forge.pki.privateKeyFromPem(privateKeyPem);
 
-        // 1. Decrypt AES Key
-        const aesKey = rsaPrivateKey.decrypt(forge.util.decode64(encKey64), 'RSA-OAEP', { md: forge.md.sha256.create() });
+        // 1. Decrypt AES key with native OpenSSL-backed crypto.
+        const aesKey = crypto.privateDecrypt(
+            {
+                key: privateKeyPem,
+                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+                oaepHash: 'sha256'
+            },
+            Buffer.from(encKey64, 'base64')
+        );
 
-        // 2. Decrypt File Content (AES-GCM)
-        const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
-        decipher.start({ 
-            iv: forge.util.decode64(iv64), 
-            tag: forge.util.decode64(tag64) 
-        });
-        
-        decipher.update(forge.util.createBuffer(encryptedBuffer.toString('binary')));
-        const pass = decipher.finish();
-        
-        if (!pass) throw new Error('Integrity check failed (Tag Mismatch)');
+        // 2. Decrypt file content (AES-256-GCM) with native crypto.
+        const iv = Buffer.from(iv64, 'base64');
+        const authTag = Buffer.from(tag64, 'base64');
+        const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, iv);
+        decipher.setAuthTag(authTag);
 
-        return Buffer.from(decipher.output.getBytes(), 'binary');
+        const decrypted = Buffer.concat([
+            decipher.update(encryptedBuffer),
+            decipher.final()
+        ]);
+
+        return decrypted;
     } catch (err) {
         console.error('🔐 Decryption Failed:', err.message);
         throw err;

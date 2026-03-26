@@ -66,7 +66,9 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser()); 
 app.use(generalLimiter);
 
-app.get('/healthz', (req, res) => {
+const BASE_URL = '/api/v1';
+
+app.get(`${BASE_URL}/system/status`, (req, res) => {
     const keyStatus = getKeyStatus();
     const serviceName = process.env.K_SERVICE || 'sci-request-system';
     const serviceRegion = process.env.K_REGION || process.env.APP_REGION || process.env.REGION || null;
@@ -140,8 +142,6 @@ if (process.env.NODE_ENV === 'development' && fs.existsSync(swaggerFile)) {
 
 // Security Middleware (Encryption/Decryption)
 app.use(securityMiddleware);
-
-const BASE_URL = '/api/v1';
 
 app.use(`${BASE_URL}/auth`, authRoutes);
 app.use(`${BASE_URL}/oidc`, oidcAuthRoutes);

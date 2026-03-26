@@ -357,7 +357,7 @@
             </div>
           </div>
           <div class="action-grid" style="margin-top:12px;">
-            <button id="healthBtn" type="button">GET /healthz</button>
+            <button id="healthBtn" type="button">GET /system/status</button>
             <button id="publicKeyBtn" class="secondary" type="button">GET /auth/public-key</button>
             <button id="oidcMeBtn" class="secondary" type="button">GET /oidc/me</button>
             <button id="initSessionBtn" class="secondary" type="button">POST /session/init</button>
@@ -471,7 +471,7 @@
           <h2>What This Tests</h2>
           <div class="section-list">
             <ul>
-              <li>`GET /healthz` and `GET /api/v1/auth/public-key`</li>
+              <li>`GET /api/v1/system/status` and `GET /api/v1/auth/public-key`</li>
               <li>`GET /api/v1/oidc/me` and `POST /api/v1/oidc/logout` for auth lifecycle verification</li>
               <li>`POST /api/v1/session/init` with secure JSON and encrypted response handling</li>
               <li>cookie-backed auth requests such as `departments`, `forms`, and `form detail`</li>
@@ -536,9 +536,9 @@
           output.hint = "Browser request was blocked before the backend returned a response. Complete Google OIDC login first, then verify GET /oidc/me succeeds before retrying.";
         }
 
-        if (label === "GET /healthz" && output.name === "TypeError" && output.message === "Failed to fetch") {
-          output.hint = "The browser could not complete the request to /healthz. This usually means a network/CORS/TLS issue, or the backend URL is unreachable from this page.";
-          output.nextStep = "Open the Network tab and check whether /healthz returned an HTTP status (for example 404/500) or failed before any response was received.";
+        if (label === "GET /system/status" && output.name === "TypeError" && output.message === "Failed to fetch") {
+          output.hint = "The browser could not complete the request to /api/v1/system/status. This usually means a network/CORS/TLS issue, or the backend URL is unreachable from this page.";
+          output.nextStep = "Open the Network tab and check whether /api/v1/system/status returned an HTTP status (for example 404/500) or failed before any response was received.";
         }
 
         if (error && typeof error.status !== "undefined") {
@@ -577,7 +577,7 @@
         var backend = getBackend();
         var currentBase = window.location.origin + window.location.pathname;
         metaBackend.textContent = backend || "-";
-        metaHealth.textContent = backend ? backend + "/healthz" : "-";
+        metaHealth.textContent = backend ? backend + "/api/v1/system/status" : "-";
         metaPublicKey.textContent = backend ? backend + "/api/v1/auth/public-key" : "-";
         badgeBackend.textContent = backend || "-";
         badgeHost.textContent = currentBase;
@@ -970,7 +970,7 @@
 
       async function runSmokeTest() {
         var smoke = {};
-        smoke.health = await fetch(getBackend() + "/healthz", {
+        smoke.health = await fetch(getBackend() + "/api/v1/system/status", {
           method: "GET",
           credentials: "include"
         }).then(async function (response) {
@@ -1030,8 +1030,8 @@
       });
 
       document.getElementById("healthBtn").addEventListener("click", function () {
-        run("GET /healthz", async function () {
-          var response = await fetch(getBackend() + "/healthz", {
+        run("GET /system/status", async function () {
+          var response = await fetch(getBackend() + "/api/v1/system/status", {
             method: "GET",
             credentials: "include"
           });

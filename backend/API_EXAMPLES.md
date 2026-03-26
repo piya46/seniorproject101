@@ -21,7 +21,7 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1
 Health endpoint:
 
 ```text
-https://sci-request-system-466086429766.asia-southeast3.run.app/healthz
+https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/status
 
 ตัวอย่าง response:
 

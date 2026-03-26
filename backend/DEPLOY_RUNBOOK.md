@@ -133,7 +133,7 @@ cd /Users/pst./senior/backend
 
 หลัง deploy ควรเช็ก:
 
-1. `GET /healthz`
+1. `GET /api/v1/system/status`
 2. `GET /api/v1/auth/public-key`
 3. เปิด `GET /api/v1/oidc/google/login?return_to=https://pstpyst.com`
 4. หลังกลับมาให้ `GET /api/v1/oidc/me`
