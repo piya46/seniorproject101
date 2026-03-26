@@ -21,6 +21,7 @@ Last updated: `2026-03-26`
 - Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`
 - Secure JSON endpoints ใช้ application-level encryption transport
 - `GET /api/v1/system/status` ใช้เป็น public liveness endpoint หลัก
+- `GET /api/v1/system/status/details` ใช้เป็น authenticated detailed status endpoint สำหรับ internal QA/ops
 
 ## Security Posture Summary
 
@@ -58,6 +59,7 @@ flow ที่แนะนำ:
 | Endpoint | Method | ต้อง Auth | ต้อง Encryption | คำอธิบาย |
 | --- | --- | --- | --- | --- |
 | `/api/v1/system/status` | `GET` | ไม่ต้อง | ไม่ต้อง | service liveness + high-level check status |
+| `/api/v1/system/status/details` | `GET` | ต้อง | ไม่ต้อง | detailed runtime/config status สำหรับ internal QA/ops |
 | `/auth/public-key` | `GET` | ไม่ต้อง | ไม่ต้อง | public key สำหรับ secure JSON |
 | `/oidc/google/login` | `GET` | ไม่ต้อง | ไม่ต้อง | เริ่ม Google OIDC login |
 | `/oidc/google/callback` | `GET` | ไม่ต้อง | ไม่ต้อง | backend callback หลัง Google login |

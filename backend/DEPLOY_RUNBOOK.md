@@ -135,10 +135,12 @@ cd /Users/pst./senior/backend
 
 1. `GET /api/v1/system/status`
    endpoint นี้ตั้งใจให้เป็น public liveness check แบบ minimal ไม่เผย runtime/config ภายในเกินจำเป็น
-2. `GET /api/v1/auth/public-key`
-3. เปิด `GET /api/v1/oidc/google/login?return_to=https://pstpyst.com`
-4. หลังกลับมาให้ `GET /api/v1/oidc/me`
-5. `POST /api/v1/session/init`
+2. `GET /api/v1/system/status/details`
+   ใช้หลัง login แล้วสำหรับ internal QA/ops เมื่อต้องเช็ก runtime/config เชิงลึก
+3. `GET /api/v1/auth/public-key`
+4. เปิด `GET /api/v1/oidc/google/login?return_to=https://pstpyst.com`
+5. หลังกลับมาให้ `GET /api/v1/oidc/me`
+6. `POST /api/v1/session/init`
 
 ## Separate Audit/Cleanup Scripts
 

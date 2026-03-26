@@ -44,6 +44,12 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/st
   "now": "2026-03-26T12:11:50.086Z"
 }
 ```
+
+Authenticated details endpoint:
+
+```text
+https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/status/details
+```
 ```
 
 Canonical Google OAuth callback:
