@@ -324,12 +324,12 @@
         <div class="step-card">
           <div class="step-number">2</div>
           <h3>Verify Session</h3>
-          <p>Use `GET /oidc/me` or `POST /session/init` to confirm the current browser can access the backend with credentials.</p>
+          <p>Use `GET /oidc/me` or `POST /session/init` to confirm the current browser can access the backend with credentials, then use `POST /oidc/logout` to verify revoked-session behavior.</p>
         </div>
         <div class="step-card">
           <div class="step-number">3</div>
           <h3>Run QA Flow</h3>
-          <p>After session verification, test forms, upload, validation, merge, chat, and support in the same browser window.</p>
+          <p>After session verification, test forms, upload, validation, merge, chat, and support in the same browser window. Re-check `GET /oidc/me` after logout to confirm the session is gone.</p>
         </div>
       </div>
     </section>
@@ -361,12 +361,13 @@
             <button id="publicKeyBtn" class="secondary" type="button">GET /auth/public-key</button>
             <button id="oidcMeBtn" class="secondary" type="button">GET /oidc/me</button>
             <button id="initSessionBtn" class="secondary" type="button">POST /session/init</button>
+            <button id="oidcLogoutBtn" class="warn-btn" type="button">POST /oidc/logout</button>
             <button id="departmentsBtn" class="secondary" type="button">GET /departments</button>
             <button id="formsBtn" class="secondary" type="button">GET /forms</button>
             <button id="formDetailBtn" class="secondary" type="button">GET /forms/:form_code</button>
           </div>
           <div class="helper-note">
-            `POST /session/init` should be used only after `Open Google Login` and a successful `GET /oidc/me`. This dashboard now uses direct browser requests only, with no server-side helper path.
+            `POST /session/init` should be used only after `Open Google Login` and a successful `GET /oidc/me`. Use `POST /oidc/logout` to verify that both the browser cookie and the server-side session record are revoked. This dashboard now uses direct browser requests only, with no server-side helper path.
           </div>
         </section>
 
@@ -471,6 +472,7 @@
           <div class="section-list">
             <ul>
               <li>`GET /healthz` and `GET /api/v1/auth/public-key`</li>
+              <li>`GET /api/v1/oidc/me` and `POST /api/v1/oidc/logout` for auth lifecycle verification</li>
               <li>`POST /api/v1/session/init` with secure JSON and encrypted response handling</li>
               <li>cookie-backed auth requests such as `departments`, `forms`, and `form detail`</li>
               <li>encrypted file upload to `POST /api/v1/upload`</li>
@@ -486,6 +488,7 @@
             <li>Serve this file from localhost with a simple static server such as Vite or `python -m http.server`.</li>
             <li>Your current local origin must be included in backend `FRONTEND_EXTRA_URLS` before OIDC and auth-required browser requests will work.</li>
             <li>The backend session cookie is `HttpOnly`, so the dashboard infers session health from successful authenticated requests.</li>
+            <li>`POST /oidc/logout` is the quickest negative-path test: after it succeeds, `GET /oidc/me` should return unauthorized.</li>
             <li>Support email tests send real email through the configured backend target.</li>
             <li>Merge needs the required files for the selected form to be uploaded first.</li>
           </ul>
@@ -792,6 +795,18 @@
         return this.postEncrypted("/session/init", {});
       };
 
+      QaClient.prototype.logout = async function () {
+        var response = await fetch(this.baseUrl() + "/oidc/logout", {
+          method: "POST",
+          credentials: "include"
+        });
+        var data = await safeParseJson(response);
+        if (!response.ok) {
+          throw new ApiClientError(response.status, data);
+        }
+        return data;
+      };
+
       QaClient.prototype.uploadEncryptedFile = async function (file, fileKey, formCode) {
         var publicKey = await this.ensurePublicKey();
         var fileBuffer = await file.arrayBuffer();
@@ -967,6 +982,15 @@
         }, "Session initialized");
       });
 
+      document.getElementById("oidcLogoutBtn").addEventListener("click", function () {
+        run("POST /oidc/logout", async function () {
+          var result = await client.logout();
+          client.publicKey = null;
+          metaSession.textContent = "Logged out (re-check GET /oidc/me)";
+          return result;
+        }, "Logout completed");
+      });
+
       document.getElementById("departmentsBtn").addEventListener("click", function () {
         run("GET /departments", function () {
           return client.get("/departments");
@@ -1062,7 +1086,7 @@
       }
 
       updateMeta();
-      responseBox.textContent = "Choose an action to begin.\n\nRecommended order:\n1. Open Google Login\n2. Run GET /oidc/me\n3. Run Smoke Test\n4. Upload a file\n5. Run Validation or Merge\n6. Test Chat and Support";
+      responseBox.textContent = "Choose an action to begin.\n\nRecommended order:\n1. Open Google Login\n2. Run GET /oidc/me\n3. Run Smoke Test\n4. Test POST /oidc/logout\n5. Re-run GET /oidc/me to confirm unauthorized state\n6. Open Google Login again if you want to continue protected endpoint testing";
 
       if (oidcDone) {
         badgeOidc.className = "badge ok";
