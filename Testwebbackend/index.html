@@ -536,6 +536,11 @@
           output.hint = "Browser request was blocked before the backend returned a response. Complete Google OIDC login first, then verify GET /oidc/me succeeds before retrying.";
         }
 
+        if (label === "GET /healthz" && output.name === "TypeError" && output.message === "Failed to fetch") {
+          output.hint = "The browser could not complete the request to /healthz. This usually means a network/CORS/TLS issue, or the backend URL is unreachable from this page.";
+          output.nextStep = "Open the Network tab and check whether /healthz returned an HTTP status (for example 404/500) or failed before any response was received.";
+        }
+
         if (error && typeof error.status !== "undefined") {
           output.status = error.status;
         }
@@ -555,6 +560,14 @@
               output.details = error.data.details;
             }
           }
+        }
+
+        if (error && typeof error.contentType === "string" && error.contentType) {
+          output.contentType = error.contentType;
+        }
+
+        if (error && typeof error.rawText === "string" && error.rawText) {
+          output.rawText = error.rawText;
         }
 
         showResponse(label, output);
@@ -642,6 +655,33 @@
           return JSON.parse(text);
         } catch (_error) {
           return text;
+        }
+      }
+
+      async function parseResponseBody(response) {
+        var text = await response.text();
+        var contentType = response.headers.get("content-type") || "";
+
+        if (!text) {
+          return {
+            parsed: null,
+            rawText: "",
+            contentType: contentType
+          };
+        }
+
+        try {
+          return {
+            parsed: JSON.parse(text),
+            rawText: text,
+            contentType: contentType
+          };
+        } catch (_error) {
+          return {
+            parsed: text,
+            rawText: text,
+            contentType: contentType
+          };
         }
       }
 
@@ -742,6 +782,8 @@
         this.status = status;
         this.data = data;
         this.nonce = nonce;
+        this.rawText = null;
+        this.contentType = null;
       }
       ApiClientError.prototype = Object.create(Error.prototype);
       ApiClientError.prototype.constructor = ApiClientError;
@@ -932,7 +974,25 @@
           method: "GET",
           credentials: "include"
         }).then(async function (response) {
-          return { status: response.status, body: await safeParseJson(response) };
+          var body = await parseResponseBody(response);
+          var result = {
+            status: response.status,
+            contentType: body.contentType,
+            body: body.parsed
+          };
+
+          if (!response.ok) {
+            var error = new ApiClientError(response.status, result);
+            error.rawText = body.rawText;
+            error.contentType = body.contentType;
+            throw error;
+          }
+
+          if (typeof body.parsed === "string") {
+            result.rawText = body.rawText;
+          }
+
+          return result;
         });
 
         smoke.publicKey = await client.get("/auth/public-key");
@@ -975,10 +1035,25 @@
             method: "GET",
             credentials: "include"
           });
-          return {
+          var body = await parseResponseBody(response);
+          var result = {
             status: response.status,
-            body: await safeParseJson(response)
+            contentType: body.contentType,
+            body: body.parsed
           };
+
+          if (!response.ok) {
+            var error = new ApiClientError(response.status, result);
+            error.rawText = body.rawText;
+            error.contentType = body.contentType;
+            throw error;
+          }
+
+          if (typeof body.parsed === "string") {
+            result.rawText = body.rawText;
+          }
+
+          return result;
         });
       });
 

@@ -40,7 +40,7 @@ export FRONTEND_EXTRA_URLS=""
 export OIDC_ENABLED="true"
 export OIDC_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th"
 export OIDC_REQUIRE_HOSTED_DOMAIN="true"
-export AI_LOCATION="global"
+export AI_LOCATION="us-central1"
 export GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id"
 export GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret"
 export GOOGLE_OIDC_CALLBACK_URL="https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback"
@@ -50,7 +50,7 @@ export GOOGLE_OIDC_CALLBACK_URL="https://sci-request-system-466086429766.asia-so
 
 - `FRONTEND_URL` ควรเป็น production origin หลักเพียงค่าเดียว
 - `FRONTEND_EXTRA_URLS` เป็น optional override สำหรับ dev/QA origins เท่านั้น
-- `AI_LOCATION=global` เป็นค่าที่แนะนำสำหรับ Vertex Generative AI endpoints ในระบบนี้
+- `AI_LOCATION=us-central1` เป็นค่าที่แนะนำในระบบปัจจุบันเพื่อให้สอดคล้องกับ AI routes ที่ใช้งานจริง
 - ไม่ควรปล่อย `localhost` หรือ origin ชั่วคราวค้างใน production โดยไม่จำเป็น
 - ควรใส่ `Authorised redirect URI` ใน Google OAuth client ให้ตรงกับ callback URL ข้างต้นแบบ exact match
 

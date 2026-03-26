@@ -22,6 +22,28 @@ Health endpoint:
 
 ```text
 https://sci-request-system-466086429766.asia-southeast3.run.app/healthz
+
+ตัวอย่าง response:
+
+```json
+{
+  "status": "ok",
+  "service": "sci-request-system",
+  "checks": {
+    "configuration": {
+      "status": "ok",
+      "missing_required_env": []
+    },
+    "oidc": {
+      "status": "ok"
+    },
+    "crypto": {
+      "status": "ok",
+      "active_key_slot": "active"
+    }
+  }
+}
+```
 ```
 
 Canonical Google OAuth callback:

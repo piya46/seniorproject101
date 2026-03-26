@@ -57,7 +57,7 @@ flow ที่แนะนำ:
 
 | Endpoint | Method | ต้อง Auth | ต้อง Encryption | คำอธิบาย |
 | --- | --- | --- | --- | --- |
-| `/healthz` | `GET` | ไม่ต้อง | ไม่ต้อง | service health |
+| `/healthz` | `GET` | ไม่ต้อง | ไม่ต้อง | service health + runtime/config status |
 | `/auth/public-key` | `GET` | ไม่ต้อง | ไม่ต้อง | public key สำหรับ secure JSON |
 | `/oidc/google/login` | `GET` | ไม่ต้อง | ไม่ต้อง | เริ่ม Google OIDC login |
 | `/oidc/google/callback` | `GET` | ไม่ต้อง | ไม่ต้อง | backend callback หลัง Google login |
