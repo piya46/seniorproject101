@@ -16,7 +16,6 @@ const path = require('path');
 
 const app = express();
 const oidcEnabled = String(process.env.OIDC_ENABLED !== undefined ? process.env.OIDC_ENABLED : 'true').toLowerCase() === 'true';
-const appVersion = process.env.npm_package_version || 'unknown';
 
 // --- Security Check ---
 const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME', 'Gb_PRIVATE_KEY_BASE64', 'Gb_PUBLIC_KEY_BASE64'];
@@ -71,62 +70,23 @@ const BASE_URL = '/api/v1';
 app.get(`${BASE_URL}/system/status`, (req, res) => {
     const keyStatus = getKeyStatus();
     const serviceName = process.env.K_SERVICE || 'sci-request-system';
-    const serviceRegion = process.env.K_REGION || process.env.APP_REGION || process.env.REGION || null;
-    const projectNumber = process.env.GCP_PROJECT_NUMBER || null;
-    const runAppUrl = serviceRegion && projectNumber
-        ? `https://${serviceName}-${projectNumber}.${serviceRegion}.run.app`
-        : null;
     const missingCriticalEnv = requiredEnv.filter(key => !process.env[key]);
     const healthy = missingCriticalEnv.length === 0;
     const status = {
         status: healthy ? 'ok' : 'degraded',
         service: serviceName,
-        version: appVersion,
         checks: {
             configuration: {
-                status: healthy ? 'ok' : 'degraded',
-                missing_required_env: missingCriticalEnv
+                status: healthy ? 'ok' : 'degraded'
             },
             oidc: {
                 status: oidcEnabled ? 'ok' : 'disabled'
             },
             crypto: {
-                status: keyStatus.activeLabel ? 'ok' : 'degraded',
-                active_key_slot: keyStatus.activeLabel || null,
-                active_certificate_valid_to: keyStatus.activeCertificateValidTo || null,
-                rotation_enabled: keyStatus.rotationEnabled
+                status: keyStatus.activeLabel ? 'ok' : 'degraded'
             }
         },
-        runtime: {
-            node_env: process.env.NODE_ENV || 'development',
-            port: Number(process.env.PORT || 8080),
-            region: serviceRegion,
-            revision: process.env.K_REVISION || null,
-            uptime_seconds: Math.floor(process.uptime()),
-            service_url: runAppUrl
-        },
-        auth: {
-            oidc_enabled: oidcEnabled,
-            allowed_origins: allowedOrigins,
-            allowed_domains: String(process.env.OIDC_ALLOWED_DOMAINS || '')
-                .split(',')
-                .map((value) => value.trim())
-                .filter(Boolean),
-            hosted_domain_required: String(process.env.OIDC_REQUIRE_HOSTED_DOMAIN || 'true').toLowerCase() === 'true'
-        },
-        crypto: {
-            e2ee_enabled: true,
-            active_key_slot: keyStatus.activeLabel || null,
-            key_rotation_enabled: keyStatus.rotationEnabled,
-            active_certificate_valid_to: keyStatus.activeCertificateValidTo || null
-        },
-        integrations: {
-            gcp_project_id: process.env.GCP_PROJECT_ID || null,
-            gcp_project_number: projectNumber,
-            gcs_bucket_name: process.env.GCS_BUCKET_NAME || null,
-            ai_location: process.env.AI_LOCATION || 'us-central1',
-            tech_support_target_email: process.env.TECH_SUPPORT_TARGET_EMAIL || null
-        },
+        message: healthy ? 'Service is available' : 'Service is running with degraded configuration',
         now: new Date().toISOString()
     };
 

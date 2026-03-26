@@ -134,6 +134,7 @@ cd /Users/pst./senior/backend
 หลัง deploy ควรเช็ก:
 
 1. `GET /api/v1/system/status`
+   endpoint นี้ตั้งใจให้เป็น public liveness check แบบ minimal ไม่เผย runtime/config ภายในเกินจำเป็น
 2. `GET /api/v1/auth/public-key`
 3. เปิด `GET /api/v1/oidc/google/login?return_to=https://pstpyst.com`
 4. หลังกลับมาให้ `GET /api/v1/oidc/me`

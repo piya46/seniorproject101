@@ -29,19 +29,19 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/st
 {
   "status": "ok",
   "service": "sci-request-system",
+  "message": "Service is available",
   "checks": {
     "configuration": {
-      "status": "ok",
-      "missing_required_env": []
+      "status": "ok"
     },
     "oidc": {
       "status": "ok"
     },
     "crypto": {
-      "status": "ok",
-      "active_key_slot": "active"
+      "status": "ok"
     }
-  }
+  },
+  "now": "2026-03-26T12:11:50.086Z"
 }
 ```
 ```
