@@ -4,6 +4,7 @@ const { Storage } = require('@google-cloud/storage');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet'); 
+const requestContextMiddleware = require('./middlewares/requestContextMiddleware');
 const securityMiddleware = require('./middlewares/securityMiddleware');
 const authMiddleware = require('./middlewares/authMiddleware');
 const authRoutes = require('./routes/authRoutes');
@@ -56,8 +57,8 @@ const corsOptions = {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
     credentials: true 
 };
 app.use(cors(corsOptions));
@@ -65,6 +66,7 @@ app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser()); 
+app.use(requestContextMiddleware);
 app.use(generalLimiter);
 
 const BASE_URL = '/api/v1';
@@ -206,7 +208,9 @@ app.get(`${BASE_URL}/system/status/details`, authMiddleware, (req, res) => {
             gcp_project_number: projectNumber,
             gcs_bucket_name: process.env.GCS_BUCKET_NAME || null,
             ai_location: process.env.AI_LOCATION || 'us-central1',
-            tech_support_target_email: process.env.TECH_SUPPORT_TARGET_EMAIL || null
+            tech_support_target_email: process.env.TECH_SUPPORT_TARGET_EMAIL || null,
+            ai_daily_token_limit: Number(process.env.AI_DAILY_TOKEN_LIMIT || 50000),
+            ai_usage_retention_days: Number(process.env.AI_USAGE_RETENTION_DAYS || 30)
         },
         now: new Date().toISOString()
     });
@@ -235,7 +239,15 @@ app.use(`${BASE_URL}/support`, require('./routes/supportRoutes'));
 
 // Error Handler
 app.use((err, req, res, next) => {
-    console.error('🔥 Unhandled Error:', err);
+    if (req.log) {
+        req.log.error('unhandled_error', {
+            status_code: err.statusCode || 500,
+            message: err.message
+        });
+    } else {
+        console.error('🔥 Unhandled Error:', err);
+    }
+
     res.status(500).json({
         error: 'Internal Server Error',
         message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'

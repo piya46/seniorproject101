@@ -8,14 +8,18 @@ const { validate } = require('../middlewares/validationMiddleware');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { getFormConfig } = require('../data/staticData'); 
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
+const { assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUtils');
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
 const { validationCheckSchema } = require('../validators/schemas');
 
 // ✅ เพิ่ม strictLimiter ใน Route
 router.post('/check-completeness', authMiddleware, strictLimiter, validate(validationCheckSchema), async (req, res) => {
+  let usageRecorded = false;
+
   try {
     const { form_code, degree_level, sub_type, case_key } = req.body;
     const sessionId = req.user.session_id;
+    await assertAiWithinDailyLimit(req.user);
 
     // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติจาก Utility)
     const allFiles = await getDecryptedSessionFiles(sessionId);
@@ -34,7 +38,10 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
 
     const latestUserFiles = selectLatestFilesByKey(userFiles);
 
-    console.log(`🔍 Validation: Checking ${latestUserFiles.length} latest files for form ${form_code}`);
+    req.log?.info('validation_started', {
+      form_code,
+      file_count: latestUserFiles.length
+    });
 
     
 
@@ -120,7 +127,7 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
         
         const [exists] = await gcsFile.exists();
         if (!exists) {
-            console.warn(`File missing in GCS: ${file.gcs_path}`);
+            req.log?.warn('validation_gcs_file_missing', { gcs_path: file.gcs_path });
             return null;
         }
         
@@ -220,10 +227,58 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     // Clean JSON String (เผื่อ AI เผลอใส่ Markdown backticks มา)
     aiText = aiText.replace(/```json|```/g, '').trim();
 
+    try {
+      const usageSnapshot = await recordAiUsage({
+        user: req.user,
+        route: req.path,
+        model: 'gemini-2.5-pro',
+        usageMetadata: response.usageMetadata || {},
+        degreeLevel: degree_level,
+        formCode: form_code,
+        subType: sub_type,
+        caseKey: case_key,
+        success: true
+      });
+      usageRecorded = true;
+
+      req.log?.audit('ai_usage_recorded', {
+        ai_route: req.path,
+        model: 'gemini-2.5-pro',
+        total_tokens: usageSnapshot.total_tokens,
+        request_count: usageSnapshot.request_count
+      });
+    } catch (usageError) {
+      req.log?.warn('ai_usage_record_failed', { message: usageError.message });
+    }
+
     res.json(JSON.parse(aiText));
 
   } catch (error) {
-    console.error('AI Validation Error:', error);
+    if (error.statusCode && error.payload) {
+        req.log?.warn('validation_ai_limit_blocked', error.payload.data || {});
+        return res.status(error.statusCode).json(error.payload);
+    }
+
+    if (!usageRecorded) {
+        try {
+            await recordAiUsage({
+                user: req.user,
+                route: req.path,
+                model: 'gemini-2.5-pro',
+                degreeLevel: req.body?.degree_level || null,
+                formCode: req.body?.form_code || null,
+                subType: req.body?.sub_type || null,
+                caseKey: req.body?.case_key || null,
+                success: false,
+                failureReason: error.message
+            });
+            usageRecorded = true;
+        } catch (usageError) {
+            req.log?.warn('ai_usage_record_failed', { message: usageError.message });
+        }
+    }
+
+    req.log?.error('ai_validation_error', { message: error.message });
     
     // จัดการ Error ให้ Frontend เข้าใจง่าย
     if (error.message.includes('not found')) {

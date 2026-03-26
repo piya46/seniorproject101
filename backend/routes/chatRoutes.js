@@ -4,6 +4,7 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { forms, getFormConfig } = require('../data/staticData');
 const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
+const { assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUtils');
 const { validate } = require('../middlewares/validationMiddleware');
 const { chatRecommendSchema } = require('../validators/schemas');
 
@@ -60,6 +61,8 @@ const model = vertex_ai.getGenerativeModel({
 });
 
 router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (req, res) => {
+  let usageRecorded = false;
+
   try {
     const { message, degree_level } = req.body;
     
@@ -69,12 +72,14 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
     if (!message) {
         return res.status(400).json({ error: "Message is required" });
     }
+
+    await assertAiWithinDailyLimit(req.user);
     
     let history = [];
     try {
         history = await getChatHistory(sessionId);
     } catch (err) {
-        console.warn("Could not fetch chat history:", err);
+        req.log?.warn('chat_history_fetch_failed', { message: err.message });
     }
 
     const chat = model.startChat({
@@ -88,7 +93,7 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
     try {
         result = await chat.sendMessage(userMessage);
     } catch (apiError) {
-        console.error("Vertex AI API Error:", apiError);
+        req.log?.error('chat_vertex_api_error', { message: apiError.message });
         throw new Error(`AI Service connection failed: ${apiError.message}`);
     }
 
@@ -115,7 +120,28 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
         await saveChatMessage(sessionId, 'user', userMessage);
         await saveChatMessage(sessionId, 'model', cleanJson);
     } catch (dbError) {
-        console.error("Database save error:", dbError);
+        req.log?.warn('chat_history_save_failed', { message: dbError.message });
+    }
+
+    try {
+        const usageSnapshot = await recordAiUsage({
+            user: req.user,
+            route: req.path,
+            model: 'gemini-2.5-flash',
+            usageMetadata: response.usageMetadata || {},
+            degreeLevel: degree_level,
+            success: true
+        });
+        usageRecorded = true;
+
+        req.log?.audit('ai_usage_recorded', {
+            ai_route: req.path,
+            model: 'gemini-2.5-flash',
+            total_tokens: usageSnapshot.total_tokens,
+            request_count: usageSnapshot.request_count
+        });
+    } catch (usageError) {
+        req.log?.warn('ai_usage_record_failed', { message: usageError.message });
     }
 
     // 5. ส่ง Response
@@ -125,7 +151,28 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
     });
 
   } catch (error) {
-    console.error('Chat Processing Error:', error);
+    if (error.statusCode && error.payload) {
+        req.log?.warn('chat_ai_limit_blocked', error.payload.data || {});
+        return res.status(error.statusCode).json(error.payload);
+    }
+
+    if (!usageRecorded) {
+        try {
+            await recordAiUsage({
+                user: req.user,
+                route: req.path,
+                model: 'gemini-2.5-flash',
+                degreeLevel: req.body?.degree_level || null,
+                success: false,
+                failureReason: error.message
+            });
+            usageRecorded = true;
+        } catch (usageError) {
+            req.log?.warn('ai_usage_record_failed', { message: usageError.message });
+        }
+    }
+
+    req.log?.error('chat_processing_error', { message: error.message });
     res.status(500).json({ 
         error: 'Chat processing failed', 
         details: error.message,

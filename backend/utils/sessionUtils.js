@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { initSessionRecord, revokeSessionRecord } = require('./dbUtils');
+const { ensureCsrfCookie } = require('./csrfUtils');
 
 function generateSecureSessionId() {
   return 'sess_' + crypto.randomBytes(16).toString('hex');
@@ -92,8 +93,9 @@ async function ensureAppSession(req, res, identity = {}) {
   const token = jwt.sign(buildSessionPayload(sessionId, mergedIdentity), process.env.JWT_SECRET, { expiresIn });
 
   res.cookie('sci_session_token', token, buildSessionCookieOptions());
+  const csrfToken = ensureCsrfCookie(req, res);
 
-  return { sessionId, expiresIn };
+  return { sessionId, expiresIn, csrfToken };
 }
 
 module.exports = {

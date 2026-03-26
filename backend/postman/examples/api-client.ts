@@ -42,6 +42,7 @@ export type UploadEncryptedFileParams = {
 export type InitSessionResponse = {
   message: string;
   session_id: string;
+  csrf_token?: string;
 };
 
 export type FormCaseRule = {
@@ -65,6 +66,7 @@ export class SciRequestApiClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private publicKey: CryptoKey | null = null;
+  private csrfToken: string | null = null;
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -95,11 +97,14 @@ export class SciRequestApiClient {
   }
 
   async initSession(): Promise<InitSessionResponse> {
-    return this.postEncrypted<InitSessionResponse>("/session/init", {});
+    const response = await this.postEncrypted<InitSessionResponse>("/session/init", {});
+    this.captureCsrfToken(response);
+    return response;
   }
 
   async prepare(): Promise<void> {
     await this.fetchPublicKey();
+    await this.fetchCsrfToken(true);
     await this.initSession();
   }
 
@@ -189,6 +194,7 @@ export class SciRequestApiClient {
 
   async uploadEncryptedFile(params: UploadEncryptedFileParams): Promise<JsonObject> {
     const publicKey = await this.ensurePublicKey();
+    const csrfToken = await this.ensureCsrfToken();
     const fileBuffer = await params.file.arrayBuffer();
     const encryptedFile = await encryptBinaryPayload(new Uint8Array(fileBuffer), publicKey);
 
@@ -210,6 +216,9 @@ export class SciRequestApiClient {
 
     const response = await this.fetchImpl(`${this.baseUrl}/upload`, {
       method: "POST",
+      headers: {
+        "x-csrf-token": csrfToken,
+      },
       body: formData,
       credentials: "include",
     });
@@ -227,12 +236,14 @@ export class SciRequestApiClient {
     businessBody: JsonObject
   ): Promise<T> {
     const publicKey = await this.ensurePublicKey();
+    const csrfToken = await this.ensureCsrfToken();
     const requestContext = await encryptJsonPayload(businessBody, publicKey);
 
     const response = await this.fetchImpl(`${this.baseUrl}${endpoint}`, {
       method,
       headers: {
         "Content-Type": "application/json",
+        "x-csrf-token": csrfToken,
       },
       body: JSON.stringify(requestContext.transportBody),
       credentials: "include",
@@ -248,6 +259,7 @@ export class SciRequestApiClient {
       return (await decryptJsonResponse(parsedBody, requestContext.aesKey)) as T;
     }
 
+    this.captureCsrfToken(parsedBody);
     return parsedBody as T;
   }
 
@@ -256,6 +268,48 @@ export class SciRequestApiClient {
       return this.publicKey;
     }
     return this.fetchPublicKey();
+  }
+
+  async fetchCsrfToken(forceRefresh = false): Promise<string> {
+    if (this.csrfToken && !forceRefresh) {
+      return this.csrfToken;
+    }
+
+    const response = await this.fetchImpl(`${this.baseUrl}/auth/csrf-token`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw await this.toApiError(response);
+    }
+
+    const data = (await safeParseJson(response)) as { csrf_token?: string } | null;
+    if (!data?.csrf_token) {
+      throw new Error("Backend did not return csrf_token");
+    }
+
+    this.csrfToken = data.csrf_token;
+    return this.csrfToken;
+  }
+
+  private async ensureCsrfToken(): Promise<string> {
+    if (this.csrfToken) {
+      return this.csrfToken;
+    }
+
+    return this.fetchCsrfToken();
+  }
+
+  private captureCsrfToken(data: unknown): void {
+    if (!data || typeof data !== "object") {
+      return;
+    }
+
+    const candidate = data as Record<string, unknown>;
+    if (typeof candidate.csrf_token === "string" && candidate.csrf_token) {
+      this.csrfToken = candidate.csrf_token;
+    }
   }
 
   private async toApiError(response: Response): Promise<ApiClientError> {

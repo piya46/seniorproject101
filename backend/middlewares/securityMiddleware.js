@@ -1,6 +1,7 @@
 const { decryptHybridPayload, encryptSymmetric } = require('../utils/cryptoUtils');
 const { checkAndMarkNonce } = require('../utils/dbUtils'); // ✅ Import ฟังก์ชันใหม่
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
+const { isValidCsrfToken } = require('../utils/csrfUtils');
 
 const MULTIPART_ALLOWED_PATHS = new Set([
     '/api/v1/upload',
@@ -30,10 +31,27 @@ function buildEncryptedResponseData(data) {
     return { ...timestamped, value: data };
 }
 
+function requiresCsrfProtection(req) {
+    const stateChangingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+    return stateChangingMethods.has(req.method) && Boolean(req.cookies?.sci_session_token);
+}
+
 module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป็น async function
+    if (requiresCsrfProtection(req) && !isValidCsrfToken(req)) {
+        req.log?.warn('csrf_validation_failed', {
+            has_cookie_token: Boolean(req.cookies?.sci_csrf_token),
+            has_header_token: typeof req.headers['x-csrf-token'] === 'string'
+        });
+        return res.status(403).json({
+            error: 'Forbidden',
+            message: 'CSRF token is missing or invalid.'
+        });
+    }
+
     if (isMultipartRequest(req)) {
         if (!MULTIPART_ALLOWED_PATHS.has(req.path)) {
-            console.warn(`⛔ Blocked unexpected multipart request to ${req.path} from IP ${req.ip}`);
+            req.log?.warn('unexpected_multipart_blocked');
             return res.status(415).json({
                 error: 'Unsupported Media Type',
                 message: 'multipart/form-data is only allowed for approved upload endpoints.'
@@ -41,7 +59,7 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
         }
 
         if (!isAllowedBrowserOrigin(req, { requireHeader: true })) {
-            console.warn(`⛔ Blocked multipart request with invalid browser origin to ${req.path} from IP ${req.ip}`);
+            req.log?.warn('multipart_origin_blocked');
             return res.status(403).json({
                 error: 'Forbidden',
                 message: 'Origin is not allowed for multipart browser requests.'
@@ -62,7 +80,7 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
             const result = decryptHybridPayload(req.body);
             
             if (!result) {
-                console.warn(`⚠️ Security Alert: Decryption failed from IP ${req.ip}`);
+                req.log?.warn('payload_decryption_failed');
                 return res.status(400).json({ 
                     error: 'Security Error', 
                     message: 'Decryption failed. Data may be tampered.' 
@@ -77,12 +95,12 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
 
             // เช็ค Timestamp
             if (!data._ts || typeof data._ts !== 'number') {
-                 console.warn(`⚠️ Security Alert: Missing timestamp in payload from IP ${req.ip}`);
+                 req.log?.warn('payload_timestamp_missing');
                  return res.status(400).json({ error: 'Security Error', message: 'Missing timestamp (_ts).' });
             }
 
             if (now - data._ts > REQUEST_MAX_AGE * 1000) {
-                console.warn(`⚠️ Replay Attack Detected: Expired timestamp from IP ${req.ip}`);
+                req.log?.warn('payload_timestamp_expired');
                 return res.status(403).json({ error: 'Security Error', message: 'Request expired. Please sync your clock.' });
             }
 
@@ -92,7 +110,7 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
 
             // เช็ค Nonce
             if (!data.nonce) {
-                console.warn(`⚠️ Security Alert: Missing Nonce from IP ${req.ip}`);
+                req.log?.warn('payload_nonce_missing');
                 return res.status(400).json({ error: 'Security Error', message: 'Missing unique nonce.' });
             }
 
@@ -100,7 +118,7 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
             const isNonceValid = await checkAndMarkNonce(data.nonce, REQUEST_MAX_AGE);
 
             if (!isNonceValid) {
-                console.warn(`🔥 Replay Attack BLOCKED: Duplicate Nonce ${data.nonce} from IP ${req.ip}`);
+                req.log?.warn('payload_replay_blocked', { nonce: data.nonce });
                 return res.status(403).json({ error: 'Security Error', message: 'Replay detected (Duplicate Nonce).' });
             }
 
@@ -109,7 +127,7 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
             res.locals.sessionKey = aesKey; 
 
         } else {
-            console.warn(`⛔ Blocked unencrypted request to ${req.path} from IP ${req.ip}`);
+            req.log?.warn('unencrypted_request_blocked');
             return res.status(403).json({ 
                 error: 'Access Denied', 
                 message: 'This API requires Encryption. Please encrypt your payload.' 
@@ -131,7 +149,7 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
                 res.locals.__skipEncryptedSend = true;
                 return originalJson.call(this, encryptedResponse);
             } catch (err) {
-                console.error('Response Encryption Error:', err);
+                req.log?.error('response_encryption_error', { message: err.message });
                 res.locals.__skipEncryptedSend = true;
                 this.status(500);
                 return originalSend.call(this, 'Internal Security Error');
@@ -156,7 +174,7 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
             this.type('application/json');
             return originalSend.call(this, JSON.stringify(encryptedResponse));
         } catch (err) {
-            console.error('Response Send Encryption Error:', err);
+            req.log?.error('response_send_encryption_error', { message: err.message });
             res.locals.__skipEncryptedSend = true;
             this.status(500);
             return originalSend.call(this, 'Internal Security Error');

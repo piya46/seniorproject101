@@ -1,7 +1,26 @@
 # Changelog Postman Docs
 
-Current version: `v1.9.2`
-Last updated: `2026-03-26`
+Current version: `v1.9.3`
+Last updated: `2026-03-27`
+
+## v1.9.3
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เพิ่มเอกสาร flow `GET /api/v1/auth/csrf-token` ให้ตรงกับ anti-CSRF enforcement ปัจจุบัน
+- อัปเดต auth flow ใน API docs/examples/Postman guide ให้เรียก CSRF token ก่อน `POST /session/init` และก่อน state-changing requests อื่น
+- เพิ่มคำอธิบายเรื่อง `AI_USAGE_DAILY` และ retention ผ่าน `AI_USAGE_RETENTION_DAYS`
+- ยืนยันใน docs ว่า usage analytics ตอนนี้ดูตรงจาก Firestore Console ไม่ได้เปิด admin report endpoint ในแอป
+
+Breaking change:
+
+- ฝั่ง client/browser ที่ใช้ session cookie ต้องแนบ `x-csrf-token` กับ state-changing requests ตาม flow ใหม่
+
+ผลกระทบฝั่งทีม:
+
+- frontend/QA/Postman ต้องเรียก `GET /api/v1/auth/csrf-token` หลัง login สำเร็จ
+- ถ้าจะ inspect AI usage ให้เปิดดู collection `AI_USAGE_DAILY` ใน Firestore แทนการคาดหวัง report endpoint
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.3`
 
 ## v1.9.2
 

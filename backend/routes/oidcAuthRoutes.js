@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { ensureAppSession, buildSessionCookieOptions } = require('../utils/sessionUtils');
 const { revokeSessionRecord } = require('../utils/dbUtils');
+const { clearCsrfCookie, ensureCsrfCookie } = require('../utils/csrfUtils');
 const {
   buildGoogleLoginUrl,
   exchangeCodeForTokens,
@@ -28,8 +29,10 @@ router.get('/google/login', (req, res) => {
 
   try {
     const loginUrl = buildGoogleLoginUrl(req, String(req.query.return_to || '').trim());
+    req.log?.audit('oidc_login_redirect_started');
     return res.redirect(302, loginUrl);
   } catch (error) {
+    req.log?.warn('oidc_login_redirect_rejected', { message: error.message });
     return res.status(400).json({
       error: 'Invalid login request',
       message: error.message
@@ -68,6 +71,11 @@ router.get('/google/callback', async (req, res) => {
     const identity = normalizeGoogleIdentity(payload);
 
     await ensureAppSession(req, res, identity);
+    ensureCsrfCookie(req, res);
+    req.log?.audit('oidc_login_completed', {
+      user_email: identity.email || null,
+      hosted_domain: identity.hosted_domain || null
+    });
 
     const redirectUrl = new URL(decodedState.return_to);
     redirectUrl.searchParams.set('auth', 'ok');
@@ -75,7 +83,7 @@ router.get('/google/callback', async (req, res) => {
 
     return res.redirect(302, redirectUrl.toString());
   } catch (error) {
-    console.error('OIDC callback error:', error);
+    req.log?.error('oidc_callback_error', { message: error.message });
     return res.status(401).json({
       error: 'OIDC authentication failed',
       message: error.message
@@ -84,6 +92,7 @@ router.get('/google/callback', async (req, res) => {
 });
 
 router.get('/me', authMiddleware, (req, res) => {
+  ensureCsrfCookie(req, res);
   return res.json({
     authenticated: true,
     email: req.user?.email || null,
@@ -109,8 +118,9 @@ router.post('/logout', async (req, res) => {
           algorithms: ['HS256']
         });
         await revokeSessionRecord(decoded.session_id);
+        req.log?.audit('oidc_logout_completed', { session_id: decoded.session_id });
       } catch (error) {
-        console.warn('OIDC logout revoke skipped:', error.message);
+        req.log?.warn('oidc_logout_revoke_skipped', { message: error.message });
       }
     }
 
@@ -119,13 +129,14 @@ router.post('/logout', async (req, res) => {
       maxAge: undefined,
       expires: new Date(0)
     });
+    clearCsrfCookie(res);
 
     return res.json({
       status: 'success',
       message: 'Logged out successfully.'
     });
   } catch (error) {
-    console.error('OIDC logout error:', error);
+    req.log?.error('oidc_logout_error', { message: error.message });
     return res.status(500).json({
       error: 'Logout failed',
       message: 'Failed to revoke the active session.'

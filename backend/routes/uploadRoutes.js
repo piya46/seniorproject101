@@ -218,10 +218,16 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
     await addFileToSession(sessionId, {
         file_key, gcs_path: gcsPath, file_type: finalMimeType, form_code: safeFormCode
     });
+    req.log?.audit('file_uploaded', {
+        file_key,
+        form_code: safeFormCode,
+        mime_type: finalMimeType,
+        gcs_path: gcsPath
+    });
     res.json({ status: 'success', data: { file_key, form_code: safeFormCode } });
 
   } catch (error) {
-    console.error('❌ Upload Handler Error:', error);
+    req.log?.error('upload_handler_error', { message: error.message });
     res.status(500).json({ error: 'Internal Server Error.' });
   } finally {
     await cleanupTempFile(req.file?.path);

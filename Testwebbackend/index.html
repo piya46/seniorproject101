@@ -788,9 +788,10 @@
       ApiClientError.prototype = Object.create(Error.prototype);
       ApiClientError.prototype.constructor = ApiClientError;
 
-      function QaClient() {
-        this.publicKey = null;
-      }
+	      function QaClient() {
+	        this.publicKey = null;
+	        this.csrfToken = null;
+	      }
 
       QaClient.prototype.baseUrl = function () {
         return getBackend() + "/api/v1";
@@ -825,8 +826,8 @@
         return this.fetchPublicKey(false);
       };
 
-      QaClient.prototype.get = async function (endpoint, query) {
-        var response = await fetch(buildUrl(this.baseUrl() + endpoint, query), {
+	      QaClient.prototype.get = async function (endpoint, query) {
+	        var response = await fetch(buildUrl(this.baseUrl() + endpoint, query), {
           method: "GET",
           credentials: "include"
         });
@@ -834,19 +835,57 @@
         if (!response.ok) {
           throw new ApiClientError(response.status, data);
         }
-        return data;
-      };
+	        return data;
+	      };
 
-      QaClient.prototype.postEncrypted = async function (endpoint, body) {
-        var publicKey = await this.ensurePublicKey();
-        var requestContext = await encryptJsonPayload(body, publicKey);
+	      QaClient.prototype.fetchCsrfToken = async function (forceRefresh) {
+	        if (this.csrfToken && !forceRefresh) {
+	          return this.csrfToken;
+	        }
 
-        var response = await fetch(this.baseUrl() + endpoint, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestContext.transportBody)
-        });
+	        var response = await fetch(this.baseUrl() + "/auth/csrf-token", {
+	          method: "GET",
+	          credentials: "include"
+	        });
+	        var data = await safeParseJson(response);
+	        if (!response.ok) {
+	          throw new ApiClientError(response.status, data);
+	        }
+	        if (!data || !data.csrf_token) {
+	          throw new Error("Backend did not return csrf_token");
+	        }
+
+	        this.csrfToken = data.csrf_token;
+	        return this.csrfToken;
+	      };
+
+	      QaClient.prototype.ensureCsrfToken = async function () {
+	        if (this.csrfToken) {
+	          return this.csrfToken;
+	        }
+	        return this.fetchCsrfToken(false);
+	      };
+
+	      QaClient.prototype.captureCsrfToken = function (data) {
+	        if (data && typeof data === "object" && typeof data.csrf_token === "string" && data.csrf_token) {
+	          this.csrfToken = data.csrf_token;
+	        }
+	      };
+
+	      QaClient.prototype.postEncrypted = async function (endpoint, body) {
+	        var publicKey = await this.ensurePublicKey();
+	        var csrfToken = await this.ensureCsrfToken();
+	        var requestContext = await encryptJsonPayload(body, publicKey);
+
+	        var response = await fetch(this.baseUrl() + endpoint, {
+	          method: "POST",
+	          credentials: "include",
+	          headers: {
+	            "Content-Type": "application/json",
+	            "x-csrf-token": csrfToken
+	          },
+	          body: JSON.stringify(requestContext.transportBody)
+	        });
 
         var parsedBody = await safeParseJson(response);
         if (!response.ok) {
@@ -857,24 +896,31 @@
           );
         }
 
-        if (isEncryptedResponse(parsedBody)) {
-          return decryptJsonResponse(parsedBody, requestContext.aesKey);
-        }
-        return parsedBody;
-      };
+	        if (isEncryptedResponse(parsedBody)) {
+	          return decryptJsonResponse(parsedBody, requestContext.aesKey);
+	        }
+	        this.captureCsrfToken(parsedBody);
+	        return parsedBody;
+	      };
 
-      QaClient.prototype.initSession = async function () {
-        return this.postEncrypted("/session/init", {});
-      };
+	      QaClient.prototype.initSession = async function () {
+	        var result = await this.postEncrypted("/session/init", {});
+	        this.captureCsrfToken(result);
+	        return result;
+	      };
 
-      QaClient.prototype.logout = async function () {
-        return this.postEncrypted("/oidc/logout", {});
-      };
+	      QaClient.prototype.logout = async function () {
+	        var result = await this.postEncrypted("/oidc/logout", {});
+	        this.publicKey = null;
+	        this.csrfToken = null;
+	        return result;
+	      };
 
-      QaClient.prototype.uploadEncryptedFile = async function (file, fileKey, formCode) {
-        var publicKey = await this.ensurePublicKey();
-        var fileBuffer = await file.arrayBuffer();
-        var encryptedFile = await encryptBinaryPayload(new Uint8Array(fileBuffer), publicKey);
+	      QaClient.prototype.uploadEncryptedFile = async function (file, fileKey, formCode) {
+	        var publicKey = await this.ensurePublicKey();
+	        var csrfToken = await this.ensureCsrfToken();
+	        var fileBuffer = await file.arrayBuffer();
+	        var encryptedFile = await encryptBinaryPayload(new Uint8Array(fileBuffer), publicKey);
         var formData = new FormData();
         formData.append("file", new Blob([encryptedFile.ciphertext], { type: "application/octet-stream" }), file.name);
         formData.append("file_key", fileKey);
@@ -885,11 +931,14 @@
         formData.append("iv", encryptedFile.transport.iv);
         formData.append("tag", encryptedFile.transport.tag);
 
-        var response = await fetch(this.baseUrl() + "/upload", {
-          method: "POST",
-          body: formData,
-          credentials: "include"
-        });
+	        var response = await fetch(this.baseUrl() + "/upload", {
+	          method: "POST",
+	          headers: {
+	            "x-csrf-token": csrfToken
+	          },
+	          body: formData,
+	          credentials: "include"
+	        });
 
         var data = await safeParseJson(response);
         if (!response.ok) {
@@ -898,8 +947,9 @@
         return data;
       };
 
-      QaClient.prototype.sendSupportEmail = async function (payload) {
-        var formData = new FormData();
+	      QaClient.prototype.sendSupportEmail = async function (payload) {
+	        var csrfToken = await this.ensureCsrfToken();
+	        var formData = new FormData();
         formData.append("reporter_email", payload.reporter_email);
         formData.append("issue_type", payload.issue_type);
         formData.append("subject", payload.subject);
@@ -908,11 +958,14 @@
           formData.append("attachment", payload.attachment, payload.attachment.name);
         }
 
-        var response = await fetch(this.baseUrl() + "/support/technical-email", {
-          method: "POST",
-          body: formData,
-          credentials: "include"
-        });
+	        var response = await fetch(this.baseUrl() + "/support/technical-email", {
+	          method: "POST",
+	          headers: {
+	            "x-csrf-token": csrfToken
+	          },
+	          body: formData,
+	          credentials: "include"
+	        });
 
         var data = await safeParseJson(response);
         if (!response.ok) {
@@ -970,7 +1023,7 @@
 
       async function runSmokeTest() {
         var smoke = {};
-        smoke.health = await fetch(getBackend() + "/api/v1/system/status", {
+	        smoke.health = await fetch(getBackend() + "/api/v1/system/status", {
           method: "GET",
           credentials: "include"
         }).then(async function (response) {
@@ -995,8 +1048,9 @@
           return result;
         });
 
-        smoke.publicKey = await client.get("/auth/public-key");
-        smoke.session = await client.initSession();
+	        smoke.publicKey = await client.get("/auth/public-key");
+	        smoke.csrf = await client.fetchCsrfToken(true);
+	        smoke.session = await client.initSession();
         smoke.departments = await client.get("/departments");
         smoke.forms = await client.get("/forms", { degree_level: getDegreeLevel() });
 
@@ -1009,12 +1063,13 @@
         return smoke;
       }
 
-      document.getElementById("saveBackendBtn").addEventListener("click", function () {
-        sessionStorage.setItem("testwebbackend.baseUrl", getBackend());
-        client.publicKey = null;
-        updateMeta();
-        setStatus("Backend saved.", "ok");
-      });
+	      document.getElementById("saveBackendBtn").addEventListener("click", function () {
+	        sessionStorage.setItem("testwebbackend.baseUrl", getBackend());
+	        client.publicKey = null;
+	        client.csrfToken = null;
+	        updateMeta();
+	        setStatus("Backend saved.", "ok");
+	      });
 
       document.getElementById("smokeTestBtn").addEventListener("click", function () {
         run("Smoke Test", runSmokeTest, "Smoke test completed");
@@ -1080,12 +1135,11 @@
       });
 
       document.getElementById("oidcLogoutBtn").addEventListener("click", function () {
-        run("POST /oidc/logout", async function () {
-          var result = await client.logout();
-          client.publicKey = null;
-          metaSession.textContent = "Logged out (re-check GET /oidc/me)";
-          return result;
-        }, "Logout completed");
+	        run("POST /oidc/logout", async function () {
+	          var result = await client.logout();
+	          metaSession.textContent = "Logged out (re-check GET /oidc/me)";
+	          return result;
+	        }, "Logout completed");
       });
 
       document.getElementById("departmentsBtn").addEventListener("click", function () {

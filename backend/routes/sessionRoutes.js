@@ -8,10 +8,11 @@ const { ensureAppSession } = require('../utils/sessionUtils');
 
 router.post('/init', authMiddleware, strictLimiter, validate(sessionInitSchema), async (req, res) => {
   try {
-      const { sessionId } = await ensureAppSession(req, res);
-      res.json({ message: 'Session initialized', session_id: sessionId });
+      const { sessionId, csrfToken } = await ensureAppSession(req, res);
+      req.log?.audit('session_initialized', { session_id: sessionId });
+      res.json({ message: 'Session initialized', session_id: sessionId, csrf_token: csrfToken });
   } catch (error) {
-      console.error('Session Init Error:', error);
+      req.log?.error('session_init_error', { message: error.message });
       res.status(500).json({ error: 'Failed to initialize session' });
   }
 });

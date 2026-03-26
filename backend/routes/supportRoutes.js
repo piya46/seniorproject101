@@ -224,6 +224,12 @@ router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrig
         : null,
       message_id: mailInfo.messageId
     });
+    req.log?.audit('technical_support_email_sent', {
+      reporter_email: reporterEmail,
+      issue_type: issueType,
+      message_id: mailInfo.messageId,
+      has_attachment: Boolean(req.file)
+    });
 
     return res.status(200).json({
       status: 'success',
@@ -243,7 +249,7 @@ router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrig
       }
     });
   } catch (error) {
-    console.error('Technical Support Email Error:', error);
+    req.log?.error('technical_support_email_error', { message: error.message });
     return res.status(500).json({
       error: 'Failed to send technical support email',
       message: error.message

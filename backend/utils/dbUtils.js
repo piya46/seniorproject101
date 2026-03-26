@@ -7,6 +7,37 @@ const firestore = new Firestore({
 });
 const COLLECTION_NAME = process.env.FIRESTORE_COLLECTION_NAME || 'SESSION';
 const SUB_COLLECTION_NAME = process.env.FIRESTORE_FILES_SUBCOLLECTION || 'files';
+const AI_USAGE_COLLECTION_NAME = 'AI_USAGE_DAILY';
+const DEFAULT_AI_USAGE_RETENTION_DAYS = 30;
+
+const getAiUsageRetentionDays = () => {
+    const parsed = Number.parseInt(String(process.env.AI_USAGE_RETENTION_DAYS || DEFAULT_AI_USAGE_RETENTION_DAYS), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_AI_USAGE_RETENTION_DAYS;
+};
+
+const getDateKey = (date = new Date()) => date.toISOString().slice(0, 10);
+
+const buildAiUsageExpireAt = (date = new Date()) => {
+    const retentionDays = getAiUsageRetentionDays();
+    const expireAt = new Date(date);
+    expireAt.setUTCDate(expireAt.getUTCDate() + retentionDays);
+    expireAt.setUTCHours(23, 59, 59, 999);
+    return expireAt;
+};
+
+const appendUniqueString = (values = [], input) => {
+    const normalized = String(input || '').trim();
+    if (!normalized) {
+        return Array.isArray(values) ? values : [];
+    }
+
+    const existing = Array.isArray(values) ? values.filter(Boolean).map((value) => String(value)) : [];
+    if (existing.includes(normalized)) {
+        return existing;
+    }
+
+    return [...existing, normalized];
+};
 
 const getDbKey = (keyBuffer) => {
     if (keyBuffer) return keyBuffer;
@@ -203,8 +234,122 @@ exports.checkAndMarkNonce = async (nonce, expireSeconds) => {
     }
 };
 
+const buildAiUsageDocRef = (usageKey, dateKey) =>
+    firestore.collection(AI_USAGE_COLLECTION_NAME).doc(`${dateKey}:${usageKey}`);
+
+exports.getAiUsageForToday = async (usageKey, date = new Date()) => {
+    const dateKey = getDateKey(date);
+
+    try {
+        const snapshot = await buildAiUsageDocRef(usageKey, dateKey).get();
+        if (!snapshot.exists) {
+            return {
+                date_key: dateKey,
+                request_count: 0,
+                prompt_tokens: 0,
+                candidate_tokens: 0,
+                total_tokens: 0
+            };
+        }
+
+        return snapshot.data() || {};
+    } catch (error) {
+        console.error('❌ Firestore AI Usage Read Error:', error);
+        throw error;
+    }
+};
+
+exports.listAiUsageByDate = async (date = new Date(), limit = 100) => {
+    const dateKey = getDateKey(date);
+    const cappedLimit = Math.min(Math.max(Number(limit) || 100, 1), 200);
+
+    try {
+        const snapshot = await firestore
+            .collection(AI_USAGE_COLLECTION_NAME)
+            .where('date_key', '==', dateKey)
+            .orderBy('total_tokens', 'desc')
+            .limit(cappedLimit)
+            .get();
+
+        return snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error('❌ Firestore AI Usage List Error:', error);
+        throw error;
+    }
+};
+
+exports.recordAiUsageForToday = async ({
+    usageKey,
+    identityType,
+    identityValue,
+    sessionId,
+    email,
+    route,
+    model,
+    degreeLevel,
+    formCode,
+    subType,
+    caseKey,
+    success = true,
+    failureReason = null,
+    prompt_tokens = 0,
+    candidate_tokens = 0,
+    total_tokens = 0
+}, date = new Date()) => {
+    const dateKey = getDateKey(date);
+    const docRef = buildAiUsageDocRef(usageKey, dateKey);
+
+    try {
+        return await firestore.runTransaction(async (transaction) => {
+            const snapshot = await transaction.get(docRef);
+            const existing = snapshot.exists ? snapshot.data() || {} : {};
+            const nextData = {
+                date_key: dateKey,
+                usage_key: usageKey,
+                identity_type: identityType,
+                identity_value: identityValue,
+                session_id: sessionId || null,
+                email: email || null,
+                route: route || existing.route || null,
+                model: model || existing.model || null,
+                request_count: Number(existing.request_count || 0) + 1,
+                success_count: Number(existing.success_count || 0) + (success ? 1 : 0),
+                failure_count: Number(existing.failure_count || 0) + (success ? 0 : 1),
+                prompt_tokens: Number(existing.prompt_tokens || 0) + Number(prompt_tokens || 0),
+                candidate_tokens: Number(existing.candidate_tokens || 0) + Number(candidate_tokens || 0),
+                total_tokens: Number(existing.total_tokens || 0) + Number(total_tokens || 0),
+                degree_levels: appendUniqueString(existing.degree_levels, degreeLevel),
+                form_codes: appendUniqueString(existing.form_codes, formCode),
+                sub_types: appendUniqueString(existing.sub_types, subType),
+                case_keys: appendUniqueString(existing.case_keys, caseKey),
+                last_status: success ? 'success' : 'failure',
+                last_failure_reason: success ? null : (failureReason || existing.last_failure_reason || null),
+                last_used_at: new Date().toISOString(),
+                expire_at: buildAiUsageExpireAt(date)
+            };
+
+            if (!snapshot.exists) {
+                nextData.created_at = new Date().toISOString();
+            } else {
+                nextData.created_at = existing.created_at || new Date().toISOString();
+            }
+
+            transaction.set(docRef, nextData, { merge: true });
+            return nextData;
+        });
+    } catch (error) {
+        console.error('❌ Firestore AI Usage Write Error:', error);
+        throw error;
+    }
+};
+
 exports.firestore = firestore;
 exports.COLLECTION_NAME = COLLECTION_NAME;
 exports.SUB_COLLECTION_NAME = SUB_COLLECTION_NAME;
+exports.AI_USAGE_COLLECTION_NAME = AI_USAGE_COLLECTION_NAME;
+exports.getAiUsageRetentionDays = getAiUsageRetentionDays;
 exports.encryptData = encryptData;
 exports.decryptData = decryptData;

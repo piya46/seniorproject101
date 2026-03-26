@@ -132,9 +132,14 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
         email_subject: `ยื่นคำร้อง ${formConfig.name_th}`
       }
     });
+    req.log?.audit('documents_merged', {
+      form_code,
+      merged_page_count: mergedPageCount,
+      merged_file_name: mergedFileName
+    });
 
   } catch (error) {
-    console.error('Merge Error:', error);
+    req.log?.error('document_merge_error', { message: error.message });
     res.status(500).json({ error: 'Merge process failed.' });
   }
 });

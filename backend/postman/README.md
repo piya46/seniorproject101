@@ -1,7 +1,7 @@
 # Postman Guide
 
-Version: `v1.9.2`
-Last updated: `2026-03-26`
+Version: `v1.9.3`
+Last updated: `2026-03-27`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
 
@@ -29,13 +29,21 @@ Last updated: `2026-03-26`
 2. login ผ่าน Google
 3. backend callback ตั้ง session cookie
 4. เรียก `GET /oidc/me`
-5. ค่อยเรียก `POST /session/init` และ endpoint อื่น
+5. เรียก `GET /auth/csrf-token`
+6. ค่อยเรียก `POST /session/init` และ endpoint อื่น
 
 ## Collection Notes
 
 - collection-level scripts ยังช่วยเรื่อง secure JSON transport ให้เหมือนเดิม
+- state-changing requests ที่ใช้ session cookie ต้องมี `x-csrf-token`
 - business body ยังต้องถูกเข้ารหัสสำหรับ secure JSON endpoints
 - `GET` endpoints และ multipart upload ไม่ใช้ secure JSON wrapper
+
+## AI Usage Notes
+
+- backend เก็บ AI usage รายวันไว้ใน Firestore collection `AI_USAGE_DAILY`
+- retention ของข้อมูลนี้คุมผ่าน env `AI_USAGE_RETENTION_DAYS`
+- ตอนนี้ไม่มี admin report endpoint สำหรับ usage และแนวทางคือเปิดดูตรงใน Firestore Console
 
 ## Useful Commands
 

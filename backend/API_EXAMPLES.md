@@ -1,14 +1,15 @@
 # API Examples
 
-Version: `v1.9.2`
-Last updated: `2026-03-26`
+Version: `v1.9.3`
+Last updated: `2026-03-27`
 
 ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only
 
 1. เปิด Google OIDC login
 2. ตรวจ session ด้วย `GET /oidc/me`
-3. ดึง public key
-4. เริ่ม session ด้วย `POST /session/init`
+3. ดึง CSRF token ด้วย `GET /auth/csrf-token`
+4. ดึง public key
+5. เริ่ม session ด้วย `POST /session/init`
 
 ## Base URL
 
@@ -181,11 +182,31 @@ const data = await response.json();
 console.log(data.publicKey);
 ```
 
-## 4. Initialize Session
+## 4. Fetch CSRF Token
+
+### JavaScript
+
+```js
+const csrfResponse = await fetch("https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/auth/csrf-token", {
+  method: "GET",
+  credentials: "include"
+});
+
+const csrfData = await csrfResponse.json();
+console.log(csrfData.csrf_token);
+```
+
+หมายเหตุ:
+
+- browser client ควรเรียก endpoint นี้หลัง `GET /oidc/me`
+- นำ token ที่ได้ไปใส่ใน header `x-csrf-token` ของทุก `POST`, `PUT`, `PATCH`, `DELETE`
+
+## 5. Initialize Session
 
 `POST /session/init` เป็น secure JSON endpoint:
 
 - ต้องมี OIDC-backed session ก่อน
+- ต้องมี `x-csrf-token`
 - browser/client ต้องส่ง `application/json`
 - body จริงที่ส่งผ่าน network ต้องเป็น encrypted wrapper
 
@@ -211,6 +232,7 @@ console.log(data.publicKey);
 ```bash
 curl -X POST https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/session/init \
   -H 'Content-Type: application/json' \
+  -H 'x-csrf-token: <csrf-token>' \
   -d '{"encKey":"<base64>","iv":"<base64>","tag":"<base64>","payload":"<base64>"}'
 ```
 
@@ -227,7 +249,8 @@ const transportBody = {
 const response = await fetch("https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/session/init", {
   method: "POST",
   headers: {
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "x-csrf-token": csrfData.csrf_token
   },
   body: JSON.stringify(transportBody),
   credentials: "include"
@@ -238,5 +261,12 @@ const response = await fetch("https://sci-request-system-466086429766.asia-south
 
 1. เปิด `GET /oidc/google/login?return_to=<frontend-url>`
 2. frontend เรียก `GET /oidc/me` ด้วย `credentials: 'include'`
-3. ถ้าต้องใช้ secure JSON flow ให้เรียก `POST /session/init`
-4. ค่อยเรียก endpoint ที่ต้อง auth อื่น
+3. frontend เรียก `GET /auth/csrf-token`
+4. ถ้าต้องใช้ secure JSON flow ให้เรียก `POST /session/init`
+5. ค่อยเรียก endpoint ที่ต้อง auth อื่น
+
+## AI Usage Retention
+
+- backend เก็บ usage รายวันใน Firestore collection `AI_USAGE_DAILY`
+- retention ของข้อมูลนี้คุมผ่าน `AI_USAGE_RETENTION_DAYS`
+- ระบบใช้ข้อมูลชุดนี้ทั้งสำหรับ daily token limit และการวิเคราะห์ usage ภายหลัง
