@@ -1,4 +1,3 @@
-// backend/utils/cryptoUtils.js
 const crypto = require('crypto');
 
 const decodeBase64Pem = (base64Value) => Buffer.from(base64Value, 'base64').toString('utf8').trim();
@@ -101,33 +100,6 @@ const loadKeySlots = () => {
     };
 };
 
-let CURRENT_KEY_SLOT = null;
-let ALL_KEY_SLOTS = [];
-
-try {
-    const { currentSlot, allSlots } = loadKeySlots();
-    CURRENT_KEY_SLOT = currentSlot;
-    ALL_KEY_SLOTS = allSlots;
-
-    if (CURRENT_KEY_SLOT?.certificateInfo) {
-        console.log(
-            `🔑 Active public certificate loaded. Valid to: ${CURRENT_KEY_SLOT.certificateInfo.validTo}`
-        );
-    }
-
-    if (ALL_KEY_SLOTS.length > 1) {
-        console.log(`🔄 Key rotation enabled with ${ALL_KEY_SLOTS.length} private key slot(s).`);
-    }
-} catch (e) {
-    console.error("❌ Error loading keys from Env:", e.message);
-    if (process.env.NODE_ENV === 'production') process.exit(1);
-}
-
-if (!CURRENT_KEY_SLOT && process.env.NODE_ENV === 'production') {
-    console.error("❌ CRITICAL: Missing Keys in Production!");
-    process.exit(1);
-}
-
 const tryDecryptWithPrivateKey = (slot, encKey) =>
     crypto.privateDecrypt(
         {
@@ -138,34 +110,87 @@ const tryDecryptWithPrivateKey = (slot, encKey) =>
         Buffer.from(encKey, 'base64')
     );
 
-exports.getPublicKey = () => CURRENT_KEY_SLOT?.publicKeyPem || null;
-exports.getKeyStatus = () => ({
-    activeLabel: CURRENT_KEY_SLOT?.label || null,
-    rotationEnabled: ALL_KEY_SLOTS.length > 1,
-    activeCertificateValidTo: CURRENT_KEY_SLOT?.certificateInfo?.validTo || null
-});
+let ACTIVE_CRYPTO_PROVIDER = null;
+
+try {
+    const { currentSlot, allSlots } = loadKeySlots();
+
+    ACTIVE_CRYPTO_PROVIDER = {
+        currentSlot,
+        allSlots,
+        getPublicKey() {
+            return currentSlot?.publicKeyPem || null;
+        },
+        getKeyStatus() {
+            return {
+                activeLabel: currentSlot?.label || null,
+                rotationEnabled: allSlots.length > 1,
+                activeCertificateValidTo: currentSlot?.certificateInfo?.validTo || null
+            };
+        },
+        decryptEnvelopeKey(encKey) {
+            let aesKeyBuffer = null;
+            let lastDecryptError = null;
+
+            for (const slot of allSlots) {
+                try {
+                    aesKeyBuffer = tryDecryptWithPrivateKey(slot, encKey);
+                    break;
+                } catch (error) {
+                    lastDecryptError = error;
+                }
+            }
+
+            if (!aesKeyBuffer) {
+                throw lastDecryptError || new Error('No private key could decrypt the payload.');
+            }
+
+            return aesKeyBuffer;
+        }
+    };
+
+    const keyStatus = ACTIVE_CRYPTO_PROVIDER.getKeyStatus();
+
+    if (keyStatus.activeCertificateValidTo) {
+        console.log(`🔑 Active public certificate loaded. Valid to: ${keyStatus.activeCertificateValidTo}`);
+    }
+
+    if (keyStatus.rotationEnabled) {
+        console.log(`🔄 Key rotation enabled with ${ACTIVE_CRYPTO_PROVIDER.allSlots?.length || 0} private key slot(s).`);
+    }
+} catch (e) {
+    console.error('❌ Error loading crypto keys:', e.message);
+    if (process.env.NODE_ENV === 'production') process.exit(1);
+}
+
+if (!ACTIVE_CRYPTO_PROVIDER?.getPublicKey?.() && process.env.NODE_ENV === 'production') {
+    console.error('❌ CRITICAL: Crypto keys are not ready in production.');
+    process.exit(1);
+}
+
+const decryptEnvelopeKey = (encKey) => {
+    if (!ACTIVE_CRYPTO_PROVIDER) {
+        throw new Error('Crypto provider is not initialized.');
+    }
+
+    return ACTIVE_CRYPTO_PROVIDER.decryptEnvelopeKey(encKey);
+};
+
+exports.decryptEnvelopeKey = decryptEnvelopeKey;
+exports.getPublicKey = () => ACTIVE_CRYPTO_PROVIDER?.getPublicKey?.() || null;
+exports.getKeyStatus = () => ACTIVE_CRYPTO_PROVIDER?.getKeyStatus?.() || {
+    activeLabel: null,
+    rotationEnabled: false,
+    activeCertificateValidTo: null
+};
 
 exports.decryptHybridPayload = (encryptedPackage) => {
     try {
         const { encKey, iv, tag, payload } = encryptedPackage;
         if (!encKey || !iv || !tag || !payload) return null; // Validate structure
 
-        let aesKeyBuffer = null;
-        let lastDecryptError = null;
-
         // ขั้นที่ 1: ใช้ Private Key แกะ AES Key ออกมา
-        for (const slot of ALL_KEY_SLOTS) {
-            try {
-                aesKeyBuffer = tryDecryptWithPrivateKey(slot, encKey);
-                break;
-            } catch (error) {
-                lastDecryptError = error;
-            }
-        }
-
-        if (!aesKeyBuffer) {
-            throw lastDecryptError || new Error('No private key could decrypt the payload.');
-        }
+        const aesKeyBuffer = decryptEnvelopeKey(encKey);
 
         // ขั้นที่ 2: ใช้ AES Key แกะข้อมูลจริง
         const decipher = crypto.createDecipheriv('aes-256-gcm', aesKeyBuffer, Buffer.from(iv, 'base64'));

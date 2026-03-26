@@ -17,6 +17,7 @@ const { strictLimiter, createScopedLimiter } = require('../middlewares/rateLimit
 const { addFileToSession, deleteFileRecord, getDecryptedSessionFiles } = require('../utils/dbUtils');
 const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc } = require('../utils/fileSelection');
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
+const { decryptEnvelopeKey } = require('../utils/cryptoUtils');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -67,19 +68,7 @@ const getFileTypeDetector = async () => {
 
 const decryptFileToPath = async (encryptedPath, outputPath, encKey64, iv64, tag64) => {
     try {
-        if (!process.env.Gb_PRIVATE_KEY_BASE64) {
-            throw new Error('Server Private Key missing');
-        }
-
-        const privateKeyPem = Buffer.from(process.env.Gb_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
-        const aesKey = crypto.privateDecrypt(
-            {
-                key: privateKeyPem,
-                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-                oaepHash: 'sha256'
-            },
-            Buffer.from(encKey64, 'base64')
-        );
+        const aesKey = decryptEnvelopeKey(encKey64);
 
         const iv = Buffer.from(iv64, 'base64');
         const authTag = Buffer.from(tag64, 'base64');

@@ -210,8 +210,7 @@ app.get(`${BASE_URL}/system/status/details`, authMiddleware, (req, res) => {
             ai_location: process.env.AI_LOCATION || 'us-central1',
             tech_support_target_email: process.env.TECH_SUPPORT_TARGET_EMAIL || null,
             ai_daily_token_limit: Number(process.env.AI_DAILY_TOKEN_LIMIT || 50000),
-            ai_usage_retention_days: Number(process.env.AI_USAGE_RETENTION_DAYS || 30),
-            rate_limit_store_provider: process.env.RATE_LIMIT_STORE_PROVIDER || 'firestore'
+            ai_usage_retention_days: Number(process.env.AI_USAGE_RETENTION_DAYS || 30)
         },
         now: new Date().toISOString()
     });
