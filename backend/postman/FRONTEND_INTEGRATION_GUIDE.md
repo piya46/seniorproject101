@@ -1,6 +1,6 @@
 # Frontend Integration Guide
 
-Version: `v1.9.1`
+Version: `v1.9.2`
 Last updated: `2026-03-26`
 
 คู่มือนี้อธิบายสิ่งที่ frontend ต้องทำเพื่อเชื่อมต่อ backend ในโหมด Google OIDC + session cookie + secure JSON transport

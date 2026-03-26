@@ -18,11 +18,11 @@
 3. push tag ขึ้น remote
 
 ```bash
-npm run docs:postman:bump -- v1.8.5
+npm run docs:postman:bump -- v1.9.2
 git add .
-git commit -m "docs: release Postman API docs v1.8.5"
-git tag docs/v1.8.5
-git push origin docs/v1.8.5
+git commit -m "docs: release Postman API docs v1.9.2"
+git tag docs/v1.9.2
+git push origin docs/v1.9.2
 ```
 
 ## หลังออก tag

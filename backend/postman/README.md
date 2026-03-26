@@ -1,6 +1,6 @@
 # Postman Guide
 
-Version: `v1.9.1`
+Version: `v1.9.2`
 Last updated: `2026-03-26`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
@@ -40,6 +40,16 @@ Last updated: `2026-03-26`
 ## Useful Commands
 
 ```bash
+npm run docs:postman:bump -- vX.Y.Z
+npm run docs:postman:validate
+npm run docs:api:printable
+```
+
+Recommended update flow:
+
+```bash
+cd /Users/pst./senior/backend
+npm run docs:postman:bump -- vX.Y.Z
 npm run docs:postman:validate
 npm run docs:api:printable
 ```

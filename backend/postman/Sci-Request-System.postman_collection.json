@@ -1,10 +1,10 @@
 {
   "info": {
     "_postman_id": "0f93eb4e-44fa-4f84-87be-cfbb5cf8ca23",
-    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.9.1",
+    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.9.2",
     "description": {
       "type": "text/markdown",
-      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.9.1\n**Last Updated:** 2026-03-26\n\n## Change Summary\n- คง production auth flow เป็น Google OIDC แบบ in-app\n- ยึด Cloud Run `run.app` แบบ regional เป็น canonical backend URL\n- ยืนยัน callback หลักเป็น `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`\n- `POST /session/init` ต้องมี authenticated session ก่อนใช้งาน\n- sync docs และตัวอย่าง dev origins ให้ตรงกับ workflow ปัจจุบัน\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ Backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- Google OIDC login และ callback\n- การตรวจ session/auth state ปัจจุบัน\n- การดึง Public Key\n- การเริ่มต้น Session หลัง OIDC\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- secure JSON endpoint ยังคงใช้ encryption layer เดิม\n- Google OIDC ใช้ `state`, `nonce`, `email_verified`, และ allowed domain checks ฝั่ง backend\n- `POST /session/init` ต้องใช้หลัง login สำเร็จและตรวจผ่าน `GET /oidc/me` แล้ว\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n"
+      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.9.2\n**Last Updated:** 2026-03-26\n\n## Change Summary\n- แยก `GET /api/v1/system/status` ให้เป็น public liveness endpoint แบบ minimal\n- เพิ่ม `GET /api/v1/system/status/details` สำหรับ internal QA/ops หลัง authenticated session พร้อมแล้ว\n- คง production auth flow เป็น Google OIDC แบบ in-app\n- ยึด Cloud Run `run.app` แบบ regional เป็น canonical backend URL\n- ยืนยัน callback หลักเป็น `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`\n- `POST /session/init` ต้องมี authenticated session ก่อนใช้งาน\n- คง AI runtime guidance เป็น `AI_LOCATION=us-central1`\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ Backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- Public service liveness และ authenticated detailed status\n- Google OIDC login และ callback\n- การตรวจ session/auth state ปัจจุบัน\n- การดึง Public Key\n- การเริ่มต้น Session หลัง OIDC\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- `GET /system/status` เป็น public liveness endpoint และตั้งใจให้ตอบข้อมูลน้อยที่สุด\n- `GET /system/status/details` ต้องมี authenticated session ก่อนใช้งาน\n- secure JSON endpoint ยังคงใช้ encryption layer เดิม\n- Google OIDC ใช้ `state`, `nonce`, `email_verified`, และ allowed domain checks ฝั่ง backend\n- `POST /session/init` ต้องใช้หลัง login สำเร็จและตรวจผ่าน `GET /oidc/me` แล้ว\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n"
     },
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -287,6 +287,118 @@
       },
       "item": [
         {
+          "name": "System Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "## สรุป\npublic liveness endpoint สำหรับเช็กว่า service ยังตอบได้อยู่ โดยตั้งใจให้เปิดเผยข้อมูลระดับสูงเท่านั้น\n\n## Response Example\n```json\n{\n  \"status\": \"ok\",\n  \"service\": \"sci-request-system\",\n  \"message\": \"Service is available\",\n  \"checks\": {\n    \"configuration\": { \"status\": \"ok\" },\n    \"oidc\": { \"status\": \"ok\" },\n    \"crypto\": { \"status\": \"ok\" }\n  },\n  \"now\": \"2026-03-26T12:11:50.086Z\"\n}\n```\n"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/system/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "system",
+                "status"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/system/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "system",
+                    "status"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"ok\",\n  \"service\": \"sci-request-system\",\n  \"message\": \"Service is available\",\n  \"checks\": {\n    \"configuration\": {\n      \"status\": \"ok\"\n    },\n    \"oidc\": {\n      \"status\": \"ok\"\n    },\n    \"crypto\": {\n      \"status\": \"ok\"\n    }\n  },\n  \"now\": \"2026-03-26T12:11:50.086Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "System Status Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": {
+              "type": "text/markdown",
+              "content": "## สรุป\nendpoint นี้ใช้สำหรับ internal QA/ops เมื่อต้องตรวจ runtime และ configuration เชิงลึกหลัง authenticated session พร้อมแล้ว\n\n## หมายเหตุ\n- ต้องมี session cookie ของระบบก่อน\n- ไม่ควรใช้เป็น public monitoring endpoint\n"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/system/status/details",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "system",
+                "status",
+                "details"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/system/status/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "system",
+                    "status",
+                    "details"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"status\": \"ok\",\n  \"service\": \"sci-request-system\",\n  \"version\": \"1.2.0\",\n  \"checks\": {\n    \"configuration\": {\n      \"status\": \"ok\",\n      \"missing_required_env\": []\n    },\n    \"oidc\": {\n      \"status\": \"ok\"\n    },\n    \"crypto\": {\n      \"status\": \"ok\",\n      \"active_key_slot\": \"current\",\n      \"active_certificate_valid_to\": null,\n      \"rotation_enabled\": false\n    }\n  },\n  \"runtime\": {\n    \"node_env\": \"production\",\n    \"port\": 8080,\n    \"region\": \"asia-southeast3\",\n    \"revision\": \"sci-request-system-00081-kb4\",\n    \"uptime_seconds\": 140,\n    \"service_url\": \"https://sci-request-system-466086429766.asia-southeast3.run.app\"\n  },\n  \"auth\": {\n    \"oidc_enabled\": true,\n    \"allowed_origins\": [\n      \"https://pstpyst.com\",\n      \"http://localhost:5173\",\n      \"http://127.0.0.1:5500\"\n    ],\n    \"allowed_domains\": [\n      \"chula.ac.th\",\n      \"student.chula.ac.th\"\n    ],\n    \"hosted_domain_required\": true\n  },\n  \"crypto\": {\n    \"e2ee_enabled\": true,\n    \"active_key_slot\": \"current\",\n    \"key_rotation_enabled\": false,\n    \"active_certificate_valid_to\": null\n  },\n  \"integrations\": {\n    \"gcp_project_id\": \"seniorproject101\",\n    \"gcp_project_number\": \"466086429766\",\n    \"gcs_bucket_name\": \"sci-request-files-prod\",\n    \"ai_location\": \"us-central1\",\n    \"tech_support_target_email\": \"support@example.com\"\n  },\n  \"now\": \"2026-03-26T12:11:50.086Z\"\n}"
+            },
+            {
+              "name": "Unauthorized 401",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/system/status/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "system",
+                    "status",
+                    "details"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Unauthorized: No session token found\"\n}"
+            }
+          ]
+        },
+        {
           "name": "Get Public Key",
           "event": [
             {
@@ -405,7 +517,7 @@
             "header": [],
             "description": {
               "type": "text/markdown",
-              "content": "## สรุป\nเริ่ม Google OIDC login จาก backend แล้วให้ callback กลับมาออก session cookie ของระบบก่อน redirect กลับ frontend\n\n## วิธีทำงาน\n1. frontend redirect ผู้ใช้มาที่ route นี้\n2. backend ส่งผู้ใช้ไป Google OAuth consent/login\n3. callback route ตรวจ `state`, `nonce`, `id_token`, `email_verified`, และ allowed domains\n4. backend สร้างหรือ reuse `sci_session_token`\n5. backend redirect กลับ frontend พร้อม `auth=ok`\n\n## ตัวอย่าง\n```text\nGET /oidc/google/login?return_to=https://pstpyst.com\n```\n"
+              "content": "## สรุป\nเริ่ม Google OIDC login จาก backend แล้วให้ callback กลับมาออก session cookie ของระบบก่อน redirect กลับ frontend\n\n## วิธีทำงาน\n1. frontend redirect ผู้ใช้มาที่ route นี้\n2. backend ส่งผู้ใช้ไป Google OAuth consent/login\n3. callback route ตรวจ `state`, `nonce`, `id_token`, `email_verified`, และ allowed domains\n4. backend สร้าง `sci_session_token` ใหม่สำหรับ authenticated app session\n5. backend redirect กลับ frontend พร้อม `auth=ok`\n\n## ตัวอย่าง\n```text\nGET /oidc/google/login?return_to=https://pstpyst.com\n```\n"
             },
             "url": {
               "raw": "{{baseUrl}}/oidc/google/login?return_to=https://pstpyst.com",

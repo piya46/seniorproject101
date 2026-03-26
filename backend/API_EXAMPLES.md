@@ -1,6 +1,6 @@
 # API Examples
 
-Version: `v1.9.1`
+Version: `v1.9.2`
 Last updated: `2026-03-26`
 
 ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only
@@ -18,10 +18,11 @@ Production:
 https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1
 ```
 
-Health endpoint:
+Public liveness endpoint:
 
 ```text
 https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/status
+```
 
 ตัวอย่าง response:
 
@@ -50,7 +51,11 @@ Authenticated details endpoint:
 ```text
 https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/status/details
 ```
-```
+
+หมายเหตุ:
+
+- endpoint นี้ต้องมี authenticated session ก่อน
+- ใช้สำหรับ internal QA/ops เมื่อต้องดู runtime/config ลึกขึ้น
 
 Canonical Google OAuth callback:
 

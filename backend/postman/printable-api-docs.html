@@ -128,7 +128,7 @@
       <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
     </section>
     <h1>API Documentation</h1>
-<p>Version: `v1.9.1` Last updated: `2026-03-26`</p>
+<p>Version: `v1.9.2` Last updated: `2026-03-26`</p>
 <p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
 <p>เอกสารที่เกี่ยวข้อง:</p>
 <ul>
@@ -145,7 +145,8 @@
 <li>Allowed account domains: กำหนดผ่าน `OIDC_ALLOWED_DOMAINS`</li>
 <li>Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`</li>
 <li>Secure JSON endpoints ใช้ application-level encryption transport</li>
-<li>`GET /api/v1/system/status` ใช้เป็น system status endpoint หลัก</li>
+<li>`GET /api/v1/system/status` ใช้เป็น public liveness endpoint หลัก</li>
+<li>`GET /api/v1/system/status/details` ใช้เป็น authenticated detailed status endpoint สำหรับ internal QA/ops</li>
 </ul>
 <h2>Security Posture Summary</h2>
 <ul>
@@ -187,7 +188,14 @@
 <td>`GET`</td>
 <td>ไม่ต้อง</td>
 <td>ไม่ต้อง</td>
-<td>service health + runtime/config status</td>
+<td>service liveness + high-level check status</td>
+</tr>
+<tr>
+<td>`/api/v1/system/status/details`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>detailed runtime/config status สำหรับ internal QA/ops</td>
 </tr>
 <tr>
 <td>`/auth/public-key`</td>
@@ -311,7 +319,7 @@
 <li>verify `id_token`</li>
 <li>ตรวจ `email_verified`</li>
 <li>ตรวจ email domain และ hosted domain</li>
-<li>สร้างหรือ reuse `sci_session_token`</li>
+<li>สร้าง `sci_session_token` ใหม่สำหรับ authenticated app session</li>
 <li>redirect กลับ `return_to` พร้อม `auth=ok` และ `oidc=done`</li>
 </ul>
 <h3>`GET /oidc/me`</h3>

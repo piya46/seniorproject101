@@ -1,6 +1,6 @@
 # API Documentation
 
-Version: `v1.9.1`
+Version: `v1.9.2`
 Last updated: `2026-03-26`
 
 เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client
@@ -102,7 +102,7 @@ backend จะ:
 - verify `id_token`
 - ตรวจ `email_verified`
 - ตรวจ email domain และ hosted domain
-- สร้างหรือ reuse `sci_session_token`
+- สร้าง `sci_session_token` ใหม่สำหรับ authenticated app session
 - redirect กลับ `return_to` พร้อม `auth=ok` และ `oidc=done`
 
 ### `GET /oidc/me`

@@ -1,12 +1,30 @@
 # Changelog Postman Docs
 
-Current version: `v1.9.1`
+Current version: `v1.9.2`
 Last updated: `2026-03-26`
+
+## v1.9.2
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- แยก `GET /api/v1/system/status` ให้เป็น public liveness endpoint แบบ minimal
+- เพิ่ม `GET /api/v1/system/status/details` สำหรับ internal QA/ops หลัง authenticated session พร้อมแล้ว
+- อัปเดต examples, runbook, security docs, และ printable docs ให้ตรงกับ status model ใหม่
+- คง AI runtime guidance เป็น `AI_LOCATION=us-central1`
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime หลัก แต่ public status response ถูกลดข้อมูลลงอย่างตั้งใจ
+
+ผลกระทบฝั่งทีม:
+
+- ถ้าทีมต้องการดู runtime/config เชิงลึก ให้ใช้ `GET /api/v1/system/status/details` หลัง login แทนการคาดหวังข้อมูลจาก public status
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.2`
 
 หมายเหตุ:
 
 - section ตั้งแต่ `v1.8.5` ลงไปเป็นประวัติย้อนหลังของยุค IAP/LB เดิม
-- production source of truth ปัจจุบันคือ `v1.9.1` และเอกสารชุด OIDC-only เท่านั้น
+- production source of truth ปัจจุบันคือ `v1.9.2` และเอกสารชุด OIDC-only เท่านั้น
 
 ## v1.9.1
 
