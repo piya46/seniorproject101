@@ -55,6 +55,19 @@ exports.initSessionRecord = async (sessionId) => {
     }, { merge: true });
 };
 
+exports.revokeSessionRecord = async (sessionId) => {
+    if (!sessionId) {
+        return;
+    }
+
+    try {
+        await firestore.collection(COLLECTION_NAME).doc(sessionId).delete();
+    } catch (error) {
+        console.error('❌ Revoke Session Error:', error.message);
+        throw error;
+    }
+};
+
 exports.addFileToSession = async (sessionId, fileMeta) => {
     const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
     const encryptedFile = {

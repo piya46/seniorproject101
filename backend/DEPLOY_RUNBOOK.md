@@ -1,384 +1,164 @@
 # Deploy Runbook
 
-เอกสารนี้เป็น runbook สั้นสำหรับทีม ops ที่ต้อง deploy ระบบ `sci-request-system` ในโปรเจกต์จริง โดยเน้นขั้นตอนใช้งานจาก [deploy.sh](/Users/pst./senior/backend/deploy.sh)
+Last updated: `2026-03-26`
 
-## ก่อนเริ่ม
+runbook นี้อธิบายการ deploy backend ในโหมด Google OIDC แบบไม่ใช้ IAP/LB auth gate โดยให้ `run.app` เป็น entrypoint หลัก
 
-ตรวจให้พร้อมอย่างน้อย:
+หมายเหตุสำคัญ:
 
-- อยู่ในโปรเจกต์ GCP ที่ถูกต้อง
-- มีสิทธิ์ใช้ Cloud Run, Cloud Build, Secret Manager, Storage, IAM, Scheduler, IAP
-- มีโดเมนจริงถ้าจะเปิด IAP/LB
-- ถ้าใช้ SMTP จริง ต้องมีค่าที่ใช้งานได้
+- production path ที่แนะนำตอนนี้คือ Cloud Run `run.app` URL แบบ regional โดยตรง
+- `deploy.sh` ตอนนี้ deploy ไปที่ `run.app` เสมอ
+- domain mapping, LB fallback, และ legacy LB cleanup ถูกแยกออกจาก deploy หลักแล้ว
 
-## โหมดที่รองรับ
+## Prerequisites
 
-### 1. โหมดทดสอบ
+- มีสิทธิ์ใช้ Cloud Run, Cloud Build, Secret Manager, Storage, IAM, Scheduler
+- มี Google OAuth client สำหรับ web application
+- มี Google OAuth client สำหรับ backend ตัวนี้
 
-ใช้เมื่อ:
-
-- ยังไม่มีโดเมนจริง
-- ยังไม่เปิด IAP
-- ต้องการทดสอบ backend บน Cloud Run ก่อน
+## Required OIDC Config
 
 ค่าหลัก:
 
-```bash
-export IAP_ENABLED="false"
-export AUTO_CONFIGURE_IAP_LB="false"
-```
+- `OIDC_ENABLED=true`
+- `OIDC_ALLOWED_DOMAINS=chula.ac.th,student.chula.ac.th`
+- `OIDC_REQUIRE_HOSTED_DOMAIN=true`
+- `GOOGLE_OIDC_CLIENT_ID_VALUE=<google client id>`
+- `GOOGLE_OIDC_CLIENT_SECRET_VALUE=<google client secret>`
+- `GOOGLE_OIDC_CALLBACK_URL=https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback` (optional; ถ้าไม่ตั้ง `deploy.sh` จะ default เป็น canonical Cloud Run URL นี้ให้อัตโนมัติ)
 
-ผลลัพธ์:
+หมายเหตุ:
 
-- Cloud Run หลัก deploy ด้วย ingress `all`
-- backend ทดสอบผ่าน `run.app` ได้
-- cleanup service ยังทำงานแยกของมันเองและยัง require auth
+- ถ้า Secret Manager มี `GOOGLE_OIDC_CLIENT_ID` และ `GOOGLE_OIDC_CLIENT_SECRET` อยู่แล้ว สคริปต์จะพยายาม reuse ให้อัตโนมัติก่อน prompt
+- ค่า `GOOGLE_OIDC_CLIENT_ID_VALUE` และ `GOOGLE_OIDC_CLIENT_SECRET_VALUE` จึงจำเป็นเฉพาะตอน bootstrap ครั้งแรกหรือเมื่อต้องการอัปเดต secret
 
-### 2. โหมด IAP จริง
-
-ใช้เมื่อ:
-
-- มีโดเมนจริง
-- ต้องการให้ Google IAP เป็น outer access gate
-
-ค่าหลัก:
+## Recommended Production Config
 
 ```bash
-export IAP_ENABLED="true"
-export AUTO_CONFIGURE_IAP_LB="true"
-export LB_DOMAIN_NAMES="api.pstpyst.com"
-export LB_SSL_MODE="managed"
-export IAP_ACCESS_MEMBERS="domain:chula.ac.th,domain:student.chula.ac.th"
 export FRONTEND_URL="https://pstpyst.com"
-```
-
-ถ้าจำเป็นต้องทดสอบ local ชั่วคราว ให้เติมเพิ่มผ่าน:
-
-```bash
-export FRONTEND_EXTRA_URLS="http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500|http://localhost:5173|http://127.0.0.1:8088"
-```
-
-แนวทางนี้ช่วยให้ค่า production default ไม่กว้างเกินจำเป็น
-
-ผลลัพธ์:
-
-- Cloud Run หลัก deploy ด้วย ingress `internal-and-cloud-load-balancing`
-- ใช้ `--no-allow-unauthenticated`
-- ใช้ `--no-default-url`
-- deploy พร้อม `NODE_ENV=production`
-- deploy backend หลักด้วย service account แยก แทน default compute service account
-- `deploy.sh` จะสร้าง/update LB + IAP + backend audience ให้เอง
-- `deploy.sh` จะพยายาม provision IAP service identity และ grant `run.invoker` ให้ IAP service agent ให้อัตโนมัติ
-- frontend ที่ต้องการให้ backend จบ IAP login แล้วค่อยกลับมาหน้าบ้าน ควรใช้ `GET /api/v1/iap/complete?return_to=<frontend-url>`
-- หลัง frontend ถูก redirect กลับมา แนะนำให้เรียก `GET /api/v1/iap/me` ด้วย `credentials: 'include'` เพื่อเช็กสถานะ session และอ่าน email จาก backend อย่างปลอดภัย
-
-## ขั้น deploy มาตรฐาน
-
-```bash
-cd /Users/pst./senior/backend
-chmod +x deploy.sh
-./deploy.sh
-```
-
-สคริปต์จะจัดการให้:
-
-- ตรวจ/สร้าง bucket
-- จัดการ secrets
-- deploy cleanup service รายวัน
-- deploy backend หลัก
-- ถ้าเปิด IAP auto mode จะจัดการ LB/IAP ให้ต่อ
-
-## Checklist ก่อน Deploy
-
-- ยืนยัน `PROJECT_ID`, `SERVICE_NAME`, `REGION` ให้ถูก
-- ยืนยัน `LB_DOMAIN_NAMES` เป็นโดเมนจริงที่แก้ DNS ได้
-- ยืนยัน `IAP_ENABLED=true` ถ้าจะเปิด IAP จริง
-- ยืนยัน `AUTO_CONFIGURE_IAP_LB=true` ถ้าจะให้สคริปต์สร้าง LB/IAP ให้
-- ยืนยัน `IAP_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th"`
-- ยืนยัน `IAP_REQUIRE_HOSTED_DOMAIN=true`
-- ยืนยัน `IAP_ACCESS_MEMBERS="domain:chula.ac.th,domain:student.chula.ac.th"` หรือค่าที่ต้องการจริง
-- ยืนยันว่า production ไม่เปิด `FRONTEND_EXTRA_URLS` ค้างไว้โดยไม่จำเป็น
-- ยืนยันค่า SMTP และ `TECH_SUPPORT_TARGET_EMAIL`
-- ยืนยันสิทธิ์ GCP สำหรับ Cloud Run, Load Balancer, IAP, IAM, Secret Manager, Scheduler, Storage
-- ถ้าต้องการให้สคริปต์ช่วยรอหลัง deploy ให้เปิด:
-  - `WAIT_FOR_DNS_PROPAGATION=true`
-  - `WAIT_FOR_MANAGED_CERTIFICATE=true`
-  - `POST_DEPLOY_HEALTHCHECK_ENABLED=true`
-
-## Example IAP Deploy
-
-```bash
-cd /Users/pst./senior/backend
-
-export PROJECT_ID="seniorproject101"
-export SERVICE_NAME="sci-request-system"
-export REGION="asia-southeast3"
-
-export IAP_ENABLED="true"
-export AUTO_CONFIGURE_IAP_LB="true"
-export IAP_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th"
-export IAP_REQUIRE_HOSTED_DOMAIN="true"
-export IAP_ACCESS_MEMBERS="domain:chula.ac.th,domain:student.chula.ac.th"
-
-export LB_DOMAIN_NAMES="api.pstpyst.com"
-export FRONTEND_URL="https://pstpyst.com"
-# ถ้าจะทดสอบ local ค่อยเปิดบรรทัดนี้ชั่วคราว
-# export FRONTEND_EXTRA_URLS="http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500|http://localhost:5173|http://127.0.0.1:8088"
-
-export WAIT_FOR_DNS_PROPAGATION="true"
-export WAIT_FOR_MANAGED_CERTIFICATE="true"
-export POST_DEPLOY_HEALTHCHECK_ENABLED="true"
-
-./deploy.sh
-```
-
-## Production Values Snapshot
-
-ค่าปัจจุบันที่ใช้จริงสำหรับ production ณ ตอนนี้:
-
-```bash
-PROJECT_ID="seniorproject101"
-SERVICE_NAME="sci-request-system"
-REGION="asia-southeast3"
-
-BUCKET_NAME="sci-request-files-prod"
-BUCKET_LOCATION="asia-southeast3"
-BUCKET_STORAGE_CLASS="STANDARD"
-
-FRONTEND_URL="https://pstpyst.com"
-
-TECH_SUPPORT_TARGET_EMAIL="piyaton56@gmail.com"
-SMTP_HOST_VALUE="pstpyst.com"
-SMTP_PORT="465"
-SMTP_SECURE="true"
-SMTP_USER_VALUE="no-reply@pstpyst.com"
-SMTP_FROM_EMAIL_VALUE="no-reply@pstpyst.com"
-SMTP_FROM_NAME_VALUE="Sci Request Support"
-
-IAP_ENABLED="true"
-AUTO_CONFIGURE_IAP_LB="true"
-IAP_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th"
-IAP_REQUIRE_HOSTED_DOMAIN="true"
-IAP_ACCESS_MEMBERS="domain:chula.ac.th,domain:student.chula.ac.th"
-
-LB_DOMAIN_NAMES="api.pstpyst.com"
-LB_SSL_MODE="managed"
-
-WAIT_FOR_DNS_PROPAGATION="true"
-WAIT_FOR_MANAGED_CERTIFICATE="true"
-POST_DEPLOY_HEALTHCHECK_ENABLED="true"
-
-ENABLE_DAILY_FILE_CLEANUP_FUNCTION="true"
-APP_SERVICE_ACCOUNT_NAME="sci-request-system-sa"
-CLEANUP_SERVICE_NAME="delete-file-cleanup"
-CLEANUP_SERVICE_REGION="asia-southeast3"
-CLEANUP_SERVICE_ACCOUNT_NAME="delete-file-cleanup-sa"
-CLEANUP_SCHEDULER_JOB_NAME="delete-file-cleanup-daily"
-CLEANUP_SCHEDULER_FALLBACK_LOCATION="asia-southeast1"
-CLEANUP_SCHEDULE_CRON="0 3 * * *"
-CLEANUP_TIME_ZONE="Asia/Bangkok"
-
-AUTO_CREATE_BUCKET_ON_LOCATION_MISMATCH="false"
-AUTO_CLEANUP_LEFTOVER_TEMP_BUCKET="false"
-ENABLE_BUCKET_LIFECYCLE_CLEANUP="false"
+export FRONTEND_EXTRA_URLS=""
+export OIDC_ENABLED="true"
+export OIDC_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th"
+export OIDC_REQUIRE_HOSTED_DOMAIN="true"
+export AI_LOCATION="global"
+export GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id"
+export GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret"
+export GOOGLE_OIDC_CALLBACK_URL="https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback"
 ```
 
 หมายเหตุ:
 
-- `SMTP_PASS_VALUE` ไม่ได้ถูก hardcode ในไฟล์ ต้องมาจาก Secret Manager, env, หรือ prompt ตอนรัน
-- `IAP_EXPECTED_AUDIENCE` และ `IAP_BACKEND_SERVICE_ID` จะถูกคำนวณและเติมกลับให้อัตโนมัติเมื่อ LB/IAP ถูกสร้างสำเร็จ
-- `NODE_ENV=production` จะถูก set ให้โดย default เพื่อให้ cookie behavior ตรงกับ production
-- Cloud Scheduler อาจ fallback ไป `asia-southeast1` หาก location หลักยังไม่รองรับในโปรเจกต์นี้
-- `LB_SSL_MODE=managed` คือค่า default ถ้าไม่มี cert ขององค์กร
-- ถ้าต้องใช้ cert/key ขององค์กร ให้ตั้ง `LB_SSL_MODE=custom` และเตรียม Secret Manager สำหรับ cert/key ก่อน deploy
-- backend หลักจะใช้ service account แยกชื่อ default เป็น `${SERVICE_NAME}-sa@PROJECT_ID.iam.gserviceaccount.com`
+- `FRONTEND_URL` ควรเป็น production origin หลักเพียงค่าเดียว
+- `FRONTEND_EXTRA_URLS` เป็น optional override สำหรับ dev/QA origins เท่านั้น
+- `AI_LOCATION=global` เป็นค่าที่แนะนำสำหรับ Vertex Generative AI endpoints ในระบบนี้
+- ไม่ควรปล่อย `localhost` หรือ origin ชั่วคราวค้างใน production โดยไม่จำเป็น
+- ควรใส่ `Authorised redirect URI` ใน Google OAuth client ให้ตรงกับ callback URL ข้างต้นแบบ exact match
 
-## Post-Deploy Security Checks
-
-หลัง deploy production จริง ควรเช็กอย่างน้อย:
-
-- cert ของ `api.pstpyst.com` เป็น `ACTIVE`
-- Cloud Run ingress เป็น `internal-and-cloud-load-balancing`
-- Cloud Run ไม่มี default URL
-- IAP backend service เปิดอยู่
-- IAP service agent มี `roles/run.invoker` บน service หลัก
-- runtime env มี `NODE_ENV=production`
-- `FRONTEND_URL` เป็น production origin ที่ต้องการจริง
-- ถ้าใช้ `Custom OAuth` ให้ยืนยันว่า client secret ถูกเก็บนอก repo
-
-## SMTP Password
-
-สคริปต์จะใช้ลำดับนี้:
-
-1. `SMTP_PASS_VALUE` จาก env
-2. secret `SMTP_PASS` จาก Secret Manager
-3. ถ้ายังไม่มี จะถามผ่าน prompt แบบซ่อนรหัส
-
-หมายเหตุ:
-
-- ไม่มีการ hardcode password ในไฟล์แล้ว
-
-## Custom TLS Certificate Checklist
-
-ใช้เมื่อ:
-
-- องค์กรหรือมหาวิทยาลัยต้องการใช้ cert/key ของตัวเองแทน Google-managed certificate
-
-สิ่งที่ต้องเตรียมใน Secret Manager:
-
-- secret สำหรับ certificate PEM
-- secret สำหรับ private key PEM
-
-ชื่อ default ที่ `deploy.sh` รองรับ:
-
-- `LB_CUSTOM_SSL_CERT_PEM`
-- `LB_CUSTOM_SSL_PRIVATE_KEY_PEM`
-
-ค่าที่ต้องตั้ง:
+## Deploy
 
 ```bash
-export LB_SSL_MODE="custom"
-export LB_SSL_CERT_NAME="sci-request-system-custom-cert"
-export LB_CUSTOM_SSL_CERT_SECRET_NAME="LB_CUSTOM_SSL_CERT_PEM"
-export LB_CUSTOM_SSL_PRIVATE_KEY_SECRET_NAME="LB_CUSTOM_SSL_PRIVATE_KEY_PEM"
+cd /Users/pst./senior/backend
+./deploy.sh
 ```
 
-สิ่งที่ควรเช็กก่อน deploy:
+สคริปต์จะ:
 
-- cert และ private key เป็นคู่กันจริง
-- cert อยู่ในรูป PEM
-- private key อยู่ในรูป PEM
-- secret ถูกสร้างใน project ที่ deploy จริง
-- คนที่รัน deploy มีสิทธิ์อ่าน secret
+- deploy Cloud Run service
+- update SMTP and OIDC secrets in Secret Manager
+- inject production env vars
+- keep cleanup service/scheduler flow เดิม
+- ไม่สร้าง domain mapping หรือ LB resources ระหว่าง deploy
 
-สิ่งที่ควรรู้:
+ตัวอย่างเพิ่ม dev local ชั่วคราว:
 
-- ถ้าใช้ `LB_SSL_MODE=custom` สคริปต์จะไม่รอ managed certificate
-- private key ของ cert ไม่ควรถูกเก็บใน repo หรือวางเป็นไฟล์ถาวรในเครื่อง
-- ถ้าไม่ได้มี requirement จากองค์กรจริง ให้ใช้ `LB_SSL_MODE=managed` จะง่ายและปลอดภัยกว่าในเชิง operation
+```bash
+export FRONTEND_URL="https://pstpyst.com"
+export FRONTEND_EXTRA_URLS="http://localhost:5173|http://127.0.0.1:5500"
+```
 
-## Daily Cleanup
+แนวทางที่แนะนำ:
 
-cleanup architecture ปัจจุบัน:
+- production ปกติให้ใช้ `FRONTEND_URL=https://pstpyst.com`
+- ใช้ `FRONTEND_EXTRA_URLS` เฉพาะตอนที่ต้องทดสอบ local จริง
+- เมื่อลง production รอบจริง ควรลบ dev origins ออกจากค่า deploy
 
-`Cloud Scheduler -> OIDC -> Cloud Run cleanup service`
+## Production Path: run.app
 
-ค่าหลัก:
+production path ปัจจุบันคือ `run.app` โดยตรง:
 
-- service default: `delete-file-cleanup`
-- service account default: `delete-file-cleanup-sa@PROJECT_ID.iam.gserviceaccount.com`
-- schedule default: `0 3 * * *`
-- timezone default: `Asia/Bangkok`
+- เปิด `run.app` URL ของ Cloud Run โดยยึด canonical URL นี้เป็นหลัก:
+  - `https://sci-request-system-466086429766.asia-southeast3.run.app`
+- ไม่สร้าง domain mapping
+- ไม่สร้างหรือแก้ LB resources ผ่าน deploy หลัก
 
-สิ่งที่ cleanup ทำ:
+ข้อควรทราบ:
 
-- ลบ object ทั้งหมดใน bucket ไฟล์
-- ลบ Firestore records ใต้ `SESSION/*/files`
+- path นี้ practical แต่ยังเป็น `cross-origin` ถ้า frontend อยู่ที่ `pstpyst.com`
+- security ยังพอรับได้ถ้า OIDC/session/domain checks เข้ม
+- แต่ defense-in-depth จะน้อยกว่าระบบเดิมที่มี `LB + IAP`
 
-สิ่งที่ควรรู้:
+## One-Shot Deploy In `deploy.sh`
 
-- cleanup service ใช้ service account แยก
-- scheduler จะใช้ OIDC caller
-- ถ้า scheduler location หลักใช้ไม่ได้ จะ fallback ไป `asia-southeast1`
-- ถ้ามี Cloud Function/scheduler cleanup แบบเก่าค้างอยู่ สคริปต์จะลบให้อัตโนมัติหลัง path ใหม่พร้อม
+ถ้าต้องการรัน flow หลักในคำสั่งเดียว ใช้ `deploy.sh` ได้เลย:
 
-## App Service Account
+```bash
+cd /Users/pst./senior/backend
+./deploy.sh
+```
 
-เพื่อไม่ให้ backend หลักแชร์สิทธิ์กว้างกับ default compute service account อีกต่อไป `deploy.sh` จะสร้าง service account แยกสำหรับแอปหลักโดย default:
+สคริปต์นี้จะทำตามลำดับ:
 
-- `${SERVICE_NAME}-sa@PROJECT_ID.iam.gserviceaccount.com`
+1. deploy backend เวอร์ชัน OIDC-only
+2. เปิด `run.app` URL ของ Cloud Run
+3. ไม่แตะ domain mapping หรือ LB resources ใน deploy path หลัก
 
-สิทธิ์หลักที่สคริปต์ให้:
+เพื่อหลีกเลี่ยงความสับสนจาก Cloud Run ที่อาจมีทั้ง deterministic URL และ legacy hash URL:
 
-- `roles/secretmanager.secretAccessor` ระดับโปรเจกต์
-- `roles/aiplatform.user` ระดับโปรเจกต์
-- `roles/datastore.user` ระดับโปรเจกต์
-- `roles/storage.objectAdmin` แบบผูกเฉพาะ bucket เป้าหมาย
+- ให้ยึด canonical URL นี้เป็นหลักในการตั้ง OAuth callback:
+  - `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
+- `deploy.sh` จะตั้ง `GOOGLE_OIDC_CALLBACK_URL` ให้เป็นค่านี้อัตโนมัติถ้าคุณไม่ override เอง
+- ถึงแม้ Cloud Run service เดียวกันอาจมี legacy hash URL แสดงอยู่บางจุด ให้ใช้ regional URL นี้เป็น source of truth สำหรับ OAuth callback และเอกสารปัจจุบัน
+- ใน Google OAuth client ควรใส่ redirect URI ตัวนี้อย่างน้อย 1 รายการ
 
-ผลลัพธ์:
+## Authentication Flow After Deploy
 
-- ลด blast radius จากการใช้ default compute service account
-- จำกัดสิทธิ์ storage เหลือเฉพาะ bucket ที่ระบบใช้จริง
-- ในโหมด IAP จะปิด default `run.app` URL ด้วย `--no-default-url` เพื่อลดช่อง bypass LB/IAP
+1. ผู้ใช้เปิด `GET /api/v1/oidc/google/login?return_to=<frontend-url>`
+2. Google login สำเร็จ
+3. backend callback verify identity
+4. backend ตั้ง `sci_session_token`
+5. frontend เรียก `GET /api/v1/oidc/me`
+6. frontend เรียก `POST /api/v1/session/init` และ endpoint อื่น
 
-## Bucket Migration
+## Verification Checklist
 
-ค่า default ปลอดภัย:
+หลัง deploy ควรเช็ก:
 
-- `AUTO_CREATE_BUCKET_ON_LOCATION_MISMATCH=false`
-- `AUTO_CLEANUP_LEFTOVER_TEMP_BUCKET=false`
+1. `GET /healthz`
+2. `GET /api/v1/auth/public-key`
+3. เปิด `GET /api/v1/oidc/google/login?return_to=https://pstpyst.com`
+4. หลังกลับมาให้ `GET /api/v1/oidc/me`
+5. `POST /api/v1/session/init`
 
-ความหมาย:
+## Separate Audit/Cleanup Scripts
 
-- deploy ปกติจะไม่เริ่ม bucket migration เอง
-- จะไม่ไปลบ temp bucket migration เอง เว้นแต่เปิด explicit
+เช็ก resource เก่าที่อาจไม่ใช้แล้ว:
 
-ถ้าต้อง migrate bucket จริง:
+```bash
+cd /Users/pst./senior/backend
+./audit-legacy-resources.sh
+```
 
-- ใช้ env migration โดยตั้งเองชัดเจน
-- อ่าน warning เรื่อง downtime ให้ครบก่อนรัน
+ลบ resource เก่าเมื่อมั่นใจแล้ว:
 
-## Checklist หลัง Deploy
+```bash
+cd /Users/pst./senior/backend
+DELETE_LEGACY_LB="true" ./cleanup-legacy-resources.sh
+```
 
-เช็กอย่างน้อย:
+## Notes
 
-- backend หลัก deploy สำเร็จ
-- cleanup service deploy สำเร็จ
-- scheduler job เป็น `ENABLED`
-- เอา IP ที่สคริปต์พิมพ์ออกมาไปชี้ `A record`
-- DNS resolve มาที่ IP ของ LB แล้ว
-- managed certificate เป็น `ACTIVE`
-- `IAP_EXPECTED_AUDIENCE` ถูกเติมกลับเข้า Cloud Run แล้ว
-- ถ้าเป็นโหมด IAP จริง:
-  - LB/IAP พร้อม
-  - ผู้ใช้ที่ไม่มีสิทธิ์เข้าไม่ได้
-
-## Test Checklist
-
-- เปิดโดเมนจริงแล้วต้องเด้งไป Google login
-- login ด้วย `@chula.ac.th` ได้
-- login ด้วย `@student.chula.ac.th` ได้
-- login ด้วย Gmail ส่วนตัวไม่ได้
-- ผู้ใช้ที่ผ่าน IAP แต่ไม่มี session เดิมของระบบ ยังเข้า API ที่ต้อง auth ไม่ได้
-- `/api/v1/auth/public-key` ยังตอบได้ใน flow ที่ควรตอบ
-- flow หลักของระบบยังใช้งานได้
-- support upload/merge/validation ยังใช้งานได้
-- cleanup job ยังเป็น `ENABLED`
-
-## Security Checklist
-
-- Cloud Run หลักอยู่หลัง IAP จริง
-- โหมด IAP ใช้ `--no-allow-unauthenticated`
-- โหมด IAP ใช้ `--no-default-url`
-- ingress ของ service หลักเป็น `internal-and-cloud-load-balancing`
-- backend หลักใช้ service account แยก ไม่ใช้ default compute service account
-- backend ยัง verify IAP JWT
-- backend ยังเช็ก domain `chula.ac.th,student.chula.ac.th`
-- session auth เดิมยังทำงาน
-- ไม่ได้ลด CORS/origin/rate-limit/file validation เดิม
-
-## ถ้า deploy ล้ม
-
-ให้ดูตามหมวด:
-
-- Bucket / IAM / Secret Manager
-- Cleanup service / Scheduler
-- Cloud Run main service
-- IAP / LB / DNS / certificate
-
-เช็กสาเหตุพื้นฐานก่อน:
-
-- DNS ยังไม่ชี้
-- cert ยังไม่ `ACTIVE`
-- `LB_DOMAIN_NAMES` ผิด
-- `IAP_ACCESS_MEMBERS` ผิด
-- account ที่ใช้ login ไม่ได้อยู่ใน Google Workspace domain ที่ตรงตาม policy
-- project/region ใน env ไม่ตรงของจริง
-
-และส่ง log ล่าสุดของ `deploy.sh` มาทั้งบล็อกที่ fail
-
-## เอกสารที่เกี่ยวข้อง
-
-- [IAP_DEPLOYMENT_GUIDE.md](/Users/pst./senior/backend/IAP_DEPLOYMENT_GUIDE.md)
-- [KEY_ROTATION.md](/Users/pst./senior/backend/KEY_ROTATION.md)
-- [API_DOCUMENTATION.md](/Users/pst./senior/backend/API_DOCUMENTATION.md)
+- สคริปต์นี้ไม่ใช้ `IAP` เป็น auth gate แล้ว
+- `deploy.sh` ตอนนี้ใช้ `run.app` โดยตรงเสมอ
+- ถ้าต้อง audit หรือล้าง legacy LB ให้ใช้สคริปต์แยก
+- custom domain / certificate ควรจัดการแยกตาม infra ที่ใช้งานจริง
+- ถ้าจะเปลี่ยนโดเมน Chula หรือเปลี่ยน CA ระดับมหาวิทยาลัย ส่วนใหญ่จะกระทบ DNS / certificate / callback URL มากกว่า code

@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
 const { firestore, COLLECTION_NAME } = require('../utils/dbUtils'); // ✅ Import Firestore
+const { extractDomain, getAllowedDomains, isHostedDomainRequired, isTruthy } = require('../utils/oidcUtils');
 
-function isTruthy(value) {
-  return String(value || '').toLowerCase() === 'true';
+function isOidcEnabled() {
+  return isTruthy(process.env.OIDC_ENABLED !== undefined ? process.env.OIDC_ENABLED : 'true');
 }
 
 module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป็น async
@@ -39,8 +40,24 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
     }
  
     req.user = decoded;
-    if (req.iap) {
-      req.user.iap = req.iap;
+
+    if (isOidcEnabled()) {
+      const email = String(decoded.email || '').trim().toLowerCase();
+      const hostedDomain = String(decoded.hosted_domain || '').trim().toLowerCase() || null;
+      const allowedDomains = getAllowedDomains();
+      const emailDomain = extractDomain(email);
+
+      if (!email) {
+        return res.status(403).json({ error: 'Forbidden', message: 'OIDC-backed session is required.' });
+      }
+
+      if (allowedDomains.length > 0 && !allowedDomains.includes(emailDomain)) {
+        return res.status(403).json({ error: 'Forbidden', message: 'Your Google account domain is not allowed.' });
+      }
+
+      if (isHostedDomainRequired() && allowedDomains.length > 0 && !allowedDomains.includes(hostedDomain)) {
+        return res.status(403).json({ error: 'Forbidden', message: 'Your Google Workspace hosted domain is not allowed.' });
+      }
     }
 
     next();

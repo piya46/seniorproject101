@@ -1,7 +1,48 @@
 # Changelog Postman Docs
 
-Current version: `v1.8.5`
-Last updated: `2026-03-18`
+Current version: `v1.9.1`
+Last updated: `2026-03-26`
+
+หมายเหตุ:
+
+- section ตั้งแต่ `v1.8.5` ลงไปเป็นประวัติย้อนหลังของยุค IAP/LB เดิม
+- production source of truth ปัจจุบันคือ `v1.9.1` และเอกสารชุด OIDC-only เท่านั้น
+
+## v1.9.1
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- อัปเดตเอกสารให้ยึด Cloud Run `run.app` แบบ regional เป็น canonical backend URL
+- เพิ่มคำอธิบายเรื่อง Google OAuth callback ให้ตรงกับ `deploy.sh` ที่ตั้ง `GOOGLE_OIDC_CALLBACK_URL` อัตโนมัติ
+- sync ตัวอย่าง dev origins ให้ตรงกับ workflow ปัจจุบันคือ `http://localhost:5173` และ `http://127.0.0.1:5500`
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็นการ sync docs และ deployment guidance ให้ตรงกับ production ปัจจุบัน
+
+ผลกระทบฝั่งทีม:
+
+- Google OAuth client ควรใช้ redirect URI แบบ exact match เป็น `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
+- frontend/local QA ควรใช้ origin allowlist ตามค่าปัจจุบันใน runbook และ integration guide
+
+## v1.9.0
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เปลี่ยนชุดเอกสารและ collection หลักเป็น Google OIDC แบบ in-app
+- แทนที่ endpoint กลุ่มเดิมด้วย `GET /oidc/google/login`, `GET /oidc/me`, และ `POST /oidc/logout`
+- อัปเดต API summary, examples, runbook, และ printable docs ให้รองรับ direct Cloud Run + custom domain
+- ปรับเอกสาร security ให้ระบุชัดว่า migration นี้ลด defense-in-depth จากระบบเดิมที่มี IAP อยู่หน้า backend
+
+Breaking change:
+
+- production auth flow ใน docs เปลี่ยนจาก IAP-based เป็น OIDC-based
+
+ผลกระทบฝั่งทีม:
+
+- frontend ต้องเริ่ม login ผ่าน `GET /api/v1/oidc/google/login?return_to=<frontend-url>`
+- frontend ควรตรวจ session ด้วย `GET /api/v1/oidc/me` และเรียก `POST /api/v1/oidc/logout` เมื่อต้องการ sign out
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.0`
 
 ## v1.8.5
 

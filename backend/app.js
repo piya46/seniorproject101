@@ -5,8 +5,7 @@ const cookieParser = require('cookie-parser');
 const helmet = require('helmet'); 
 const securityMiddleware = require('./middlewares/securityMiddleware');
 const authRoutes = require('./routes/authRoutes');
-const iapAuthRoutes = require('./routes/iapAuthRoutes');
-const iapMiddleware = require('./middlewares/iapMiddleware');
+const oidcAuthRoutes = require('./routes/oidcAuthRoutes');
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
 const { getKeyStatus } = require('./utils/cryptoUtils');
 
@@ -16,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const iapEnabled = String(process.env.IAP_ENABLED || '').toLowerCase() === 'true';
+const oidcEnabled = String(process.env.OIDC_ENABLED !== undefined ? process.env.OIDC_ENABLED : 'true').toLowerCase() === 'true';
 
 // --- Security Check ---
 const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME', 'Gb_PRIVATE_KEY_BASE64', 'Gb_PUBLIC_KEY_BASE64'];
@@ -42,7 +41,7 @@ app.use(helmet({
 }));
 
 // CORS Setup
-const rawOrigins = process.env.FRONTEND_URL || "http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500";
+const rawOrigins = process.env.FRONTEND_URL || "http://localhost:5173|http://127.0.0.1:5500";
 const allowedOrigins = rawOrigins.split(/[,|]/).map(url => url.trim());
 
 const corsOptions = {
@@ -60,6 +59,7 @@ const corsOptions = {
     credentials: true 
 };
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser()); 
@@ -82,8 +82,7 @@ app.use(securityMiddleware);
 const BASE_URL = '/api/v1';
 
 app.use(`${BASE_URL}/auth`, authRoutes);
-app.use(BASE_URL, iapMiddleware);
-app.use(`${BASE_URL}/iap`, iapAuthRoutes);
+app.use(`${BASE_URL}/oidc`, oidcAuthRoutes);
 app.use(`${BASE_URL}/session`, require('./routes/sessionRoutes'));
 app.use(`${BASE_URL}/departments`, require('./routes/metaRoutes'));
 app.use(`${BASE_URL}/forms`, require('./routes/formRoutes'));
@@ -108,7 +107,7 @@ app.listen(PORT, () => {
   console.log(`🚀 API running on port ${PORT}`);
   console.log(`🌍 Allowed Origins: ${allowedOrigins.join(', ')}`);
   console.log(`🔒 E2EE Security: ACTIVE`);
-  console.log(`🪪 IAP Enforcement: ${iapEnabled ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`🪪 Google OIDC: ${oidcEnabled ? 'ENABLED' : 'DISABLED'}`);
   console.log(`🔑 Active Key Slot: ${keyStatus.activeLabel || 'unavailable'}`);
   console.log(`🔄 Key Rotation Fallback: ${keyStatus.rotationEnabled ? 'ENABLED' : 'DISABLED'}`);
   if (keyStatus.activeCertificateValidTo) {

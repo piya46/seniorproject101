@@ -5,7 +5,6 @@
   "scripts": {
     "start": "node app.js",
     "deploy": "sh deploy.sh",
-    "test:iap": "node --test tests/iapMiddleware.test.js",
     "test:support": "node --test tests/supportRoutes.test.js",
     "docs:build": "node scripts/buildDocs.js",
     "docs:api:sync": "node scripts/syncApiDocumentationFromPostman.js",

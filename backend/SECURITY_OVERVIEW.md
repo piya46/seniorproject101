@@ -1,139 +1,215 @@
 # Security Overview
 
-Last updated: `2026-03-18`
+Last updated: `2026-03-26`
 
-เอกสารนี้สรุป security posture ปัจจุบันของ `sci-request-system`, สิ่งที่ดีขึ้นจากเดิม, และ checklist ที่ควรใช้เวลา audit หรือ deploy production
+เอกสารนี้สรุป security posture ของระบบหลัง migration ไปเป็น Google OIDC แบบ in-app และไม่ใช้ IAP/LB เป็น auth gate แล้ว
 
-## Executive Summary
+## Production Topology
 
-ภาพรวมตอนนี้ security **เพิ่มขึ้นจากเดิม** ไม่ได้ลดลง โดยเฉพาะในมุม production deployment และ login flow:
+production topology ใหม่:
 
-- backend production อยู่หลัง `HTTPS Load Balancer -> IAP -> Serverless NEG -> Cloud Run`
-- Cloud Run ใช้ `internal-and-cloud-load-balancing`
-- production deploy ใช้ `--no-allow-unauthenticated`
-- production deploy ใช้ `--no-default-url`
-- backend verify IAP JWT เพิ่มจากการมี session/JWT ภายในระบบเดิม
-- secure JSON encryption layer เดิมยังอยู่ครบ
-- session ยังถูกสร้างฝั่ง server เป็น `HttpOnly` cookie
-- IAP completion flow ใหม่หลีกเลี่ยงการส่ง identity ผ่าน query string
+- `pstpyst.com` = frontend
+- `https://sci-request-system-466086429766.asia-southeast3.run.app` = backend Cloud Run
+- auth = Google OIDC ที่ backend
+- transport security = HTTPS/TLS
+- session = `sci_session_token` แบบ `HttpOnly`
+- canonical OAuth callback = `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
 
-## สิ่งที่ดีขึ้นจากเดิม
+## Security Layers ที่ยังคงอยู่
 
-### 1. Production access path แคบลง
+### 1. Google OIDC Identity Verification
 
-ก่อน hardening รอบนี้ production มีความเสี่ยงที่ allowlist จะกว้างเกินจำเป็น และมีโอกาสพึ่ง `run.app` หรือ localhost origins มากเกินไป
+backend จะ:
 
-ตอนนี้:
+- redirect ผู้ใช้ไป Google OIDC login
+- verify signed `id_token`
+- ตรวจ `issuer`
+- ตรวจ `audience`
+- ตรวจ `state`
+- ตรวจ `nonce`
+- ตรวจ `email_verified`
 
-- `deploy.sh` ใช้ `FRONTEND_URL=https://pstpyst.com` เป็น default
-- dev/local origins ต้องเติมผ่าน `FRONTEND_EXTRA_URLS` เท่านั้น
-- ลดโอกาสเผลอ deploy production ด้วย localhost allowlist
+จุดที่เกี่ยวข้อง:
 
-### 2. Cookie behavior production ชัดเจนขึ้น
+- [oidcAuthRoutes.js](/Users/pst./senior/backend/routes/oidcAuthRoutes.js)
+- [oidcUtils.js](/Users/pst./senior/backend/utils/oidcUtils.js)
 
-`deploy.sh` now sets:
+### 2. Domain Enforcement
+
+ระบบยัง enforce domain allowlist เหมือนเดิมผ่าน:
+
+- `OIDC_ALLOWED_DOMAINS`
+- `OIDC_REQUIRE_HOSTED_DOMAIN`
+
+โดยตรวจทั้ง:
+
+- email domain
+- Google Workspace hosted domain (`hd`)
+
+ดังนั้นแม้ user จะเป็น Google account ธรรมดา ถ้าไม่อยู่ในโดเมนที่อนุญาตก็ยังเข้าไม่ได้
+
+### 3. Server-Managed Session
+
+หลัง login สำเร็จ backend จะออก `sci_session_token`
+
+properties สำคัญ:
+
+- `HttpOnly`
+- `Secure` ใน production
+- `SameSite=None` ใน production
+- signed ด้วย `JWT_SECRET`
+
+session cookie ไม่ถูก expose ให้ frontend อ่านเอง
+
+### 4. Session Record And Revocation
+
+middleware auth ยังตรวจ session record ใน Firestore
+
+ดังนั้น:
+
+- ถ้า session ถูก revoke
+- หรือไม่มี session record
+
+request จะถูกปฏิเสธ แม้ cookie จะยังมีอยู่
+
+`POST /oidc/logout` ตอนนี้จะลบทั้ง cookie และ session record ฝั่ง Firestore
+
+### 5. App-Level Encryption
+
+secure JSON endpoints ยังใช้ encryption layer เดิม:
+
+- RSA-OAEP สำหรับ encrypt AES key
+- AES-256-GCM สำหรับ encrypt payload
+
+layer นี้ยังคงเป็น defense-in-depth เพิ่มจาก TLS ปกติ
+
+### 6. Validation And Origin Checks
+
+ยังมี:
+
+- request validation
+- file signature validation
+- size limits
+- support endpoint origin/referer checks
+- business rule validation
+
+### 7. Rate Limiting
+
+rate limiting ยังอยู่เหมือนเดิม
+
+### 8. Cloud Run IAM / Service Account Isolation
+
+service account แยกของระบบและสิทธิ์ Secret Manager / Storage / Firestore ยังใช้เหมือนเดิม
+
+## สิ่งที่ลดลงจากสถาปัตยกรรมเดิม
+
+เมื่อเทียบกับระบบเดิมที่มี `IAP + app session`:
+
+- outer access gate ของ Google IAP หายไป
+- request จะไม่ถูก block ที่ edge ก่อนถึงแอปอีก
+- ความเข้มแบบ defense-in-depth เชิง infrastructure ลดลง 1 ชั้น
+
+ดังนั้นคำสรุปที่ตรงที่สุดคือ:
+
+- `ไม่ใช่ insecure`
+- แต่ `ไม่เท่ากับ IAP + app-layer เดิม` ในเชิง layered security
+
+## ทำไมยังถือว่าปลอดภัยได้
+
+เพราะ auth หลักไม่ได้หายไป แต่ย้ายเข้ามาอยู่ในแอปอย่างชัดเจน:
+
+- verified Google identity
+- enforced university domain
+- server-issued session
+- session revocation
+- validation
+- encryption
+- rate limiting
+
+ถ้าดูในเชิงแอป auth/control, ระบบยังเข้มอยู่
+
+## Risk Notes
+
+### 1. OIDC Client Secret ต้องดูแลดี
+
+ตอนนี้ `GOOGLE_OIDC_CLIENT_SECRET` เป็น secret สำคัญ
+
+ต้อง:
+
+- เก็บใน Secret Manager
+- ไม่ hardcode ลง repo
+- จำกัดสิทธิ์ผู้เข้าถึง
+
+### 2. `run.app` เป็น production entrypoint อยู่ตอนนี้
+
+เพราะไม่ได้ใช้ IAP/LB เป็น outer gate แล้ว และ region ปัจจุบันไม่รองรับ domain mapping ตามที่ต้องการ production path ตอนนี้จึงใช้ `run.app` โดยตรง
+
+ข้อที่ต้องยอมรับ:
+
+- จะมี public origin ของ backend เพิ่มขึ้น 1 จุด
+- ไม่ถือว่า auth พัง ถ้า app-layer OIDC ยังบังคับครบ
+- surface area จะกว้างกว่าการมี custom domain เพียงจุดเดียว
+
+### 3. Allowed Domain Is Critical
+
+ถ้าตั้ง `OIDC_ALLOWED_DOMAINS` กว้างเกินไป security จะอ่อนลงทันที
+
+production ที่แนะนำ:
+
+```text
+OIDC_ALLOWED_DOMAINS=chula.ac.th,student.chula.ac.th
+OIDC_REQUIRE_HOSTED_DOMAIN=true
+```
+
+### 4. Frontend Origin Allowlist ควรแคบที่สุด
+
+origin allowlist ฝั่ง frontend มีผลกับ:
+
+- `return_to`
+- browser credentialed requests
+- support/upload origin checks
+
+production ที่แนะนำ:
+
+```text
+FRONTEND_URL=https://pstpyst.com
+FRONTEND_EXTRA_URLS=
+```
+
+ถ้าต้องใช้ dev local:
+
+- ให้เพิ่มผ่าน `FRONTEND_EXTRA_URLS` ชั่วคราว
+- ไม่ควรปล่อย `localhost` ค้างใน production deploy โดยไม่จำเป็น
+
+## Recommended Production Posture
+
+ค่าที่แนะนำ:
 
 - `NODE_ENV=production`
+- `OIDC_ENABLED=true`
+- `OIDC_ALLOWED_DOMAINS=chula.ac.th,student.chula.ac.th`
+- `OIDC_REQUIRE_HOSTED_DOMAIN=true`
+- `FRONTEND_URL=https://pstpyst.com`
+- `FRONTEND_EXTRA_URLS=` (เว้นว่างใน production ปกติ)
+- Google OIDC credentials เก็บใน Secret Manager
 
-ผลคือ session cookie ของระบบจะใช้ production options จาก [sessionUtils.js](/Users/pst./senior/backend/utils/sessionUtils.js):
+## Summary
 
-- `httpOnly: true`
-- `secure: true`
-- `sameSite: 'None'`
+หลัง migration:
 
-### 3. IAP setup ครบกว่าเดิม
+- app-layer security หลักยังอยู่ครบ
+- domain enforcement ยังอยู่
+- session security ยังอยู่
+- encryption/rate limit/validation ยังอยู่
 
-deployment automation ตอนนี้พยายามทำสิ่งต่อไปนี้ให้อัตโนมัติ:
+แต่:
 
-- create IAP service identity
-- grant `roles/run.invoker` ให้ IAP service agent บน Cloud Run
-- ตั้ง backend audience สำหรับ IAP verification
+- infrastructure gate แบบ IAP ไม่อยู่แล้ว
 
-ช่วยลด manual gap ที่เคยทำให้เกิด error เช่น:
+ดังนั้น security posture ใหม่คือ:
 
-- missing IAP service account
-- backend audience misconfiguration
+`แข็งในระดับแอปและ identity verification`
 
-### 4. Login flow ปลอดภัยขึ้น
+แต่
 
-flow เดิมที่พยายามให้ IAP ของ `api.pstpyst.com` redirect ตรงไป `pstpyst.com` มีปัญหาเรื่อง topology และเสี่ยงต่อการออกแบบ auth state ที่ไม่เป็น server-driven
-
-flow ใหม่:
-
-1. user ผ่าน IAP ที่ `api.pstpyst.com`
-2. backend route `GET /api/v1/iap/complete` สร้าง/reuse app session
-3. backend redirect กลับ frontend พร้อมแค่ `auth=ok`
-4. frontend เรียก `GET /api/v1/iap/me` ด้วย cookie เดิม
-
-ข้อดี:
-
-- ไม่ส่ง email/token ผ่าน query string
-- backend เป็นผู้ควบคุม session state
-- ลดการผูก auth flow ข้าม host แบบไม่จำเป็น
-
-## Security Layers ปัจจุบัน
-
-ระบบปัจจุบันมีหลายชั้น:
-
-1. HTTPS ที่ load balancer
-2. IAP เป็น outer access gate
-3. backend verify IAP JWT
-4. application session cookie (`sci_session_token`)
-5. secure JSON encryption สำหรับ endpoint ที่กำหนด
-6. route-specific validation เช่น origin check, file signature check, upload constraints
-
-## จุดที่ยังควรระวัง
-
-### 1. Custom OAuth secret ต้องเก็บให้ดี
-
-ถ้า IAP ใช้ `Custom OAuth`:
-
-- อย่า commit `client secret` ลง repo
-- อย่าใส่ secret แบบ plain text ใน doc ภายใน repo
-- ถ้าจะ automate เพิ่ม ให้เก็บ secret ใน Secret Manager แล้ว inject ตอน deploy
-
-นี่ไม่ใช่จุดที่ทำให้ระบบอ่อนลงทันที แต่เป็น operational risk ที่ต้องคุมให้ดี
-
-### 2. Local origins ควรใช้ชั่วคราวเท่านั้น
-
-ถ้าจะทดสอบ `localhost` หรือ `127.0.0.1`:
-
-- เติมผ่าน `FRONTEND_EXTRA_URLS`
-- ใช้เท่าที่จำเป็น
-- เอาออกเมื่อจบทดสอบ production
-
-### 3. อย่าส่ง identity ผ่าน query string
-
-หลัง IAP login สำเร็จ:
-
-- ไม่ควรส่ง email ผ่าน `?email=...`
-- ไม่ควรส่ง token ผ่าน URL
-- ควรให้ frontend เรียก `GET /api/v1/iap/me` แทน
-
-## Production Audit Checklist
-
-ก่อนถือว่าระบบ production พร้อม ควรเช็กอย่างน้อย:
-
-- cert ของ `api.pstpyst.com` เป็น `ACTIVE`
-- Cloud Run ingress เป็น `internal-and-cloud-load-balancing`
-- Cloud Run ไม่มี default URL (`--no-default-url`)
-- IAP backend service เปิดใช้งานแล้ว
-- Cloud Run มี `roles/run.invoker` สำหรับ `service-<PROJECT_NUMBER>@gcp-sa-iap.iam.gserviceaccount.com`
-- `IAP_EXPECTED_AUDIENCE` และ `IAP_BACKEND_SERVICE_ID` ถูกตั้งแล้ว
-- `NODE_ENV=production`
-- `FRONTEND_URL` เป็น production origin ที่ถูกต้อง
-- ถ้าเปิด local testing อยู่ ให้ทบทวนว่าจำเป็นจริงหรือไม่
-
-## Operational Recommendations
-
-- ถ้าต้องการ QA จาก localhost ให้ใช้ `FRONTEND_EXTRA_URLS` แบบชั่วคราว ไม่แก้ production default
-- ถ้าต้องการให้ deploy จบในรอบเดียว ให้ใช้ [deploy.sh](/Users/pst./senior/backend/deploy.sh) เวอร์ชันล่าสุด
-- ถ้าต้องการ automation ของ `Custom OAuth`, ให้ใช้ Secret Manager แทน hardcode
-- ถ้าต้องการ authorization เข้มกว่า domain-wide access ของ IAP, ให้พิจารณาใช้ Google Group แทนการเปิดทั้ง domain
-
-## Related Docs
-
-- [DEPLOY_RUNBOOK.md](/Users/pst./senior/backend/DEPLOY_RUNBOOK.md)
-- [IAP_DEPLOYMENT_GUIDE.md](/Users/pst./senior/backend/IAP_DEPLOYMENT_GUIDE.md)
-- [API_DOCUMENTATION.md](/Users/pst./senior/backend/API_DOCUMENTATION.md)
-- [FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)
+`มี defense-in-depth น้อยกว่าระบบที่มี IAP หน้า backend`

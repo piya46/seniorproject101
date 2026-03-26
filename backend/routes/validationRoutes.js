@@ -99,9 +99,8 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     `
       : '';
 
-    const project = process.env.GCP_PROJECT_ID || "seniorproject101";
-    // ✅ ใช้ us-central1 เพื่อความเสถียรและรองรับ model ใหม่ๆ
-    const location = "us-central1";
+    const project = process.env.GCP_PROJECT_ID || 'seniorproject101';
+    const location = process.env.AI_LOCATION || 'global';
     const bucketName = process.env.GCS_BUCKET_NAME;
 
     const storage = new Storage();

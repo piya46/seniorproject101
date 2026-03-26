@@ -41,7 +41,7 @@ const sanitizeFormCode = (code) => {
 
 const getAllowedOrigins = () => {
     const rawOrigins =
-        process.env.FRONTEND_URL || 'http://localhost:3000|http://localhost:5500|http://127.0.0.1:5500';
+        process.env.FRONTEND_URL || 'http://localhost:5173|http://127.0.0.1:5500';
     return rawOrigins
         .split(/[,|]/)
         .map((url) => url.trim())

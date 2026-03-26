@@ -7,10 +7,8 @@ const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
 const { validate } = require('../middlewares/validationMiddleware');
 const { chatRecommendSchema } = require('../validators/schemas');
 
-const project = process.env.GCP_PROJECT_ID || "seniorproject101";
-
-// ✅ ใช้ Global Endpoint (Vertex AI จะ Auto-route)
-const location = 'us-central1';
+const project = process.env.GCP_PROJECT_ID || 'seniorproject101';
+const location = process.env.AI_LOCATION || 'global';
 
 const getFormsContext = () => {
   return forms.map(f => {

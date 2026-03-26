@@ -1,46 +1,57 @@
 # Testwebbackend
 
-Small QA scaffold for checking the production backend from:
+Local-first static QA scaffold for validating the backend directly from a browser.
 
-- a full PHP + HTML QA dashboard (`index.php`)
-- lightweight PHP helpers in `php/`
+deployment shape ที่เอกสารนี้อิง:
+
+- local QA page on `http://localhost:5173` หรือ static host อื่น
+- backend on `https://sci-request-system-466086429766.asia-southeast3.run.app`
+- authentication via Google OIDC
 
 ## Files
 
-- `index.php` main QA dashboard for end-to-end browser testing
-- `php/health.php` server-side proxy for `/healthz`
-- `php/public-key.php` server-side proxy for `/api/v1/auth/public-key`
-- `php/session-init.php` server-side secure session bootstrap
-- `php/iap-login.php` redirect helper for `/api/v1/iap/complete`
+- `index.html` main QA dashboard
 
-## Default backend
+## Local Run
 
-The scaffold defaults to:
+ใช้ static server อะไรก็ได้ เช่น:
 
-```text
-https://api.pstpyst.com
+```bash
+cd /Users/pst./senior/Testwebbackend
+python3 -m http.server 5173
 ```
 
-You can override it:
+แล้วเปิด:
 
-- in browser: add `?backend=https://your-domain`
-- in PHP: set `TESTWEBBACKEND_BASE_URL`
+```text
+http://localhost:5173/index.html
+```
+
+ถ้าใช้ Vite หรือ server อื่นก็ได้ ขอแค่ origin ที่ใช้จริงถูกเพิ่มไว้ใน backend `FRONTEND_EXTRA_URLS`
+
+ตัวอย่างถ้าใช้ Live Server หรือ static server ที่เสิร์ฟจาก root โปรเจกต์บน:
+
+```text
+http://127.0.0.1:5500/Testwebbackend/index.html
+```
+
+ถ้าจะรองรับทั้ง Vite และ Live Server พร้อมกัน ให้เพิ่มสอง origin นี้ตอน deploy backend:
+
+```bash
+FRONTEND_EXTRA_URLS="http://localhost:5173|http://127.0.0.1:5500"
+```
+
+## Recommended Flow
+
+1. Open Google Login
+2. Run `GET /oidc/me`
+3. Run `POST /session/init`
+4. Test forms/upload/validation/merge/chat/support
 
 ## Notes
 
-- `/healthz` should work directly.
-- `/api/v1/auth/public-key` should return JSON with `publicKey`.
-- `index.php` is the recommended entry because it tests the real browser flow for:
-  - session init
-  - departments
-  - forms
-  - form detail
-  - encrypted upload
-  - validation
-  - merge
-  - chat
-  - support email
-- `/api/v1/iap/complete` should be opened through the PHP helper so login finishes on the backend domain first, the backend sets `sci_session_token`, and only then redirects back.
-- If this dashboard runs on localhost, make sure backend deploy includes the local origin in `FRONTEND_EXTRA_URLS`.
-- This scaffold does not replace the main frontend.
-- PHP is required for the recommended QA flow because the scaffold uses PHP helpers for backend-first login and secure session bootstrap.
+- backend ที่ใช้จริงตอนนี้คือ `https://sci-request-system-466086429766.asia-southeast3.run.app`
+- ถ้ารันจาก localhost ต้องเพิ่ม origin ที่ใช้จริงผ่าน `FRONTEND_EXTRA_URLS` ตอน deploy backend
+- production ปกติควรเก็บ `FRONTEND_URL=https://pstpyst.com` และไม่ควรปล่อย localhost ค้างเป็น default behavior
+- dashboard นี้เป็น QA scaffold ไม่ใช่ frontend หลักของระบบ
+- ถ้าใช้เฉพาะ local testing ไม่จำเป็นต้องมี Docker หรือ Cloud Run สำหรับโฟลเดอร์นี้

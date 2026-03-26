@@ -1,70 +1,108 @@
 # API Documentation
 
-Version: `v1.8.5`
-Last updated: `2026-03-18`
+Version: `v1.9.1`
+Last updated: `2026-03-26`
 
-เอกสารนี้เป็นสรุป API contract ฝั่ง backend แบบย่อสำหรับทีมที่ต้องการดูภาพรวมเร็ว โดยรายละเอียดเชิง integration, encryption flow, Postman examples และ frontend behavior แบบเต็มอยู่ที่:
+เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client
 
-- [README.md](/Users/pst./senior/backend/postman/README.md)
-- [FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)
-- [Sci-Request-System.postman_collection.json](/Users/pst./senior/backend/postman/Sci-Request-System.postman_collection.json)
+เอกสารที่เกี่ยวข้อง:
+
+- [API_EXAMPLES.md](/Users/pst./senior/backend/API_EXAMPLES.md)
 - [SECURITY_OVERVIEW.md](/Users/pst./senior/backend/SECURITY_OVERVIEW.md)
+- [DEPLOY_RUNBOOK.md](/Users/pst./senior/backend/DEPLOY_RUNBOOK.md)
+- [backend/postman/README.md](/Users/pst./senior/backend/postman/README.md)
+- [backend/postman/FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)
 
 ## Overview
 
 - Base URL: `/api/v1`
-- Authentication: session cookie, and optionally Google Cloud IAP as an outer access gate for `@chula.ac.th` and `@student.chula.ac.th`
-- Secure JSON endpoints ใช้ encryption transport
-- `GET` และ `multipart/form-data` ไม่ใช้ secure JSON wrapper
-- `GET /healthz` เป็น service-level health endpoint ที่อยู่นอก `/api/v1`
-- `POST /support/technical-email` เป็น multipart endpoint สำหรับแจ้งปัญหาไปยังทีมพัฒนาระบบ
+- Authentication: Google OIDC login + app session cookie (`sci_session_token`)
+- Allowed account domains: กำหนดผ่าน `OIDC_ALLOWED_DOMAINS`
+- Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`
+- Secure JSON endpoints ใช้ application-level encryption transport
+- `GET /healthz` อยู่นอก `/api/v1`
 
 ## Security Posture Summary
 
-- production backend ถูกออกแบบให้วางหลัง `HTTPS Load Balancer -> IAP -> Serverless NEG -> Cloud Run`
-- secure JSON encryption layer เดิมยังอยู่ครบสำหรับ endpoint ที่กำหนด
-- flow ที่แนะนำสำหรับ IAP คือ `GET /iap/complete` แล้วให้ frontend อ่านสถานะผ่าน `GET /iap/me`
-- ไม่แนะนำให้ส่ง identity ผ่าน query string หลัง login
+- ใช้ Google OIDC เป็น identity provider
+- backend verify Google `id_token`, `state`, `nonce`, `email_verified`, และ allowed domains
+- backend ออก session cookie แบบ `HttpOnly` และ `Secure` ใน production
+- `POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server
+- endpoint ธุรกิจหลักยังต้องผ่าน session-based auth
+- secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด
+
+## Authentication Flow
+
+flow ที่แนะนำ:
+
+1. frontend หรือ browser เปิด `GET /oidc/google/login?return_to=<frontend-url>`
+2. Google login เสร็จแล้ว redirect กลับ `GET /oidc/google/callback`
+3. backend verify Google identity และสร้าง `sci_session_token`
+4. backend redirect กลับ frontend พร้อม `auth=ok` และ `oidc=done`
+5. frontend เรียก `GET /oidc/me` ด้วย `credentials: 'include'`
+6. จากนั้นค่อยเรียก `POST /session/init` และ endpoint อื่น
+
+ข้อสำคัญ:
+
+- ไม่ส่ง token หรือ email ผ่าน query string
+- `return_to` ต้องอยู่ใน frontend allowlist ของระบบ
+  production หลักควรใช้ `FRONTEND_URL`
+  และใช้ `FRONTEND_EXTRA_URLS` เฉพาะกรณี dev/QA ชั่วคราว
+- Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:
+  `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
+- `POST /session/init` ตอนนี้ต้องมี OIDC-backed session ก่อนแล้ว
 
 ## Endpoint Matrix
 
-| Endpoint | Method | ต้อง Auth | ต้อง Encryption | Request fields หลัก | Response หลัก |
-| --- | --- | --- | --- | --- | --- |
-| `/healthz` | `GET` | ไม่ต้อง | ไม่ต้อง | - | `{ status: "ok" }` |
-| `/auth/public-key` | `GET` | ไม่ต้อง | ไม่ต้อง | - | `{ publicKey }` |
-| `/iap/complete` | `GET` | ต้องผ่าน IAP | ไม่ต้อง | `return_to` | `302` redirect กลับ frontend หลัง backend ตั้ง session cookie แล้ว |
-| `/iap/me` | `GET` | ต้อง | ไม่ต้อง | - | `{ authenticated, email, hosted_domain }` |
-| `/session/init` | `POST` | ไม่ต้อง | ต้อง | - | `{ message, session_id }` |
-| `/departments` | `GET` | ต้อง | ไม่ต้อง | - | `{ data: Department[] }` |
-| `/forms` | `GET` | ต้อง | ไม่ต้อง | `degree_level` | `{ data: FormSummary[] }` |
-| `/forms/:form_code` | `GET` | ต้อง | ไม่ต้อง | `degree_level`, `sub_type` | `FormDetail` พร้อม `required_documents`, `approval_requirements`, `case_rules` |
-| `/upload` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | `file`, `file_key`, `form_code?`, `encKey`, `iv`, `tag` | `{ status, data: { file_key, form_code } }` |
-| `/validation/check-completeness` | `POST` | ต้อง | ต้อง | `form_code`, `degree_level`, `sub_type`, `case_key?` | ผลตรวจราย `file_key` |
-| `/documents/merge` | `POST` | ต้อง | ต้อง | `form_code`, `degree_level`, `sub_type` | `{ status, download_url, instruction }` |
-| `/chat/recommend` | `POST` | ต้อง | ต้อง | `message`, `degree_level` | `{ reply?, text?, recommended_form? }` |
-| `/support/technical-email` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | `reporter_email`, `issue_type`, `subject`, `description`, `attachment?` | `{ status, message, data }` |
+| Endpoint | Method | ต้อง Auth | ต้อง Encryption | คำอธิบาย |
+| --- | --- | --- | --- | --- |
+| `/healthz` | `GET` | ไม่ต้อง | ไม่ต้อง | service health |
+| `/auth/public-key` | `GET` | ไม่ต้อง | ไม่ต้อง | public key สำหรับ secure JSON |
+| `/oidc/google/login` | `GET` | ไม่ต้อง | ไม่ต้อง | เริ่ม Google OIDC login |
+| `/oidc/google/callback` | `GET` | ไม่ต้อง | ไม่ต้อง | backend callback หลัง Google login |
+| `/oidc/me` | `GET` | ต้อง | ไม่ต้อง | อ่านสถานะ session และ identity ปัจจุบัน |
+| `/oidc/logout` | `POST` | ไม่ต้อง | ไม่ต้อง | ลบ app session cookie |
+| `/session/init` | `POST` | ต้อง | ต้อง | bootstrap secure JSON flow/reuse session |
+| `/departments` | `GET` | ต้อง | ไม่ต้อง | โหลด metadata คณะ/ภาควิชา |
+| `/forms` | `GET` | ต้อง | ไม่ต้อง | โหลดรายการฟอร์ม |
+| `/forms/:form_code` | `GET` | ต้อง | ไม่ต้อง | โหลดรายละเอียดฟอร์ม |
+| `/upload` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | อัปโหลดไฟล์ |
+| `/validation/check-completeness` | `POST` | ต้อง | ต้อง | ตรวจเอกสาร |
+| `/documents/merge` | `POST` | ต้อง | ต้อง | รวมเอกสาร |
+| `/chat/recommend` | `POST` | ต้อง | ต้อง | แนะนำฟอร์ม/ตอบคำถาม |
+| `/support/technical-email` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | ส่งอีเมลแจ้งปัญหา |
 
-## Merge Endpoint Notes
+## OIDC Endpoints
 
-### `GET /iap/complete`
+### `GET /oidc/google/login`
 
-ใช้สำหรับ flow ที่ต้องการให้ IAP login จบที่ backend domain ก่อน จากนั้น backend จะสร้าง session cookie ของระบบ แล้วค่อย redirect กลับ frontend
+ใช้เริ่ม Google OIDC login
 
-ฟิลด์ที่รับ:
+query:
 
 - `return_to` optional แต่แนะนำให้ส่ง
 
-พฤติกรรม:
+เงื่อนไข:
 
-- route นี้อยู่หลัง IAP middleware
-- backend จะสร้างหรือ reuse `sci_session_token`
-- backend จะ redirect กลับ `return_to` พร้อม query `auth=ok`
-- ไม่ส่ง email หรือ token ผ่าน query string
-- flow นี้เหมาะกับสถาปัตยกรรม `frontend = pstpyst.com`, `backend = api.pstpyst.com` มากกว่าการ redirect ข้าม host ตรงจาก IAP
+- `return_to` ต้อง match origin ที่อยู่ใน frontend allowlist
+  โดย `FRONTEND_URL` ควรเป็น production origin หลัก
+  และ `FRONTEND_EXTRA_URLS` ควรใช้เป็น optional override เท่านั้น
+- backend จะสร้าง signed state และ nonce ก่อน redirect ไป Google
 
-### `GET /iap/me`
+### `GET /oidc/google/callback`
 
-ใช้ให้ frontend ตรวจว่า backend session พร้อมหรือยังหลัง redirect กลับจาก IAP completion flow
+route callback ที่ Google redirect กลับมา
+
+backend จะ:
+
+- exchange authorization code
+- verify `id_token`
+- ตรวจ `email_verified`
+- ตรวจ email domain และ hosted domain
+- สร้างหรือ reuse `sci_session_token`
+- redirect กลับ `return_to` พร้อม `auth=ok` และ `oidc=done`
+
+### `GET /oidc/me`
 
 response ตัวอย่าง:
 
@@ -72,24 +110,44 @@ response ตัวอย่าง:
 {
   "authenticated": true,
   "email": "student@chula.ac.th",
-  "hosted_domain": "student.chula.ac.th"
+  "hosted_domain": "student.chula.ac.th",
+  "name": "Student Name",
+  "picture": "https://...",
+  "auth_provider": "google_oidc"
 }
 ```
 
-### `POST /documents/merge`
+### `POST /oidc/logout`
 
-- ใช้รวมเอกสารที่เกี่ยวข้องกับฟอร์มให้เป็น PDF เดียว
-- ระบบจะเลือกใช้ไฟล์ล่าสุดต่อ `file_key` ของฟอร์มนั้น รวมถึงไฟล์ `general` ที่เกี่ยวข้อง
-- ถ้า merge ได้สำเร็จ จะคืน `download_url` และ `instruction`
-- ถ้าไฟล์อยู่ใน session แต่ไม่มีหน้าใด merge ได้จริง ระบบจะ `400` พร้อม `message` และ `details` แทนการคืน PDF เปล่า
+ลบ `sci_session_token` และ revoke session record ฝั่ง server
 
-ตัวอย่างกรณี merge ไม่ได้:
+response ตัวอย่าง:
 
 ```json
 {
-  "error": "Merge validation failed.",
-  "message": "No document pages could be merged. Please re-upload the files and try again.",
-  "details": ["Failed to merge main_form", "Unsupported content type for transcript: unknown"]
+  "status": "success",
+  "message": "Logged out successfully."
+}
+```
+
+## Session Init
+
+### `POST /session/init`
+
+ใช้เริ่ม secure JSON flow หรือ reuse session record ของระบบ
+
+ตอนนี้ endpoint นี้:
+
+- ต้องมี OIDC-backed session ก่อน
+- ใช้ secure JSON transport
+- จะคืน `session_id` ที่ผูกกับระบบภายใน
+
+response ตัวอย่าง:
+
+```json
+{
+  "message": "Session initialized",
+  "session_id": "sess_abc123"
 }
 ```
 
@@ -97,142 +155,40 @@ response ตัวอย่าง:
 
 ### `POST /support/technical-email`
 
-ใช้สำหรับส่งอีเมลแจ้งปัญหาไปยังทีมพัฒนาระบบโดยตรง ไม่ใช่ส่วนหนึ่งของ flow การยื่นคำร้อง
-
-ฟิลด์ที่รับ:
-
-- `reporter_email`
-- `issue_type`
-- `subject`
-- `description`
-- `attachment` optional
-
 ข้อจำกัด:
 
-- ต้องมี session cookie (`sci_session_token`) ที่ถูกสร้างจาก `POST /session/init` หรือ flow `GET /iap/complete`
+- ต้องมี session cookie
 - ใช้ `multipart/form-data`
-- แนบได้สูงสุด 1 ไฟล์
+- แนบไฟล์ได้สูงสุด 1 ไฟล์
 - ขนาดไฟล์ไม่เกิน 2MB
-- รองรับเฉพาะ `jpg`, `png`, `webp`, `pdf`
-- request ต้องมี `Origin` หรือ `Referer`
-- backend จะตรวจ `Origin/Referer` ให้ตรงกับ allowlist
-- ปลายทางอีเมลถูกกำหนดจาก server ผ่าน `TECH_SUPPORT_TARGET_EMAIL` ไม่รับจาก client
-- backend จะตรวจ file signature จริง ไม่เชื่อแค่ MIME จาก browser
+- รองรับ `jpg`, `png`, `webp`, `pdf`
+- backend ตรวจ `Origin/Referer`
+- ปลายทางอีเมลกำหนดจาก `TECH_SUPPORT_TARGET_EMAIL`
 
-Success response:
+## Error Model
 
-```json
-{
-  "status": "success",
-  "message": "Technical support email sent successfully.",
-  "data": {
-    "reporter_email": "student@chula.ac.th",
-    "issue_type": "upload problem",
-    "subject": "อัปโหลดไฟล์ไม่ได้",
-    "attachment": {
-      "original_name": "evidence.png",
-      "mime_type": "image/png",
-      "size": 185432
-    },
-    "message_id": "<abc123@example.com>"
-  }
-}
-```
-
-## Error Response Contract กลาง
-
-backend ไม่ได้ตอบ error ทุก endpoint ด้วย schema เดียวกัน 100% แต่ client และ QA ควรรองรับรูปแบบหลักดังนี้
-
-รูปแบบทั่วไป:
+รูปแบบกลาง:
 
 ```json
 {
-  "error": "ข้อความสรุปสั้น",
-  "message": "ข้อความอธิบายเพิ่มเติม"
+  "error": "ข้อความสรุป",
+  "message": "รายละเอียดเพิ่มเติม"
 }
 ```
 
-บาง endpoint อาจมี field เฉพาะ:
+status code ที่ client ควรรองรับ:
 
-```json
-{
-  "error": "Incomplete documents",
-  "missing_keys": ["main_form", "citizen_id_copy"]
-}
-```
+| Status | ความหมาย |
+| --- | --- |
+| `400` | request ไม่ถูกต้อง |
+| `401` | ไม่มี session หรือ auth flow ไม่สมบูรณ์ |
+| `403` | domain / hosted domain / policy ไม่ผ่าน |
+| `404` | resource ไม่พบ |
+| `429` | rate limit |
+| `500` | backend internal failure |
 
-### Status ที่ควรรองรับ
+## Notes
 
-| Status | ความหมาย | ตัวอย่างกรณี |
-| --- | --- | --- |
-| `400` | request ไม่ถูกต้องหรือข้อมูลไม่ครบ | ไม่มีฟิลด์, ไฟล์แนบเกิน 2MB |
-| `401` | ไม่มี session หรือ auth ไม่ผ่าน | ไม่ส่ง cookie, cookie หมดอายุ |
-| `403` | policy/security check ไม่ผ่าน | origin ไม่อยู่ใน allowlist |
-| `404` | ไม่พบ resource/config | form code หรือ subtype ไม่ถูกต้อง |
-| `429` | ยิงถี่เกิน rate limit | support endpoint หรือ upload ถูกเรียกซ้ำเร็วเกินไป |
-| `500` | backend ล้มเหลว | SMTP config ผิด, merge/storage ล้มเหลว |
-
-### Support Endpoint Error Examples
-
-กรณีไฟล์แนบเกินขนาด:
-
-```json
-{
-  "error": "Validation Error",
-  "message": "Attachment size must not exceed 2MB."
-}
-```
-
-กรณีไม่มี session:
-
-```json
-{
-  "error": "Unauthorized: No session token found"
-}
-```
-
-กรณี origin ไม่ผ่าน policy:
-
-```json
-{
-  "error": "Forbidden",
-  "message": "Origin is not allowed for technical support requests."
-}
-```
-
-กรณี SMTP login ไม่ผ่าน:
-
-```json
-{
-  "error": "Failed to send technical support email",
-  "message": "Invalid login: 535 5.7.8 Error: authentication failed: authentication failure"
-}
-```
-
-## Upload Endpoint Notes
-
-### `POST /upload`
-
-- ต้องมี session cookie (`sci_session_token`)
-- ใช้ `multipart/form-data`
-- รองรับไฟล์ `jpg`, `png`, `webp`, `pdf`
-- ขนาดไฟล์ไม่เกิน 10MB
-- ถ้าเป็น browser request และมี `Origin` หรือ `Referer` backend จะตรวจให้ตรงกับ frontend allowlist
-- ถ้าส่ง `encKey`, `iv`, `tag` มาด้วย backend จะถอดรหัสไฟล์ก่อนตรวจ signature และ sanitize
-- ถ้าอัปโหลดไฟล์ใหม่ด้วย `file_key` และ `form_code` เดิม ระบบจะเก็บเฉพาะไฟล์ล่าสุดของคู่นั้น
-
-## Field Notes
-
-- `approval_requirements` ใช้บอกว่าคำร้องต้องมีความเห็นหรือการลงนามจากใครบ้าง
-- `case_rules` ใช้บอกกรณีย่อยของ form เดิม โดย public response จะส่งเฉพาะ field ที่ frontend ใช้ได้อย่างปลอดภัย
-- `case_key` ใช้ใน `POST /validation/check-completeness` เมื่อ form นั้นมี `case_rules`
-- อีเมลปลายทางของ support endpoint เป็นค่า server-managed ถูก resolve จาก `TECH_SUPPORT_TARGET_EMAIL` และไม่ถูกส่งกลับใน success response
-- `POST /session/init` จะคืน `session_id` และ set cookie `sci_session_token` ให้ client ใช้กับ endpoint ที่ต้อง auth
-- ใน production ที่มี IAP หน้า load balancer แนะนำให้ใช้ `GET /iap/complete` เพื่อให้ backend สร้าง session หลัง IAP แล้วค่อย redirect กลับ frontend
-- การเปิด Google Cloud IAP เป็น outer gate เป็น infra policy เพิ่มเติม ไม่ได้แทน session auth ภายใน API
-
-## References
-
-- [README.md](/Users/pst./senior/backend/postman/README.md)
-- [FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)
-- [Sci-Request-System.postman_collection.json](/Users/pst./senior/backend/postman/Sci-Request-System.postman_collection.json)
+- การเอา IAP ออกทำให้ชั้น outer access gate หายไป แต่ app-layer auth, domain enforcement, session policy, validation, encryption, และ rate limiting ยังอยู่
+- production ตอนนี้ใช้ `run.app` โดยตรงเป็นหลัก จึงมี public origin ของ backend เพิ่มขึ้น แต่ไม่ได้เปลี่ยน app-layer auth contract
+- ถ้าต้องการ OIDC หลาย provider ในอนาคต ควรแยก abstraction ออกจาก Google-specific logic ใน `utils/oidcUtils.js`
