@@ -91,6 +91,7 @@ export OIDC_REQUIRE_HOSTED_DOMAIN="true"
 export AI_LOCATION="us-central1"
 export AI_DAILY_TOKEN_LIMIT="50000"
 export AI_USAGE_RETENTION_DAYS="30"
+export RATE_LIMIT_STORE_PROVIDER="firestore"
 export GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id"
 export GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret"
 export GOOGLE_OIDC_CALLBACK_URL="https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback"
@@ -103,8 +104,17 @@ export GOOGLE_OIDC_CALLBACK_URL="https://sci-request-system-466086429766.asia-so
 - `AI_LOCATION=us-central1` เป็นค่าที่แนะนำในระบบปัจจุบันเพื่อให้สอดคล้องกับ AI routes ที่ใช้งานจริง
 - `AI_DAILY_TOKEN_LIMIT` ใช้กำหนดเพดาน token ต่อ user ต่อวัน
 - `AI_USAGE_RETENTION_DAYS` ใช้กำหนดว่าจะเก็บเอกสาร usage รายวันใน Firestore ไว้กี่วันก่อน TTL ลบออก
+- `RATE_LIMIT_STORE_PROVIDER=firestore` เป็นค่า default ที่ปลอดภัยที่สุดสำหรับ deploy ปัจจุบัน
 - ไม่ควรปล่อย `localhost` หรือ origin ชั่วคราวค้างใน production โดยไม่จำเป็น
 - ควรใส่ `Authorised redirect URI` ใน Google OAuth client ให้ตรงกับ callback URL ข้างต้นแบบ exact match
+
+ถ้าจะใช้ Redis เป็น rate limit backend:
+
+- ตั้ง `RATE_LIMIT_STORE_PROVIDER=redis`
+- ตั้งอย่างน้อยหนึ่งชุดของ runtime env ต่อไปนี้:
+  - `RATE_LIMIT_REDIS_URL`
+  - หรือ `RATE_LIMIT_REDIS_HOST` + `RATE_LIMIT_REDIS_PORT` + optional auth/tls vars
+- แนะนำให้ inject ค่าเหล่านี้จาก Secret Manager หรือ Cloud Run runtime config แทนการ hardcode ลง repo
 
 ## Deploy
 
