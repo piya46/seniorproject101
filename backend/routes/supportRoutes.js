@@ -3,6 +3,7 @@ const multer = require('multer');
 const rateLimit = require('express-rate-limit');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { sendTechnicalSupportEmail } = require('../utils/emailUtils');
+const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 
 const router = express.Router();
 
@@ -46,45 +47,8 @@ const sanitizeHeaderLikeString = (value) => sanitizeString(value).replace(/[\r\n
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
-const getAllowedOrigins = () => {
-  const rawOrigins =
-    process.env.FRONTEND_URL || 'http://localhost:5173|http://127.0.0.1:5500';
-  return rawOrigins
-    .split(/[,|]/)
-    .map((url) => url.trim())
-    .filter(Boolean);
-};
-
 const checkBrowserOrigin = (req, res, next) => {
-  const allowedOrigins = getAllowedOrigins();
-  const origin = sanitizeString(req.headers.origin);
-  const referer = sanitizeString(req.headers.referer);
-
-  if (!origin && !referer) {
-    return res.status(403).json({
-      error: 'Forbidden',
-      message: 'Origin or Referer header is required for technical support requests.'
-    });
-  }
-
-  const isAllowed = allowedOrigins.some((allowedOrigin) => {
-    if (origin && origin === allowedOrigin) {
-      return true;
-    }
-
-    if (referer) {
-      try {
-        const refererOrigin = new URL(referer).origin;
-        return refererOrigin === allowedOrigin;
-      } catch (_error) {
-        return false;
-      }
-    }
-
-    return false;
-  });
-
-  if (!isAllowed) {
+  if (!isAllowedBrowserOrigin(req, { requireHeader: true })) {
     return res.status(403).json({
       error: 'Forbidden',
       message: 'Origin is not allowed for technical support requests.'

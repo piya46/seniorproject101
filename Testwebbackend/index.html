@@ -541,6 +541,20 @@
         }
         if (error && typeof error.data !== "undefined") {
           output.data = error.data;
+
+          if (error.data && typeof error.data === "object") {
+            if (typeof error.data.message === "string" && error.data.message !== output.message) {
+              output.decodedMessage = error.data.message;
+            }
+
+            if (typeof error.data.error === "string") {
+              output.errorCode = error.data.error;
+            }
+
+            if (Array.isArray(error.data.details) && error.data.details.length > 0) {
+              output.details = error.data.details;
+            }
+          }
         }
 
         showResponse(label, output);
@@ -936,7 +950,7 @@
       }
 
       document.getElementById("saveBackendBtn").addEventListener("click", function () {
-        localStorage.setItem("testwebbackend.baseUrl", getBackend());
+        sessionStorage.setItem("testwebbackend.baseUrl", getBackend());
         client.publicKey = null;
         updateMeta();
         setStatus("Backend saved.", "ok");
@@ -947,7 +961,7 @@
       });
 
       document.getElementById("oidcLoginBtn").addEventListener("click", function () {
-        localStorage.setItem("testwebbackend.baseUrl", getBackend());
+        sessionStorage.setItem("testwebbackend.baseUrl", getBackend());
         var returnUrl = new URL(window.location.origin + window.location.pathname);
         returnUrl.searchParams.set("oidc", "done");
         window.location.href = buildUrl(getBackend() + "/api/v1/oidc/google/login", {
@@ -1083,7 +1097,7 @@
         }, "Support email request completed");
       });
 
-      var savedBackend = localStorage.getItem("testwebbackend.baseUrl");
+      var savedBackend = sessionStorage.getItem("testwebbackend.baseUrl");
       var query = new URLSearchParams(window.location.search);
       if (savedBackend) {
         backendInput.value = savedBackend;

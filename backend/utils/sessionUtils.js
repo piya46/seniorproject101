@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { initSessionRecord } = require('./dbUtils');
+const { initSessionRecord, revokeSessionRecord } = require('./dbUtils');
 
 function generateSecureSessionId() {
   return 'sess_' + crypto.randomBytes(16).toString('hex');
@@ -72,9 +72,20 @@ function buildSessionPayload(sessionId, identity = {}) {
 
 async function ensureAppSession(req, res, identity = {}) {
   const existingToken = req.cookies?.sci_session_token;
-  const sessionId = resolveSessionIdFromCookie(existingToken);
+  const shouldRegenerateSession = identity && Object.keys(identity).length > 0;
+  const previousSessionId = shouldRegenerateSession ? resolveSessionIdFromCookie(existingToken) : null;
+  const sessionId = shouldRegenerateSession ? generateSecureSessionId() : resolveSessionIdFromCookie(existingToken);
   const existingIdentity = extractIdentityFromCookie(existingToken);
   const mergedIdentity = { ...existingIdentity, ...identity };
+
+  if (shouldRegenerateSession && previousSessionId && previousSessionId !== sessionId) {
+    try {
+      await revokeSessionRecord(previousSessionId);
+    } catch (error) {
+      console.warn('Session regeneration cleanup skipped:', error.message);
+    }
+  }
+
   await initSessionRecord(sessionId);
 
   const expiresIn = 86400;

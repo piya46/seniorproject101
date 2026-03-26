@@ -27,6 +27,7 @@ Last updated: `2026-03-26`
 - ใช้ Google OIDC เป็น identity provider
 - backend verify Google `id_token`, `state`, `nonce`, `email_verified`, และ allowed domains
 - backend ออก session cookie แบบ `HttpOnly` และ `Secure` ใน production
+- backend regenerate `session_id` ใหม่หลัง OIDC login callback
 - `POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist
 - endpoint ธุรกิจหลักยังต้องผ่าน session-based auth
 - secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด
@@ -169,6 +170,7 @@ response ตัวอย่าง:
 - รองรับ `jpg`, `png`, `webp`, `pdf`
 - backend ตรวจ `Origin/Referer`
 - backend รับ `multipart/form-data` เฉพาะ endpoint ที่ออกแบบไว้จริง เช่น `/upload` และ `/support/technical-email`
+- multipart browser requests ต้องมาจาก frontend origin ที่อยู่ใน allowlist
 - ปลายทางอีเมลกำหนดจาก `TECH_SUPPORT_TARGET_EMAIL`
 
 ## Error Model
