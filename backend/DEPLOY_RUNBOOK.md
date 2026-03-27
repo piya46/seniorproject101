@@ -89,6 +89,14 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 ```bash
 export FRONTEND_URL="https://pstpyst.com"
 export FRONTEND_EXTRA_URLS=""
+export TECH_SUPPORT_TARGET_EMAIL="piyaton56@gmail.com"
+export SMTP_HOST_VALUE="pstpyst.com"
+export SMTP_PORT="465"
+export SMTP_SECURE="true"
+export SMTP_USER_VALUE="no-reply@pstpyst.com"
+export SMTP_FROM_EMAIL_VALUE="no-reply@pstpyst.com"
+export SMTP_FROM_NAME_VALUE="Sci Request Support"
+export SMTP_PASS_VALUE="your-smtp-password"
 export OIDC_ENABLED="true"
 export OIDC_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th"
 export OIDC_REQUIRE_HOSTED_DOMAIN="true"
@@ -103,12 +111,84 @@ export GOOGLE_OIDC_CALLBACK_URL="https://sci-request-system-466086429766.asia-so
 หมายเหตุ:
 
 - `FRONTEND_URL` ควรเป็น production origin หลักเพียงค่าเดียว
-- `FRONTEND_EXTRA_URLS` เป็น optional override สำหรับ dev/QA origins เท่านั้น
+- `FRONTEND_EXTRA_URLS` เป็น temporary dev/QA override เท่านั้น
+- ถ้าต้องการ deploy แบบ non-interactive หรือรันใน CI ควร export ชุด `SMTP_*` และ `TECH_SUPPORT_TARGET_EMAIL` ให้ครบ ไม่เช่นนั้น `deploy.sh` จะ prompt ถามค่าระหว่างรัน
+- ถ้า Secret Manager มี `SMTP_PASS` อยู่แล้วและไม่ต้องการเปลี่ยนค่า สามารถไม่ export `SMTP_PASS_VALUE` ได้ โดยสคริปต์จะ reuse ค่าเดิมให้
 - `AI_LOCATION=us-central1` เป็นค่าที่แนะนำในระบบปัจจุบันเพื่อให้สอดคล้องกับ AI routes ที่ใช้งานจริง
 - `AI_DAILY_TOKEN_LIMIT` ใช้กำหนดเพดาน token ต่อ user ต่อวัน
 - `AI_USAGE_RETENTION_DAYS` ใช้กำหนดว่าจะเก็บเอกสาร usage รายวันใน Firestore ไว้กี่วันก่อน TTL ลบออก
 - ไม่ควรปล่อย `localhost` หรือ origin ชั่วคราวค้างใน production โดยไม่จำเป็น
 - ควรใส่ `Authorised redirect URI` ใน Google OAuth client ให้ตรงกับ callback URL ข้างต้นแบบ exact match
+
+## Optional Deploy Flags
+
+ค่าพวกนี้ไม่จำเป็นสำหรับ production ปกติ แต่ `deploy.sh` รองรับและอาจมีประโยชน์ในบางรอบ deploy:
+
+```bash
+export CLOUD_RUN_INGRESS="all"
+export POST_DEPLOY_HEALTHCHECK_ENABLED="false"
+export POST_DEPLOY_HEALTHCHECK_PATH="/healthz"
+```
+
+หมายเหตุ:
+
+- `CLOUD_RUN_INGRESS` รองรับ `all`, `internal`, และ `internal-and-cloud-load-balancing`
+- `POST_DEPLOY_HEALTHCHECK_ENABLED=true` จะให้สคริปต์ยิง smoke check หลัง deploy ทั้งที่ `POST_DEPLOY_HEALTHCHECK_PATH` และ `GET /api/v1/system/status/storage-signing`
+- production path ปัจจุบันใช้ `run.app` โดยตรงและค่า default ของสคริปต์คือ `CLOUD_RUN_INGRESS=all`
+
+## Copy/Paste Deploy Snippets
+
+production แบบคัดลอกไปวางรันได้ทันที:
+
+```bash
+cd /Users/pst./senior/backend && \
+FRONTEND_URL="https://pstpyst.com" \
+FRONTEND_EXTRA_URLS="" \
+TECH_SUPPORT_TARGET_EMAIL="piyaton56@gmail.com" \
+SMTP_HOST_VALUE="pstpyst.com" \
+SMTP_PORT="465" \
+SMTP_SECURE="true" \
+SMTP_USER_VALUE="no-reply@pstpyst.com" \
+SMTP_FROM_EMAIL_VALUE="no-reply@pstpyst.com" \
+SMTP_FROM_NAME_VALUE="Sci Request Support" \
+SMTP_PASS_VALUE="your-smtp-password" \
+OIDC_ENABLED="true" \
+OIDC_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th" \
+OIDC_REQUIRE_HOSTED_DOMAIN="true" \
+AI_LOCATION="us-central1" \
+AI_DAILY_TOKEN_LIMIT="50000" \
+AI_USAGE_RETENTION_DAYS="30" \
+GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id" \
+GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret" \
+GOOGLE_OIDC_CALLBACK_URL="https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback" \
+./deploy.sh
+```
+
+QA ชั่วคราวสำหรับ localhost:
+
+```bash
+cd /Users/pst./senior/backend && \
+FRONTEND_URL="https://pstpyst.com" \
+FRONTEND_EXTRA_URLS="http://localhost:5173|http://127.0.0.1:5500" \
+TECH_SUPPORT_TARGET_EMAIL="piyaton56@gmail.com" \
+SMTP_HOST_VALUE="pstpyst.com" \
+SMTP_PORT="465" \
+SMTP_SECURE="true" \
+SMTP_USER_VALUE="no-reply@pstpyst.com" \
+SMTP_FROM_EMAIL_VALUE="no-reply@pstpyst.com" \
+SMTP_FROM_NAME_VALUE="Sci Request Support" \
+SMTP_PASS_VALUE="your-smtp-password" \
+OIDC_ENABLED="true" \
+OIDC_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th" \
+OIDC_REQUIRE_HOSTED_DOMAIN="true" \
+AI_LOCATION="us-central1" \
+AI_DAILY_TOKEN_LIMIT="50000" \
+AI_USAGE_RETENTION_DAYS="30" \
+GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id" \
+GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret" \
+GOOGLE_OIDC_CALLBACK_URL="https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback" \
+./deploy.sh
+```
 
 ## Deploy
 
@@ -132,6 +212,8 @@ cd /Users/pst./senior/backend
 - `deploy.sh` ตอนนี้ไม่รอให้ runtime ไปสร้าง Firestore เอง แต่จะเช็ก/สร้าง `FIRESTORE_DATABASE_ID` ให้ก่อน deploy
 - `Cloud Run service` และ `Cloud Storage bucket` ถ้ายังไม่มี สคริปต์จะสร้างให้
 - Firestore TTL เป็น eventual rollout ของ Google Cloud หลังเปิด policy แล้ว เอกสาร/สถานะอาจใช้เวลาสักพักกว่าจะสะท้อนครบ
+- ระหว่าง step TTL อาจเห็น log ลักษณะ `Waiting for operation ... to complete...` ต่อเนื่องเป็นช่วงสั้น ๆ ซึ่งเป็นพฤติกรรมปกติของ `gcloud firestore fields ttls update` ไม่ได้แปลว่าสคริปต์ค้าง
+- ถ้า deploy ต้องการ input ระหว่างรัน แปลว่ายังมีค่า config บางตัวไม่ได้ export และไม่ได้มีค่าเดิมใน Secret Manager โดยเฉพาะชุด SMTP/OIDC
 
 ตัวอย่างเพิ่ม dev local ชั่วคราว:
 

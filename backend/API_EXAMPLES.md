@@ -1,6 +1,6 @@
 # API Examples
 
-Version: `v1.9.3`
+Version: `v1.9.4`
 Last updated: `2026-03-27`
 
 ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only
@@ -57,6 +57,17 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/st
 
 - endpoint นี้ต้องมี authenticated session ก่อน
 - ใช้สำหรับ internal QA/ops เมื่อต้องดู runtime/config ลึกขึ้น
+
+Public storage-signing smoke probe:
+
+```text
+https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/status/storage-signing
+```
+
+หมายเหตุ:
+
+- endpoint นี้เป็น public smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้
+- มีประโยชน์หลัง deploy หรือเวลาสงสัยปัญหา merge/download flow
 
 Canonical Google OAuth callback:
 

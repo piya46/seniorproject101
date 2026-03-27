@@ -64,6 +64,7 @@ FRONTEND_EXTRA_URLS="http://localhost:5173|http://127.0.0.1:5500"
 - production ปกติควรเก็บ `FRONTEND_URL=https://pstpyst.com` และไม่ควรปล่อย localhost ค้างเป็น default behavior
 - dashboard นี้เป็น QA scaffold ไม่ใช่ frontend หลักของระบบ
 - ถ้าใช้เฉพาะ local testing ไม่จำเป็นต้องมี Docker หรือ Cloud Run สำหรับโฟลเดอร์นี้
+- ถ้าต้องการชุดคำสั่ง deploy ล่าสุดและ env ที่ควร export ก่อนรัน ให้ดู [backend/DEPLOY_RUNBOOK.md](/Users/pst./senior/backend/DEPLOY_RUNBOOK.md)
 
 ## Google Branding Verification
 

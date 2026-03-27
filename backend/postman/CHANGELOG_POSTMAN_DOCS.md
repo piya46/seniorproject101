@@ -1,7 +1,26 @@
 # Changelog Postman Docs
 
-Current version: `v1.9.3`
+Current version: `v1.9.4`
 Last updated: `2026-03-27`
+
+## v1.9.4
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เพิ่ม `GET /api/v1/system/status/storage-signing` ใน API docs/examples/collection ให้ตรงกับ endpoint จริง
+- sync ถ้อยคำเรื่อง `FRONTEND_EXTRA_URLS` ให้ใช้เป็น temporary dev/QA override เท่านั้น
+- เพิ่มคำสั่ง deploy แบบ copy/paste ใน deploy runbook ให้ตรงกับ `deploy.sh`
+- อัปเดต Postman guide และ collection summary ให้สะท้อน status endpoints ชุดปัจจุบัน
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็นการ sync เอกสารและ metadata ของ collection ให้ตรงกับระบบปัจจุบัน
+
+ผลกระทบฝั่งทีม:
+
+- QA/ops สามารถใช้ `GET /api/v1/system/status/storage-signing` เป็น smoke probe เพิ่มได้หลัง deploy
+- ถ้าจะอ้างอิง deploy command ให้ยึด runbook เวอร์ชันนี้เป็นหลัก
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.4`
 
 ## v1.9.3
 

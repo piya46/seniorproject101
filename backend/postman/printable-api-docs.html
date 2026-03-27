@@ -128,7 +128,7 @@
       <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
     </section>
     <h1>API Documentation</h1>
-<p>Version: `v1.9.3` Last updated: `2026-03-27`</p>
+<p>Version: `v1.9.4` Last updated: `2026-03-27`</p>
 <p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
 <p>เอกสารที่เกี่ยวข้อง:</p>
 <ul>
@@ -146,6 +146,7 @@
 <li>Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`</li>
 <li>Secure JSON endpoints ใช้ application-level encryption transport</li>
 <li>`GET /api/v1/system/status` ใช้เป็น public liveness endpoint หลัก</li>
+<li>`GET /api/v1/system/status/storage-signing` ใช้เป็น public smoke probe สำหรับ signed URL capability</li>
 <li>`GET /api/v1/system/status/details` ใช้เป็น authenticated detailed status endpoint สำหรับ internal QA/ops</li>
 </ul>
 <h2>Security Posture Summary</h2>
@@ -167,7 +168,7 @@
 <li>ไม่ส่ง token หรือ email ผ่าน query string</li>
 <li>`return_to` ต้องอยู่ใน frontend allowlist ของระบบ</li>
 </ul>
-<p>  production หลักควรใช้ `FRONTEND_URL`   และใช้ `FRONTEND_EXTRA_URLS` เฉพาะกรณี dev/QA ชั่วคราว</p>
+<p>  production ควรใช้ `FRONTEND_URL` เป็นหลัก   และใช้ `FRONTEND_EXTRA_URLS` เป็น temporary dev/QA override เท่านั้น</p>
 <ul>
 <li>Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:</li>
 </ul>
@@ -191,6 +192,13 @@
 <td>ไม่ต้อง</td>
 <td>ไม่ต้อง</td>
 <td>service liveness + high-level check status</td>
+</tr>
+<tr>
+<td>`/api/v1/system/status/storage-signing`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้</td>
 </tr>
 <tr>
 <td>`/api/v1/system/status/details`</td>
@@ -316,7 +324,7 @@
 <ul>
 <li>`return_to` ต้อง match origin ที่อยู่ใน frontend allowlist</li>
 </ul>
-<p>  โดย `FRONTEND_URL` ควรเป็น production origin หลัก   และ `FRONTEND_EXTRA_URLS` ควรใช้เป็น optional override เท่านั้น</p>
+<p>  โดย `FRONTEND_URL` ควรเป็น production origin หลัก   และ `FRONTEND_EXTRA_URLS` ควรใช้เป็น temporary dev/QA override เท่านั้น</p>
 <ul>
 <li>backend จะสร้าง signed state และ nonce ก่อน redirect ไป Google</li>
 </ul>

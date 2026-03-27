@@ -1,6 +1,6 @@
 # API Documentation
 
-Version: `v1.9.3`
+Version: `v1.9.4`
 Last updated: `2026-03-27`
 
 เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client
@@ -21,6 +21,7 @@ Last updated: `2026-03-27`
 - Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`
 - Secure JSON endpoints ใช้ application-level encryption transport
 - `GET /api/v1/system/status` ใช้เป็น public liveness endpoint หลัก
+- `GET /api/v1/system/status/storage-signing` ใช้เป็น public smoke probe สำหรับ signed URL capability
 - `GET /api/v1/system/status/details` ใช้เป็น authenticated detailed status endpoint สำหรับ internal QA/ops
 
 ## Security Posture Summary
@@ -50,8 +51,8 @@ flow ที่แนะนำ:
 
 - ไม่ส่ง token หรือ email ผ่าน query string
 - `return_to` ต้องอยู่ใน frontend allowlist ของระบบ
-  production หลักควรใช้ `FRONTEND_URL`
-  และใช้ `FRONTEND_EXTRA_URLS` เฉพาะกรณี dev/QA ชั่วคราว
+  production ควรใช้ `FRONTEND_URL` เป็นหลัก
+  และใช้ `FRONTEND_EXTRA_URLS` เป็น temporary dev/QA override เท่านั้น
 - Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:
   `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
 - `POST /session/init` ตอนนี้ต้องมี OIDC-backed session ก่อนแล้ว
@@ -62,6 +63,7 @@ flow ที่แนะนำ:
 | Endpoint | Method | ต้อง Auth | ต้อง Encryption | คำอธิบาย |
 | --- | --- | --- | --- | --- |
 | `/api/v1/system/status` | `GET` | ไม่ต้อง | ไม่ต้อง | service liveness + high-level check status |
+| `/api/v1/system/status/storage-signing` | `GET` | ไม่ต้อง | ไม่ต้อง | smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้ |
 | `/api/v1/system/status/details` | `GET` | ต้อง | ไม่ต้อง | detailed runtime/config status สำหรับ internal QA/ops |
 | `/auth/public-key` | `GET` | ไม่ต้อง | ไม่ต้อง | public key สำหรับ secure JSON |
 | `/auth/csrf-token` | `GET` | ต้อง | ไม่ต้อง | ดึง/refresh anti-CSRF token สำหรับ browser client |
@@ -93,7 +95,7 @@ query:
 
 - `return_to` ต้อง match origin ที่อยู่ใน frontend allowlist
   โดย `FRONTEND_URL` ควรเป็น production origin หลัก
-  และ `FRONTEND_EXTRA_URLS` ควรใช้เป็น optional override เท่านั้น
+  และ `FRONTEND_EXTRA_URLS` ควรใช้เป็น temporary dev/QA override เท่านั้น
 - backend จะสร้าง signed state และ nonce ก่อน redirect ไป Google
 
 ### `GET /oidc/google/callback`

@@ -1,6 +1,6 @@
 # Security Overview
 
-Last updated: `2026-03-26`
+Last updated: `2026-03-27`
 
 เอกสารนี้สรุป security posture ของระบบหลัง migration ไปเป็น Google OIDC แบบ in-app และไม่ใช้ IAP/LB เป็น auth gate แล้ว
 
@@ -130,6 +130,12 @@ service account แยกของระบบและสิทธิ์ Secret
   ต้องมี authenticated session ก่อน และใช้สำหรับ internal QA/ops เมื่อต้องดู runtime/config เชิงลึก
 
 แนวทางนี้ช่วยให้ public endpoint ไม่เปิดเผยข้อมูลภายในเกินจำเป็น แต่ยังคงมี detailed status สำหรับ troubleshooting ได้
+
+หมายเหตุเชิง deployment/ops:
+
+- `deploy.sh` รองรับ `POST_DEPLOY_HEALTHCHECK_ENABLED=true` เพื่อยิง smoke check หลัง deploy
+- smoke check นี้จะเรียกทั้ง health endpoint หลักและ `GET /api/v1/system/status/storage-signing`
+- ถ้า signed URL smoke check fail ควรสงสัย IAM ของ app service account หรือความสามารถ `signBlob` ก่อน flow merge/download อื่น
 
 ## สิ่งที่ลดลงจากสถาปัตยกรรมเดิม
 

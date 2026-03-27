@@ -1,6 +1,6 @@
 # Postman Guide
 
-Version: `v1.9.3`
+Version: `v1.9.4`
 Last updated: `2026-03-27`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
@@ -38,6 +38,7 @@ Last updated: `2026-03-27`
 - state-changing requests ที่ใช้ session cookie ต้องมี `x-csrf-token`
 - business body ยังต้องถูกเข้ารหัสสำหรับ secure JSON endpoints
 - `GET` endpoints และ multipart upload ไม่ใช้ secure JSON wrapper
+- public status endpoints ตอนนี้แยกเป็น `GET /system/status`, `GET /system/status/storage-signing`, และ `GET /system/status/details`
 
 ## AI Usage Notes
 
