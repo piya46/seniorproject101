@@ -5,16 +5,23 @@ node_modules/
 npm-debug.log
 .env
 .env.*
+.DS_Store
 Dockerfile
 README.md
+*.md
+coverage/
+temp_files/
+tests/
 
 # ⚠️ สำคัญ: ห้ามอัปโหลด Key ที่สร้างไว้บนเครื่อง
 keys/
 *.key
 *.pem
 
-# ไม่จำเป็นต้องเอา Scripts ขึ้นไป (เพราะใช้แค่ตอน Dev)
+# ไม่จำเป็นต้องเอา assets/dev tooling ขึ้นไปกับ main app source deploy
 scripts/
 postman/
+functions/
+services/
 
 deploy.sh
