@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sci-Request API Docs Printable</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18202b;
+      --muted: #5d6b7a;
+      --line: #d6dce3;
+      --panel: #f5f7fa;
+      --accent: #113f67;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background: white;
+      line-height: 1.6;
+    }
+
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 32px 72px;
+    }
+
+    .hero {
+      border-bottom: 2px solid var(--accent);
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      color: var(--accent);
+      line-height: 1.25;
+      margin-top: 1.6em;
+      margin-bottom: 0.6em;
+      page-break-after: avoid;
+    }
+
+    p, ul, table, pre {
+      margin: 0 0 1rem;
+    }
+
+    ul {
+      padding-left: 1.3rem;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.92em;
+      background: #f1f4f8;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+
+    pre {
+      overflow-x: auto;
+      background: var(--panel);
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: var(--panel);
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .page {
+        max-width: none;
+        padding: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      pre, table {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Sci-Request API Docs</h1>
+      <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
+    </section>
+    <h1>API Documentation</h1>
+<p>Version: `v1.9.4` Last updated: `2026-03-27`</p>
+<p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
+<p>เอกสารที่เกี่ยวข้อง:</p>
+<ul>
+<li>[API_EXAMPLES.md](/Users/pst./senior/backend/API_EXAMPLES.md)</li>
+<li>[SECURITY_OVERVIEW.md](/Users/pst./senior/backend/SECURITY_OVERVIEW.md)</li>
+<li>[DEPLOY_RUNBOOK.md](/Users/pst./senior/backend/DEPLOY_RUNBOOK.md)</li>
+<li>[backend/postman/README.md](/Users/pst./senior/backend/postman/README.md)</li>
+<li>[backend/postman/FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)</li>
+</ul>
+<h2>Overview</h2>
+<ul>
+<li>Base URL: `/api/v1`</li>
+<li>Authentication: Google OIDC login + app session cookie (`sci_session_token`)</li>
+<li>Allowed account domains: กำหนดผ่าน `OIDC_ALLOWED_DOMAINS`</li>
+<li>Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`</li>
+<li>Secure JSON endpoints ใช้ application-level encryption transport</li>
+<li>`GET /api/v1/system/status` ใช้เป็น public liveness endpoint หลัก</li>
+<li>`GET /api/v1/system/status/storage-signing` ใช้เป็น public smoke probe สำหรับ signed URL capability</li>
+<li>`GET /api/v1/system/status/details` ใช้เป็น authenticated detailed status endpoint สำหรับ internal QA/ops</li>
+</ul>
+<h2>Security Posture Summary</h2>
+<ul>
+<li>ใช้ Google OIDC เป็น identity provider</li>
+<li>backend verify Google `id_token`, `state`, `nonce`, `email_verified`, และ allowed domains</li>
+<li>backend ออก session cookie แบบ `HttpOnly` และ `Secure` ใน production</li>
+<li>backend ออก anti-CSRF token ผ่าน `sci_csrf_token` + `x-csrf-token` สำหรับ state-changing requests ที่ใช้ session cookie</li>
+<li>backend regenerate `session_id` ใหม่หลัง OIDC login callback</li>
+<li>`POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist</li>
+<li>endpoint ธุรกิจหลักยังต้องผ่าน session-based auth</li>
+<li>secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด</li>
+</ul>
+<h2>Authentication Flow</h2>
+<p>flow ที่แนะนำ:</p>
+<p>1. frontend หรือ browser เปิด `GET /oidc/google/login?return_to=&lt;frontend-url&gt;` 2. Google login เสร็จแล้ว redirect กลับ `GET /oidc/google/callback` 3. backend verify Google identity และสร้าง `sci_session_token` 4. backend redirect กลับ frontend พร้อม `auth=ok` และ `oidc=done` 5. frontend เรียก `GET /oidc/me` ด้วย `credentials: &#39;include&#39;` 6. frontend เรียก `GET /auth/csrf-token` 7. จากนั้นค่อยเรียก `POST /session/init` และ endpoint อื่น</p>
+<p>ข้อสำคัญ:</p>
+<ul>
+<li>ไม่ส่ง token หรือ email ผ่าน query string</li>
+<li>`return_to` ต้องอยู่ใน frontend allowlist ของระบบ</li>
+</ul>
+<p>  production ควรใช้ `FRONTEND_URL` เป็นหลัก   และใช้ `FRONTEND_EXTRA_URLS` เป็น temporary dev/QA override เท่านั้น</p>
+<ul>
+<li>Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:</li>
+</ul>
+<p>  `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`</p>
+<ul>
+<li>`POST /session/init` ตอนนี้ต้องมี OIDC-backed session ก่อนแล้ว</li>
+<li>state-changing requests ที่ใช้ session cookie ต้องแนบ `x-csrf-token` ให้ตรงกับ token ปัจจุบัน</li>
+</ul>
+<h2>Endpoint Matrix</h2>
+<table>
+<thead><tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>ต้อง Auth</th>
+<th>ต้อง Encryption</th>
+<th>คำอธิบาย</th>
+</tr></thead><tbody>
+<tr>
+<td>`/api/v1/system/status`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>service liveness + high-level check status</td>
+</tr>
+<tr>
+<td>`/api/v1/system/status/storage-signing`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้</td>
+</tr>
+<tr>
+<td>`/api/v1/system/status/details`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>detailed runtime/config status สำหรับ internal QA/ops</td>
+</tr>
+<tr>
+<td>`/auth/public-key`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>public key สำหรับ secure JSON</td>
+</tr>
+<tr>
+<td>`/auth/csrf-token`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>ดึง/refresh anti-CSRF token สำหรับ browser client</td>
+</tr>
+<tr>
+<td>`/oidc/google/login`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>เริ่ม Google OIDC login</td>
+</tr>
+<tr>
+<td>`/oidc/google/callback`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>backend callback หลัง Google login</td>
+</tr>
+<tr>
+<td>`/oidc/me`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>อ่านสถานะ session และ identity ปัจจุบัน</td>
+</tr>
+<tr>
+<td>`/oidc/logout`</td>
+<td>`POST`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>ลบ app session cookie และ revoke session record</td>
+</tr>
+<tr>
+<td>`/session/init`</td>
+<td>`POST`</td>
+<td>ต้อง</td>
+<td>ต้อง</td>
+<td>bootstrap secure JSON flow/reuse session</td>
+</tr>
+<tr>
+<td>`/departments`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>โหลด metadata คณะ/ภาควิชา</td>
+</tr>
+<tr>
+<td>`/forms`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>โหลดรายการฟอร์ม</td>
+</tr>
+<tr>
+<td>`/forms/:form_code`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>โหลดรายละเอียดฟอร์ม</td>
+</tr>
+<tr>
+<td>`/upload`</td>
+<td>`POST multipart/form-data`</td>
+<td>ต้อง</td>
+<td>ไม่ใช้ secure JSON wrapper</td>
+<td>อัปโหลดไฟล์</td>
+</tr>
+<tr>
+<td>`/validation/check-completeness`</td>
+<td>`POST`</td>
+<td>ต้อง</td>
+<td>ต้อง</td>
+<td>ตรวจเอกสาร</td>
+</tr>
+<tr>
+<td>`/documents/merge`</td>
+<td>`POST`</td>
+<td>ต้อง</td>
+<td>ต้อง</td>
+<td>รวมเอกสาร</td>
+</tr>
+<tr>
+<td>`/chat/recommend`</td>
+<td>`POST`</td>
+<td>ต้อง</td>
+<td>ต้อง</td>
+<td>แนะนำฟอร์ม/ตอบคำถาม</td>
+</tr>
+<tr>
+<td>`/support/technical-email`</td>
+<td>`POST multipart/form-data`</td>
+<td>ต้อง</td>
+<td>ไม่ใช้ secure JSON wrapper</td>
+<td>ส่งอีเมลแจ้งปัญหา</td>
+</tr>
+</tbody></table>
+<h2>OIDC Endpoints</h2>
+<h3>`GET /oidc/google/login`</h3>
+<p>ใช้เริ่ม Google OIDC login</p>
+<p>query:</p>
+<ul>
+<li>`return_to` optional แต่แนะนำให้ส่ง</li>
+</ul>
+<p>เงื่อนไข:</p>
+<ul>
+<li>`return_to` ต้อง match origin ที่อยู่ใน frontend allowlist</li>
+</ul>
+<p>  โดย `FRONTEND_URL` ควรเป็น production origin หลัก   และ `FRONTEND_EXTRA_URLS` ควรใช้เป็น temporary dev/QA override เท่านั้น</p>
+<ul>
+<li>backend จะสร้าง signed state และ nonce ก่อน redirect ไป Google</li>
+</ul>
+<h3>`GET /oidc/google/callback`</h3>
+<p>route callback ที่ Google redirect กลับมา</p>
+<p>backend จะ:</p>
+<ul>
+<li>exchange authorization code</li>
+<li>verify `id_token`</li>
+<li>ตรวจ `email_verified`</li>
+<li>ตรวจ email domain และ hosted domain</li>
+<li>สร้าง `sci_session_token` ใหม่สำหรับ authenticated app session</li>
+<li>redirect กลับ `return_to` พร้อม `auth=ok` และ `oidc=done`</li>
+</ul>
+<h3>`GET /oidc/me`</h3>
+<p>response ตัวอย่าง:</p>
+<pre><code>
+{
+
+  &quot;authenticated&quot;: true,
+
+  &quot;email&quot;: &quot;student@chula.ac.th&quot;,
+
+  &quot;hosted_domain&quot;: &quot;student.chula.ac.th&quot;,
+
+  &quot;name&quot;: &quot;Student Name&quot;,
+
+  &quot;picture&quot;: &quot;https://...&quot;,
+
+  &quot;auth_provider&quot;: &quot;google_oidc&quot;
+
+}
+
+</code></pre>
+<h3>`POST /oidc/logout`</h3>
+<p>ลบ `sci_session_token` และ revoke session record ฝั่ง server</p>
+<p>เงื่อนไขเพิ่มเติม:</p>
+<ul>
+<li>request ต้องมาจาก browser origin ที่อยู่ใน frontend allowlist</li>
+<li>ต้องแนบ `x-csrf-token` ถ้าเรียกผ่าน session cookie จาก browser</li>
+<li>ใช้สำหรับทดสอบ negative-path ได้โดยเรียก `GET /oidc/me` ซ้ำหลัง logout</li>
+</ul>
+<p>response ตัวอย่าง:</p>
+<pre><code>
+{
+
+  &quot;status&quot;: &quot;success&quot;,
+
+  &quot;message&quot;: &quot;Logged out successfully.&quot;
+
+}
+
+</code></pre>
+<h2>CSRF Token</h2>
+<h3>`GET /auth/csrf-token`</h3>
+<p>ใช้สำหรับดึงหรือ refresh anti-CSRF token หลัง login สำเร็จแล้ว</p>
+<p>response ตัวอย่าง:</p>
+<pre><code>
+{
+
+  &quot;csrf_token&quot;: &quot;random-token-value&quot;
+
+}
+
+</code></pre>
+<p>หมายเหตุ:</p>
+<ul>
+<li>frontend ควรเรียก endpoint นี้หลัง `GET /oidc/me`</li>
+<li>token นี้ต้องถูกส่งกลับมาใน header `x-csrf-token`</li>
+<li>ใช้กับทุก `POST`, `PUT`, `PATCH`, `DELETE` ที่อาศัย `sci_session_token`</li>
+</ul>
+<h2>Session Init</h2>
+<h3>`POST /session/init`</h3>
+<p>ใช้เริ่ม secure JSON flow หรือ reuse session record ของระบบ</p>
+<p>ตอนนี้ endpoint นี้:</p>
+<ul>
+<li>ต้องมี OIDC-backed session ก่อน</li>
+<li>ต้องมี anti-CSRF token ก่อน</li>
+<li>ใช้ secure JSON transport</li>
+<li>จะคืน `session_id` ที่ผูกกับระบบภายใน</li>
+</ul>
+<p>response ตัวอย่าง:</p>
+<pre><code>
+{
+
+  &quot;message&quot;: &quot;Session initialized&quot;,
+
+  &quot;session_id&quot;: &quot;sess_abc123&quot;,
+
+  &quot;csrf_token&quot;: &quot;random-token-value&quot;
+
+}
+
+</code></pre>
+<h2>Support Endpoint</h2>
+<h3>`POST /support/technical-email`</h3>
+<p>ข้อจำกัด:</p>
+<ul>
+<li>ต้องมี session cookie</li>
+<li>ต้องแนบ `x-csrf-token`</li>
+<li>ใช้ `multipart/form-data`</li>
+<li>แนบไฟล์ได้สูงสุด 1 ไฟล์</li>
+<li>ขนาดไฟล์ไม่เกิน 2MB</li>
+<li>รองรับ `jpg`, `png`, `webp`, `pdf`</li>
+<li>backend ตรวจ `Origin/Referer`</li>
+<li>backend รับ `multipart/form-data` เฉพาะ endpoint ที่ออกแบบไว้จริง เช่น `/upload` และ `/support/technical-email`</li>
+<li>multipart browser requests ต้องมาจาก frontend origin ที่อยู่ใน allowlist</li>
+<li>ปลายทางอีเมลกำหนดจาก `TECH_SUPPORT_TARGET_EMAIL`</li>
+</ul>
+<h2>Error Model</h2>
+<p>รูปแบบกลาง:</p>
+<pre><code>
+{
+
+  &quot;error&quot;: &quot;ข้อความสรุป&quot;,
+
+  &quot;message&quot;: &quot;รายละเอียดเพิ่มเติม&quot;
+
+}
+
+</code></pre>
+<p>status code ที่ client ควรรองรับ:</p>
+<table>
+<thead><tr>
+<th>Status</th>
+<th>ความหมาย</th>
+</tr></thead><tbody>
+<tr>
+<td>`400`</td>
+<td>request ไม่ถูกต้อง</td>
+</tr>
+<tr>
+<td>`401`</td>
+<td>ไม่มี session หรือ auth flow ไม่สมบูรณ์</td>
+</tr>
+<tr>
+<td>`403`</td>
+<td>domain / hosted domain / policy ไม่ผ่าน</td>
+</tr>
+<tr>
+<td>`404`</td>
+<td>resource ไม่พบ</td>
+</tr>
+<tr>
+<td>`429`</td>
+<td>rate limit</td>
+</tr>
+<tr>
+<td>`500`</td>
+<td>backend internal failure</td>
+</tr>
+</tbody></table>
+<h2>AI Usage Retention</h2>
+<ul>
+<li>backend เก็บ AI usage รายวันไว้ใน Firestore collection `AI_USAGE_DAILY`</li>
+<li>ใช้ข้อมูลนี้ทั้งสำหรับ daily token limit และ usage analytics</li>
+<li>retention กำหนดผ่าน env `AI_USAGE_RETENTION_DAYS`</li>
+<li>TTL field ที่ใช้คือ `expire_at`</li>
+</ul>
+<h2>Notes</h2>
+<ul>
+<li>การเอา IAP ออกทำให้ชั้น outer access gate หายไป แต่ app-layer auth, domain enforcement, session policy, validation, encryption, และ rate limiting ยังอยู่</li>
+<li>production ตอนนี้ใช้ `run.app` โดยตรงเป็นหลัก จึงมี public origin ของ backend เพิ่มขึ้น แต่ไม่ได้เปลี่ยน app-layer auth contract</li>
+<li>ถ้าต้องการ OIDC หลาย provider ในอนาคต ควรแยก abstraction ออกจาก Google-specific logic ใน `utils/oidcUtils.js`</li>
+</ul>
+  </main>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "name": "sci-request-system",
+  "version": "1.2.0",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "deploy": "sh deploy.sh",
+    "test:support": "node --test tests/supportRoutes.test.js",
+    "docs:build": "node scripts/buildDocs.js",
+    "docs:api:sync": "node scripts/syncApiDocumentationFromPostman.js",
+    "docs:api:printable": "node scripts/buildPrintableApiDocs.js",
+    "docs:postman:version": "node scripts/getPostmanDocsVersion.js",
+    "docs:postman:bump": "node scripts/bumpPostmanDocsVersion.js",
+    "docs:postman:validate": "node scripts/validatePostmanDocs.js"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.0.0",
+    "@google-cloud/secret-manager": "^5.0.1",
+    "@google-cloud/storage": "^6.9.5",
+    "@google-cloud/vertexai": "^1.10.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.5.1",
+    "file-type": "^16.5.4",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "multer": "^2.0.2",
+    "nodemailer": "^6.10.1",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.34.5",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
+    "uuid": "^9.0.0",
+    "zod": "^4.3.6"
+  }
+}

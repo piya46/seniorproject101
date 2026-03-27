@@ -1,0 +1,184 @@
+const express = require('express');
+const router = express.Router();
+const { VertexAI } = require('@google-cloud/vertexai');
+const authMiddleware = require('../middlewares/authMiddleware');
+const { forms, getFormConfig } = require('../data/staticData');
+const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
+const { assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUtils');
+const { validate } = require('../middlewares/validationMiddleware');
+const { chatRecommendSchema } = require('../validators/schemas');
+
+const project = process.env.GCP_PROJECT_ID || 'seniorproject101';
+const location = process.env.AI_LOCATION || 'us-central1';
+
+const getFormsContext = () => {
+  return forms.map(f => {
+    let desc = `- รหัส ${f.form_code}: ${f.name_th} (${f.category})`;
+    const levels = f.degree_level || ['bachelor'];
+    const conditionsSet = new Set();
+    levels.forEach(level => {
+        const config = getFormConfig(f.form_code, level, null);
+        if (config && config.conditions) {
+            config.conditions.forEach(c => conditionsSet.add(c));
+        }
+    });
+    if (conditionsSet.size > 0) {
+        desc += `\n   ⚠️ เงื่อนไขสำคัญ: ${Array.from(conditionsSet).join(', ')}`;
+    }
+    if (f.sub_categories) {
+      desc += `\n   ตัวเลือกย่อย: ${f.sub_categories.map(s => s.label).join(', ')}`;
+    }
+    return desc;
+  }).join('\n');
+};
+
+const formsInfo = getFormsContext();
+
+const SYSTEM_INSTRUCTION = `
+คุณคือ "พี่ทะเบียนใจดี" (Registrar Assistant) ของคณะวิทยาศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย
+หน้าที่ของคุณคือแนะนำการยื่นคำร้องให้นิสิตอย่างเป็นกันเอง สุภาพ และช่วยเหลือเต็มที่
+
+ข้อมูลสำหรับอ้างอิง:
+${formsInfo}
+
+กฎการตอบคำถาม:
+1. ตอบเป็น "ภาษาไทย" เสมอ
+2. หากนิสิตถามปัญหา ให้วิเคราะห์ว่าตรงกับฟอร์มไหน แล้วแนะนำรหัสฟอร์ม (เช่น JT41, JT44) ให้ชัดเจน
+3. หากมีเงื่อนไขสำคัญ (เช่น ต้องยื่นภายในกี่วัน) ต้องแจ้งเตือนด้วยด้วยความหวังดี
+4. ตอบกลับในรูปแบบ JSON เท่านั้น ห้ามตอบเป็นข้อความธรรมดา
+   Format: { "reply": "ข้อความตอบกลับนิสิต...", "recommended_form": "รหัสฟอร์ม หรือ null" }
+`;
+
+const vertex_ai = new VertexAI({ project: project, location: location });
+
+const model = vertex_ai.getGenerativeModel({
+  model: 'gemini-2.5-flash', 
+  systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+  generationConfig: { 
+      responseMimeType: "application/json",
+      temperature: 0.4,
+  }
+});
+
+router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (req, res) => {
+  let usageRecorded = false;
+
+  try {
+    const { message, degree_level } = req.body;
+    
+    // ✅ FIX: เปลี่ยนจาก req.session เป็น req.user
+    const sessionId = req.user.session_id;
+
+    if (!message) {
+        return res.status(400).json({ error: "Message is required" });
+    }
+
+    await assertAiWithinDailyLimit(req.user);
+    
+    let history = [];
+    try {
+        history = await getChatHistory(sessionId);
+    } catch (err) {
+        req.log?.warn('chat_history_fetch_failed', { message: err.message });
+    }
+
+    const chat = model.startChat({
+        history: history,
+    });
+
+    const userMessage = `[ระดับการศึกษา: ${degree_level}] ${message}`;
+
+    // 3. ส่งข้อความไปหา AI
+    let result;
+    try {
+        result = await chat.sendMessage(userMessage);
+    } catch (apiError) {
+        req.log?.error('chat_vertex_api_error', { message: apiError.message });
+        throw new Error(`AI Service connection failed: ${apiError.message}`);
+    }
+
+    const response = await result.response;
+    
+    // Check Safety Filters
+    if (!response.candidates || !response.candidates[0] || !response.candidates[0].content) {
+        throw new Error("AI did not return content (Possible Safety Filter Trigger)");
+    }
+
+    const aiText = response.candidates[0].content.parts[0].text;
+    const cleanJson = aiText.replace(/```json|```/g, '').trim();
+    
+    let aiResponse;
+    try {
+        aiResponse = JSON.parse(cleanJson);
+    } catch (e) {
+        console.error("Failed to parse AI JSON:", cleanJson);
+        aiResponse = { reply: cleanJson, recommended_form: null };
+    }
+
+    // 4. บันทึกลง Firestore
+    try {
+        await saveChatMessage(sessionId, 'user', userMessage);
+        await saveChatMessage(sessionId, 'model', cleanJson);
+    } catch (dbError) {
+        req.log?.warn('chat_history_save_failed', { message: dbError.message });
+    }
+
+    try {
+        const usageSnapshot = await recordAiUsage({
+            user: req.user,
+            route: req.path,
+            model: 'gemini-2.5-flash',
+            usageMetadata: response.usageMetadata || {},
+            degreeLevel: degree_level,
+            success: true
+        });
+        usageRecorded = true;
+
+        req.log?.audit('ai_usage_recorded', {
+            ai_route: req.path,
+            model: 'gemini-2.5-flash',
+            total_tokens: usageSnapshot.total_tokens,
+            request_count: usageSnapshot.request_count
+        });
+    } catch (usageError) {
+        req.log?.warn('ai_usage_record_failed', { message: usageError.message });
+    }
+
+    // 5. ส่ง Response
+    res.json({
+        reply: aiResponse.reply || aiResponse.reply_message || "ระบบกำลังประมวลผลคำตอบครับ",
+        recommended_form: aiResponse.recommended_form
+    });
+
+  } catch (error) {
+    if (error.statusCode && error.payload) {
+        req.log?.warn('chat_ai_limit_blocked', error.payload.data || {});
+        return res.status(error.statusCode).json(error.payload);
+    }
+
+    if (!usageRecorded) {
+        try {
+            await recordAiUsage({
+                user: req.user,
+                route: req.path,
+                model: 'gemini-2.5-flash',
+                degreeLevel: req.body?.degree_level || null,
+                success: false,
+                failureReason: error.message
+            });
+            usageRecorded = true;
+        } catch (usageError) {
+            req.log?.warn('ai_usage_record_failed', { message: usageError.message });
+        }
+    }
+
+    req.log?.error('chat_processing_error', { message: error.message });
+    res.status(500).json({ 
+        error: 'Chat processing failed', 
+        details: error.message,
+        reply: "ขออภัย ระบบ AI ขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง" 
+    });
+  }
+});
+
+module.exports = router;

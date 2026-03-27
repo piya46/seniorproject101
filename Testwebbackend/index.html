@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Testwebbackend QA Dashboard</title>
+  <style>
+    :root {
+      --bg: #081018;
+      --panel: rgba(10, 20, 36, 0.92);
+      --panel-2: #0b1730;
+      --line: #234b73;
+      --line-soft: rgba(121, 216, 255, 0.12);
+      --text: #eef6ff;
+      --muted: #9bb3cf;
+      --muted-2: #7f96b3;
+      --mint: #7ef0c2;
+      --sky: #79d8ff;
+      --amber: #f6c768;
+      --red: #ff8f8f;
+      --shadow: 0 24px 50px rgba(0, 0, 0, 0.32);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(121, 216, 255, 0.16), transparent 24%),
+        radial-gradient(circle at top right, rgba(126, 240, 194, 0.14), transparent 24%),
+        radial-gradient(circle at 50% -10%, rgba(95, 147, 255, 0.12), transparent 34%),
+        linear-gradient(180deg, #040912, var(--bg));
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1320px, calc(100% - 28px));
+      margin: 22px auto 36px;
+    }
+
+    .hero,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+
+    .panel { padding: 18px; }
+
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 34px; margin-bottom: 10px; letter-spacing: -0.03em; }
+    h2 { font-size: 18px; margin-bottom: 12px; letter-spacing: -0.02em; }
+    h3 { font-size: 15px; margin-bottom: 10px; }
+    p { color: var(--muted); line-height: 1.6; }
+
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .badge {
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      background: rgba(8, 17, 31, 0.85);
+      color: var(--text);
+    }
+
+    .ok { color: var(--mint); }
+    .warn { color: var(--amber); }
+    .bad { color: var(--red); }
+
+    .hero-grid,
+    .main-grid,
+    .quickstart-grid,
+    .meta-grid,
+    .action-grid,
+    .field-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .hero-grid {
+      grid-template-columns: 1.3fr auto;
+      margin-top: 16px;
+      align-items: start;
+    }
+
+    .quickstart-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 18px;
+    }
+
+    .main-grid {
+      grid-template-columns: 1.15fr 0.85fr;
+      align-items: start;
+    }
+
+    .left-stack,
+    .right-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .meta-grid,
+    .field-grid {
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    }
+
+    .action-grid {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .meta-card {
+      background: #091426;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .step-card {
+      background: linear-gradient(180deg, rgba(10, 23, 48, 0.95), rgba(7, 17, 31, 0.98));
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .step-number {
+      width: 34px;
+      height: 34px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--sky), var(--mint));
+      color: #04111f;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .step-card p {
+      color: var(--muted-2);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .meta-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .meta-value {
+      font-size: 14px;
+      word-break: break-word;
+    }
+
+    .note {
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      font-size: 14px;
+    }
+
+    input,
+    select,
+    textarea {
+      background: #06111f;
+      color: var(--text);
+      padding: 12px 14px;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    button {
+      background: linear-gradient(135deg, var(--sky), var(--mint));
+      color: #06101b;
+      padding: 12px 14px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(0, 0, 0, 0.2);
+    }
+
+    button.secondary {
+      background: linear-gradient(180deg, var(--panel-2), #091426);
+      color: var(--text);
+    }
+
+    button.warn-btn { background: linear-gradient(135deg, #ffd58a, #f5b661); }
+
+    .status-box,
+    pre {
+      background: #06101d;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .status-box {
+      min-height: 72px;
+      color: var(--text);
+    }
+
+    pre {
+      min-height: 260px;
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #d7e7ff;
+      font-size: 13px;
+      line-height: 1.55;
+      overflow: auto;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .section-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .helper-note {
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line-soft);
+      background: rgba(10, 23, 48, 0.7);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 1080px) {
+      .main-grid,
+      .quickstart-grid,
+      .hero-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="topline">
+        <div>
+          <h1>Testwebbackend QA Dashboard</h1>
+          <p>Static HTML dashboard for local QA. Your browser calls the real backend contract directly for secure JSON, OIDC session checks, encrypted upload, validation, merge, chat, and support email flows.</p>
+          <div class="badge-row">
+            <div class="badge">Backend default: <strong id="badgeBackend">-</strong></div>
+            <div class="badge">Current host: <strong id="badgeHost">-</strong></div>
+            <div class="badge warn" id="badgeOidc">OIDC return: <strong id="badgeOidcText">waiting</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-grid">
+        <div>
+          <label for="backendUrl">Backend URL</label>
+          <input id="backendUrl" type="text" value="https://sci-request-system-466086429766.asia-southeast3.run.app" placeholder="https://sci-request-system-466086429766.asia-southeast3.run.app">
+          <p class="note">Serve this page with any simple static server on localhost. If the origin is `http://localhost:5173`, ensure that origin is included in backend `FRONTEND_EXTRA_URLS` before testing browser OIDC and auth-required requests.</p>
+        </div>
+        <div class="action-grid">
+          <button id="saveBackendBtn" type="button">Save Backend</button>
+          <button id="smokeTestBtn" class="secondary" type="button">Run Smoke Test</button>
+          <button id="oidcLoginBtn" class="secondary" type="button">Open Google Login</button>
+        </div>
+      </div>
+
+      <div class="quickstart-grid">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h3>Complete OIDC</h3>
+          <p>Start with `Open Google Login` so the backend creates the app session from the current browser window.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <h3>Verify Session</h3>
+          <p>Use `GET /oidc/me` or `POST /session/init` to confirm the current browser can access the backend with credentials, then use `POST /oidc/logout` to verify revoked-session behavior.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <h3>Run QA Flow</h3>
+          <p>After session verification, test forms, upload, validation, merge, chat, and support in the same browser window. Re-check `GET /oidc/me` after logout to confirm the session is gone.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="main-grid">
+      <div class="left-stack">
+        <section class="panel">
+          <h2>Session And Metadata</h2>
+          <div class="meta-grid">
+            <div class="meta-card">
+              <div class="meta-label">Current backend</div>
+              <div class="meta-value" id="metaBackend">-</div>
+            </div>
+            <div class="meta-card">
+              <div class="meta-label">Status endpoint</div>
+              <div class="meta-value" id="metaHealth">-</div>
+            </div>
+            <div class="meta-card">
+              <div class="meta-label">Public key endpoint</div>
+              <div class="meta-value" id="metaPublicKey">-</div>
+            </div>
+            <div class="meta-card">
+              <div class="meta-label">Session status</div>
+              <div class="meta-value" id="metaSession">Unknown</div>
+            </div>
+          </div>
+          <div class="action-grid" style="margin-top:12px;">
+            <button id="healthBtn" type="button">GET /system/status</button>
+            <button id="publicKeyBtn" class="secondary" type="button">GET /auth/public-key</button>
+            <button id="oidcMeBtn" class="secondary" type="button">GET /oidc/me</button>
+            <button id="initSessionBtn" class="secondary" type="button">POST /session/init</button>
+            <button id="oidcLogoutBtn" class="warn-btn" type="button">POST /oidc/logout</button>
+            <button id="departmentsBtn" class="secondary" type="button">GET /departments</button>
+            <button id="formsBtn" class="secondary" type="button">GET /forms</button>
+            <button id="formDetailBtn" class="secondary" type="button">GET /forms/:form_code</button>
+          </div>
+          <div class="helper-note">
+            `POST /session/init` should be used only after `Open Google Login` and a successful `GET /oidc/me`. Use `POST /oidc/logout` to verify that both the browser cookie and the server-side session record are revoked. This dashboard now uses direct browser requests only, with no server-side helper path.
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Form Context</h2>
+          <div class="field-grid">
+            <div>
+              <label for="degreeLevel">Degree Level</label>
+              <select id="degreeLevel">
+                <option value="bachelor">bachelor</option>
+                <option value="graduate">graduate</option>
+              </select>
+            </div>
+            <div>
+              <label for="formCode">Form Code</label>
+              <input id="formCode" type="text" value="JT44" placeholder="JT44">
+            </div>
+            <div>
+              <label for="subType">Sub Type</label>
+              <input id="subType" type="text" placeholder="optional">
+            </div>
+            <div>
+              <label for="caseKey">Case Key</label>
+              <input id="caseKey" type="text" placeholder="optional">
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Upload, Validation, Merge</h2>
+          <div class="field-grid">
+            <div>
+              <label for="uploadFileKey">File Key</label>
+              <input id="uploadFileKey" type="text" value="medical_cert" placeholder="medical_cert">
+            </div>
+            <div>
+              <label for="uploadFormCode">Upload Form Code</label>
+              <input id="uploadFormCode" type="text" value="JT44" placeholder="JT44">
+            </div>
+            <div>
+              <label for="uploadFile">File</label>
+              <input id="uploadFile" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
+            </div>
+          </div>
+          <div class="action-grid" style="margin-top:12px;">
+            <button id="uploadBtn" type="button">POST /upload</button>
+            <button id="validateBtn" class="secondary" type="button">POST /validation/check-completeness</button>
+            <button id="mergeBtn" class="secondary" type="button">POST /documents/merge</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Chat Recommend</h2>
+          <label for="chatMessage">Message</label>
+          <textarea id="chatMessage" placeholder="อยากยื่นคำร้องลาป่วยช่วงสอบ ต้องใช้ฟอร์มอะไร"></textarea>
+          <div class="action-grid" style="margin-top:12px;">
+            <button id="chatBtn" type="button">POST /chat/recommend</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Support Email Test</h2>
+          <div class="field-grid">
+            <div>
+              <label for="supportReporter">Reporter Email</label>
+              <input id="supportReporter" type="email" placeholder="student@chula.ac.th">
+            </div>
+            <div>
+              <label for="supportIssueType">Issue Type</label>
+              <input id="supportIssueType" type="text" value="qa test" placeholder="qa test">
+            </div>
+            <div>
+              <label for="supportSubject">Subject</label>
+              <input id="supportSubject" type="text" value="QA support test" placeholder="QA support test">
+            </div>
+            <div>
+              <label for="supportAttachment">Attachment</label>
+              <input id="supportAttachment" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
+            </div>
+          </div>
+          <label for="supportDescription" style="margin-top:12px;">Description</label>
+          <textarea id="supportDescription" placeholder="Describe the issue you want to send to the support endpoint."></textarea>
+          <div class="action-grid" style="margin-top:12px;">
+            <button id="supportBtn" class="warn-btn" type="button">POST /support/technical-email</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="right-stack">
+        <section class="panel">
+          <h2>Status</h2>
+          <div id="statusBox" class="status-box">Ready.</div>
+        </section>
+
+        <section class="panel">
+          <h2>Latest Response</h2>
+          <pre id="responseBox">Choose an action to start testing.</pre>
+        </section>
+
+        <section class="panel">
+          <h2>What This Tests</h2>
+          <div class="section-list">
+            <ul>
+              <li>`GET /api/v1/system/status` and `GET /api/v1/auth/public-key`</li>
+              <li>`GET /api/v1/oidc/me` and `POST /api/v1/oidc/logout` for auth lifecycle verification</li>
+              <li>`POST /api/v1/session/init` with secure JSON and encrypted response handling</li>
+              <li>cookie-backed auth requests such as `departments`, `forms`, and `form detail`</li>
+              <li>encrypted file upload to `POST /api/v1/upload`</li>
+              <li>AI validation, merge, chat recommendation, and support email flows</li>
+              <li>`GET /api/v1/oidc/google/login` directly through the backend</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Important Notes</h2>
+          <ul>
+            <li>Serve this file from localhost with a simple static server such as Vite or `python -m http.server`.</li>
+            <li>Your current local origin must be included in backend `FRONTEND_EXTRA_URLS` before OIDC and auth-required browser requests will work.</li>
+            <li>The backend session cookie is `HttpOnly`, so the dashboard infers session health from successful authenticated requests.</li>
+            <li>`POST /oidc/logout` is the quickest negative-path test: after it succeeds, `GET /oidc/me` should return unauthorized.</li>
+            <li>Support email tests send real email through the configured backend target.</li>
+            <li>Merge needs the required files for the selected form to be uploaded first.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var DEFAULT_BACKEND = "https://sci-request-system-466086429766.asia-southeast3.run.app";
+      var backendInput = document.getElementById("backendUrl");
+      var responseBox = document.getElementById("responseBox");
+      var statusBox = document.getElementById("statusBox");
+      var metaBackend = document.getElementById("metaBackend");
+      var metaHealth = document.getElementById("metaHealth");
+      var metaPublicKey = document.getElementById("metaPublicKey");
+      var metaSession = document.getElementById("metaSession");
+      var badgeBackend = document.getElementById("badgeBackend");
+      var badgeHost = document.getElementById("badgeHost");
+      var badgeOidc = document.getElementById("badgeOidc");
+      var badgeOidcText = document.getElementById("badgeOidcText");
+      var oidcDone = new URLSearchParams(window.location.search).get("oidc") === "done";
+
+      function getBackend() {
+        return backendInput.value.trim().replace(/\/+$/, "");
+      }
+
+      function setStatus(text, className) {
+        statusBox.textContent = text;
+        statusBox.className = "status-box " + (className || "");
+      }
+
+      function showResponse(label, data) {
+        responseBox.textContent = label + "\n\n" + JSON.stringify(data, null, 2);
+      }
+
+      function showError(label, error) {
+        var output = {
+          name: error && error.name ? error.name : "Error",
+          message: error && error.message ? error.message : String(error)
+        };
+
+        if (output.name === "TypeError" && output.message === "Load failed") {
+          output.hint = "Browser request was blocked before the backend returned a response. Complete Google OIDC login first, then verify GET /oidc/me succeeds before retrying.";
+        }
+
+        if (label === "GET /system/status" && output.name === "TypeError" && output.message === "Failed to fetch") {
+          output.hint = "The browser could not complete the request to /api/v1/system/status. This usually means a network/CORS/TLS issue, or the backend URL is unreachable from this page.";
+          output.nextStep = "Open the Network tab and check whether /api/v1/system/status returned an HTTP status (for example 404/500) or failed before any response was received.";
+        }
+
+        if (error && typeof error.status !== "undefined") {
+          output.status = error.status;
+        }
+        if (error && typeof error.data !== "undefined") {
+          output.data = error.data;
+
+          if (error.data && typeof error.data === "object") {
+            if (typeof error.data.message === "string" && error.data.message !== output.message) {
+              output.decodedMessage = error.data.message;
+            }
+
+            if (typeof error.data.error === "string") {
+              output.errorCode = error.data.error;
+            }
+
+            if (Array.isArray(error.data.details) && error.data.details.length > 0) {
+              output.details = error.data.details;
+            }
+          }
+        }
+
+        if (error && typeof error.contentType === "string" && error.contentType) {
+          output.contentType = error.contentType;
+        }
+
+        if (error && typeof error.rawText === "string" && error.rawText) {
+          output.rawText = error.rawText;
+        }
+
+        showResponse(label, output);
+      }
+
+      function updateMeta() {
+        var backend = getBackend();
+        var currentBase = window.location.origin + window.location.pathname;
+        metaBackend.textContent = backend || "-";
+        metaHealth.textContent = backend ? backend + "/api/v1/system/status" : "-";
+        metaPublicKey.textContent = backend ? backend + "/api/v1/auth/public-key" : "-";
+        badgeBackend.textContent = backend || "-";
+        badgeHost.textContent = currentBase;
+      }
+
+      function buildUrl(input, query) {
+        var url = new URL(input);
+        Object.keys(query || {}).forEach(function (key) {
+          var value = query[key];
+          if (value !== undefined && value !== null && value !== "") {
+            url.searchParams.set(key, String(value));
+          }
+        });
+        return url.toString();
+      }
+
+      function toBase64(bytes) {
+        var binary = "";
+        for (var i = 0; i < bytes.length; i += 1) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+      }
+
+      function fromBase64(base64) {
+        var binary = atob(base64);
+        var output = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i += 1) {
+          output[i] = binary.charCodeAt(i);
+        }
+        return output;
+      }
+
+      function toBase64Url(bytes) {
+        return toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      }
+
+      function concatUint8Arrays(left, right) {
+        var output = new Uint8Array(left.length + right.length);
+        output.set(left, 0);
+        output.set(right, left.length);
+        return output;
+      }
+
+      function splitCiphertextAndTag(encrypted) {
+        var tagLength = 16;
+        if (encrypted.length < tagLength) {
+          throw new Error("Encrypted payload is too short to contain a GCM tag");
+        }
+        return {
+          ciphertext: encrypted.slice(0, encrypted.length - tagLength),
+          tag: encrypted.slice(encrypted.length - tagLength)
+        };
+      }
+
+      function isEncryptedResponse(value) {
+        return !!value &&
+          typeof value === "object" &&
+          typeof value.iv === "string" &&
+          typeof value.tag === "string" &&
+          typeof value.payload === "string";
+      }
+
+      function createNonce() {
+        var bytes = crypto.getRandomValues(new Uint8Array(12));
+        return "req-" + Date.now() + "-" + toBase64Url(bytes);
+      }
+
+      async function safeParseJson(response) {
+        var text = await response.text();
+        if (!text) {
+          return null;
+        }
+        try {
+          return JSON.parse(text);
+        } catch (_error) {
+          return text;
+        }
+      }
+
+      async function parseResponseBody(response) {
+        var text = await response.text();
+        var contentType = response.headers.get("content-type") || "";
+
+        if (!text) {
+          return {
+            parsed: null,
+            rawText: "",
+            contentType: contentType
+          };
+        }
+
+        try {
+          return {
+            parsed: JSON.parse(text),
+            rawText: text,
+            contentType: contentType
+          };
+        } catch (_error) {
+          return {
+            parsed: text,
+            rawText: text,
+            contentType: contentType
+          };
+        }
+      }
+
+      async function importRsaPublicKey(pem) {
+        var normalizedPem = pem
+          .replace("-----BEGIN PUBLIC KEY-----", "")
+          .replace("-----END PUBLIC KEY-----", "")
+          .replace(/\s+/g, "");
+
+        return crypto.subtle.importKey(
+          "spki",
+          fromBase64(normalizedPem).buffer,
+          { name: "RSA-OAEP", hash: "SHA-256" },
+          true,
+          ["encrypt"]
+        );
+      }
+
+      async function encryptBinaryPayload(input, publicKey) {
+        var aesKey = await crypto.subtle.generateKey(
+          { name: "AES-GCM", length: 256 },
+          true,
+          ["encrypt", "decrypt"]
+        );
+        var iv = crypto.getRandomValues(new Uint8Array(12));
+        var encryptedBuffer = new Uint8Array(
+          await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, aesKey, input)
+        );
+        var parts = splitCiphertextAndTag(encryptedBuffer);
+        var rawAesKey = await crypto.subtle.exportKey("raw", aesKey);
+        var encryptedKeyBuffer = await crypto.subtle.encrypt(
+          { name: "RSA-OAEP" },
+          publicKey,
+          rawAesKey
+        );
+
+        return {
+          aesKey: aesKey,
+          ciphertext: parts.ciphertext,
+          transport: {
+            encKey: toBase64(new Uint8Array(encryptedKeyBuffer)),
+            iv: toBase64(iv),
+            tag: toBase64(parts.tag),
+            payload: toBase64(parts.ciphertext)
+          }
+        };
+      }
+
+      async function encryptJsonPayload(body, publicKey) {
+        var nonce = createNonce();
+        var plaintext = Object.assign({}, body, {
+          _ts: Date.now(),
+          nonce: nonce
+        });
+        var bytes = new TextEncoder().encode(JSON.stringify(plaintext));
+        var encrypted = await encryptBinaryPayload(bytes, publicKey);
+
+        return {
+          aesKey: encrypted.aesKey,
+          nonce: nonce,
+          transportBody: encrypted.transport
+        };
+      }
+
+      async function decryptJsonResponse(response, aesKey) {
+        var iv = fromBase64(response.iv);
+        var ciphertext = fromBase64(response.payload);
+        var tag = fromBase64(response.tag);
+        var encryptedBytes = concatUint8Arrays(ciphertext, tag);
+        var decryptedBuffer = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: iv },
+          aesKey,
+          encryptedBytes
+        );
+        var jsonText = new TextDecoder().decode(new Uint8Array(decryptedBuffer));
+        return JSON.parse(jsonText);
+      }
+
+      async function tryDecryptErrorPayload(data, aesKey) {
+        if (!aesKey || !isEncryptedResponse(data)) {
+          return data;
+        }
+
+        try {
+          return await decryptJsonResponse(data, aesKey);
+        } catch (_error) {
+          return data;
+        }
+      }
+
+      function ApiClientError(status, data, nonce) {
+        var message = "API request failed with status " + status;
+        if (data && typeof data === "object" && typeof data.message === "string") {
+          message = data.message;
+        }
+        this.name = "ApiClientError";
+        this.message = message;
+        this.status = status;
+        this.data = data;
+        this.nonce = nonce;
+        this.rawText = null;
+        this.contentType = null;
+      }
+      ApiClientError.prototype = Object.create(Error.prototype);
+      ApiClientError.prototype.constructor = ApiClientError;
+
+	      function QaClient() {
+	        this.publicKey = null;
+	        this.csrfToken = null;
+	      }
+
+      QaClient.prototype.baseUrl = function () {
+        return getBackend() + "/api/v1";
+      };
+
+      QaClient.prototype.fetchPublicKey = async function (forceRefresh) {
+        if (this.publicKey && !forceRefresh) {
+          return this.publicKey;
+        }
+
+        var response = await fetch(this.baseUrl() + "/auth/public-key", {
+          method: "GET",
+          credentials: "include"
+        });
+
+        var data = await safeParseJson(response);
+        if (!response.ok) {
+          throw new ApiClientError(response.status, data);
+        }
+        if (!data || !data.publicKey) {
+          throw new Error("Backend did not return publicKey");
+        }
+
+        this.publicKey = await importRsaPublicKey(data.publicKey);
+        return this.publicKey;
+      };
+
+      QaClient.prototype.ensurePublicKey = async function () {
+        if (this.publicKey) {
+          return this.publicKey;
+        }
+        return this.fetchPublicKey(false);
+      };
+
+	      QaClient.prototype.get = async function (endpoint, query) {
+	        var response = await fetch(buildUrl(this.baseUrl() + endpoint, query), {
+          method: "GET",
+          credentials: "include"
+        });
+        var data = await safeParseJson(response);
+        if (!response.ok) {
+          throw new ApiClientError(response.status, data);
+        }
+	        return data;
+	      };
+
+	      QaClient.prototype.fetchCsrfToken = async function (forceRefresh) {
+	        if (this.csrfToken && !forceRefresh) {
+	          return this.csrfToken;
+	        }
+
+	        var response = await fetch(this.baseUrl() + "/auth/csrf-token", {
+	          method: "GET",
+	          credentials: "include"
+	        });
+	        var data = await safeParseJson(response);
+	        if (!response.ok) {
+	          throw new ApiClientError(response.status, data);
+	        }
+	        if (!data || !data.csrf_token) {
+	          throw new Error("Backend did not return csrf_token");
+	        }
+
+	        this.csrfToken = data.csrf_token;
+	        return this.csrfToken;
+	      };
+
+	      QaClient.prototype.ensureCsrfToken = async function () {
+	        if (this.csrfToken) {
+	          return this.csrfToken;
+	        }
+	        return this.fetchCsrfToken(false);
+	      };
+
+	      QaClient.prototype.captureCsrfToken = function (data) {
+	        if (data && typeof data === "object" && typeof data.csrf_token === "string" && data.csrf_token) {
+	          this.csrfToken = data.csrf_token;
+	        }
+	      };
+
+	      QaClient.prototype.postEncrypted = async function (endpoint, body) {
+	        var publicKey = await this.ensurePublicKey();
+	        var csrfToken = await this.ensureCsrfToken();
+	        var requestContext = await encryptJsonPayload(body, publicKey);
+
+	        var response = await fetch(this.baseUrl() + endpoint, {
+	          method: "POST",
+	          credentials: "include",
+	          headers: {
+	            "Content-Type": "application/json",
+	            "x-csrf-token": csrfToken
+	          },
+	          body: JSON.stringify(requestContext.transportBody)
+	        });
+
+        var parsedBody = await safeParseJson(response);
+        if (!response.ok) {
+          throw new ApiClientError(
+            response.status,
+            await tryDecryptErrorPayload(parsedBody, requestContext.aesKey),
+            requestContext.nonce
+          );
+        }
+
+	        if (isEncryptedResponse(parsedBody)) {
+	          return decryptJsonResponse(parsedBody, requestContext.aesKey);
+	        }
+	        this.captureCsrfToken(parsedBody);
+	        return parsedBody;
+	      };
+
+	      QaClient.prototype.initSession = async function () {
+	        var result = await this.postEncrypted("/session/init", {});
+	        this.captureCsrfToken(result);
+	        return result;
+	      };
+
+	      QaClient.prototype.logout = async function () {
+	        var result = await this.postEncrypted("/oidc/logout", {});
+	        this.publicKey = null;
+	        this.csrfToken = null;
+	        return result;
+	      };
+
+	      QaClient.prototype.uploadEncryptedFile = async function (file, fileKey, formCode) {
+	        var publicKey = await this.ensurePublicKey();
+	        var csrfToken = await this.ensureCsrfToken();
+	        var fileBuffer = await file.arrayBuffer();
+	        var encryptedFile = await encryptBinaryPayload(new Uint8Array(fileBuffer), publicKey);
+        var formData = new FormData();
+        formData.append("file", new Blob([encryptedFile.ciphertext], { type: "application/octet-stream" }), file.name);
+        formData.append("file_key", fileKey);
+        if (formCode) {
+          formData.append("form_code", formCode);
+        }
+        formData.append("encKey", encryptedFile.transport.encKey);
+        formData.append("iv", encryptedFile.transport.iv);
+        formData.append("tag", encryptedFile.transport.tag);
+
+	        var response = await fetch(this.baseUrl() + "/upload", {
+	          method: "POST",
+	          headers: {
+	            "x-csrf-token": csrfToken
+	          },
+	          body: formData,
+	          credentials: "include"
+	        });
+
+        var data = await safeParseJson(response);
+        if (!response.ok) {
+          throw new ApiClientError(response.status, data);
+        }
+        return data;
+      };
+
+	      QaClient.prototype.sendSupportEmail = async function (payload) {
+	        var csrfToken = await this.ensureCsrfToken();
+	        var formData = new FormData();
+        formData.append("reporter_email", payload.reporter_email);
+        formData.append("issue_type", payload.issue_type);
+        formData.append("subject", payload.subject);
+        formData.append("description", payload.description);
+        if (payload.attachment) {
+          formData.append("attachment", payload.attachment, payload.attachment.name);
+        }
+
+	        var response = await fetch(this.baseUrl() + "/support/technical-email", {
+	          method: "POST",
+	          headers: {
+	            "x-csrf-token": csrfToken
+	          },
+	          body: formData,
+	          credentials: "include"
+	        });
+
+        var data = await safeParseJson(response);
+        if (!response.ok) {
+          throw new ApiClientError(response.status, data);
+        }
+        return data;
+      };
+
+      var client = new QaClient();
+
+      function getDegreeLevel() {
+        return document.getElementById("degreeLevel").value;
+      }
+      function getFormCode() {
+        return document.getElementById("formCode").value.trim();
+      }
+      function getSubType() {
+        return document.getElementById("subType").value.trim();
+      }
+      function getCaseKey() {
+        return document.getElementById("caseKey").value.trim();
+      }
+
+      async function refreshSessionState() {
+        try {
+          var me = await client.get("/oidc/me");
+          if (me && me.authenticated) {
+            metaSession.textContent = "Authenticated as " + (me.email || "unknown user");
+            return me;
+          }
+        } catch (_error) {
+          metaSession.textContent = "Not initialized";
+          return null;
+        }
+        metaSession.textContent = "Not initialized";
+        return null;
+      }
+
+      async function run(label, fn, successLabel) {
+        setStatus("Running " + label + "...", "warn");
+        try {
+          var result = await fn();
+          if (label.indexOf("session") !== -1 || label.indexOf("Smoke Test") !== -1 || label.indexOf("/oidc/me") !== -1) {
+            await refreshSessionState();
+          }
+          setStatus(successLabel || (label + " completed"), "ok");
+          showResponse(label, result);
+          return result;
+        } catch (error) {
+          setStatus(label + " failed", "bad");
+          showError(label, error);
+          throw error;
+        }
+      }
+
+      async function runSmokeTest() {
+        var smoke = {};
+	        smoke.health = await fetch(getBackend() + "/api/v1/system/status", {
+          method: "GET",
+          credentials: "include"
+        }).then(async function (response) {
+          var body = await parseResponseBody(response);
+          var result = {
+            status: response.status,
+            contentType: body.contentType,
+            body: body.parsed
+          };
+
+          if (!response.ok) {
+            var error = new ApiClientError(response.status, result);
+            error.rawText = body.rawText;
+            error.contentType = body.contentType;
+            throw error;
+          }
+
+          if (typeof body.parsed === "string") {
+            result.rawText = body.rawText;
+          }
+
+          return result;
+        });
+
+	        smoke.publicKey = await client.get("/auth/public-key");
+	        smoke.csrf = await client.fetchCsrfToken(true);
+	        smoke.session = await client.initSession();
+        smoke.departments = await client.get("/departments");
+        smoke.forms = await client.get("/forms", { degree_level: getDegreeLevel() });
+
+        var forms = smoke.forms && smoke.forms.data ? smoke.forms.data : [];
+        if (forms.length > 0) {
+          smoke.firstFormDetail = await client.get("/forms/" + encodeURIComponent(forms[0].form_code), {
+            degree_level: getDegreeLevel()
+          });
+        }
+        return smoke;
+      }
+
+	      document.getElementById("saveBackendBtn").addEventListener("click", function () {
+	        sessionStorage.setItem("testwebbackend.baseUrl", getBackend());
+	        client.publicKey = null;
+	        client.csrfToken = null;
+	        updateMeta();
+	        setStatus("Backend saved.", "ok");
+	      });
+
+      document.getElementById("smokeTestBtn").addEventListener("click", function () {
+        run("Smoke Test", runSmokeTest, "Smoke test completed");
+      });
+
+      document.getElementById("oidcLoginBtn").addEventListener("click", function () {
+        sessionStorage.setItem("testwebbackend.baseUrl", getBackend());
+        var returnUrl = new URL(window.location.origin + window.location.pathname);
+        returnUrl.searchParams.set("oidc", "done");
+        window.location.href = buildUrl(getBackend() + "/api/v1/oidc/google/login", {
+          return_to: returnUrl.toString()
+        });
+      });
+
+      document.getElementById("healthBtn").addEventListener("click", function () {
+        run("GET /system/status", async function () {
+          var response = await fetch(getBackend() + "/api/v1/system/status", {
+            method: "GET",
+            credentials: "include"
+          });
+          var body = await parseResponseBody(response);
+          var result = {
+            status: response.status,
+            contentType: body.contentType,
+            body: body.parsed
+          };
+
+          if (!response.ok) {
+            var error = new ApiClientError(response.status, result);
+            error.rawText = body.rawText;
+            error.contentType = body.contentType;
+            throw error;
+          }
+
+          if (typeof body.parsed === "string") {
+            result.rawText = body.rawText;
+          }
+
+          return result;
+        });
+      });
+
+      document.getElementById("publicKeyBtn").addEventListener("click", function () {
+        run("GET /auth/public-key", function () {
+          return client.get("/auth/public-key");
+        });
+      });
+
+      document.getElementById("oidcMeBtn").addEventListener("click", function () {
+        run("GET /oidc/me", async function () {
+          var result = await client.get("/oidc/me");
+          if (result && result.authenticated) {
+            metaSession.textContent = "Authenticated as " + (result.email || "unknown user");
+          }
+          return result;
+        }, "OIDC session verified");
+      });
+
+      document.getElementById("initSessionBtn").addEventListener("click", function () {
+        run("POST /session/init", function () {
+          return client.initSession();
+        }, "Session initialized");
+      });
+
+      document.getElementById("oidcLogoutBtn").addEventListener("click", function () {
+	        run("POST /oidc/logout", async function () {
+	          var result = await client.logout();
+	          metaSession.textContent = "Logged out (re-check GET /oidc/me)";
+	          return result;
+	        }, "Logout completed");
+      });
+
+      document.getElementById("departmentsBtn").addEventListener("click", function () {
+        run("GET /departments", function () {
+          return client.get("/departments");
+        }, "Departments loaded");
+      });
+
+      document.getElementById("formsBtn").addEventListener("click", function () {
+        run("GET /forms", function () {
+          return client.get("/forms", { degree_level: getDegreeLevel() });
+        }, "Forms loaded");
+      });
+
+      document.getElementById("formDetailBtn").addEventListener("click", function () {
+        run("GET /forms/:form_code", function () {
+          return client.get("/forms/" + encodeURIComponent(getFormCode()), {
+            degree_level: getDegreeLevel(),
+            sub_type: getSubType() || undefined
+          });
+        }, "Form detail loaded");
+      });
+
+      document.getElementById("uploadBtn").addEventListener("click", function () {
+        run("POST /upload", async function () {
+          var fileInput = document.getElementById("uploadFile");
+          var file = fileInput.files && fileInput.files[0];
+          var fileKey = document.getElementById("uploadFileKey").value.trim();
+          var formCode = document.getElementById("uploadFormCode").value.trim();
+
+          if (!file) {
+            throw new Error("Please choose a file first.");
+          }
+          if (!fileKey) {
+            throw new Error("file_key is required.");
+          }
+
+          return client.uploadEncryptedFile(file, fileKey, formCode);
+        }, "Upload completed");
+      });
+
+      document.getElementById("validateBtn").addEventListener("click", function () {
+        run("POST /validation/check-completeness", function () {
+          return client.postEncrypted("/validation/check-completeness", {
+            form_code: getFormCode(),
+            degree_level: getDegreeLevel(),
+            sub_type: getSubType() || null,
+            case_key: getCaseKey() || null
+          });
+        }, "Validation completed");
+      });
+
+      document.getElementById("mergeBtn").addEventListener("click", function () {
+        run("POST /documents/merge", function () {
+          return client.postEncrypted("/documents/merge", {
+            form_code: getFormCode(),
+            degree_level: getDegreeLevel(),
+            sub_type: getSubType() || null
+          });
+        }, "Merge completed");
+      });
+
+      document.getElementById("chatBtn").addEventListener("click", function () {
+        run("POST /chat/recommend", function () {
+          return client.postEncrypted("/chat/recommend", {
+            message: document.getElementById("chatMessage").value.trim(),
+            degree_level: getDegreeLevel()
+          });
+        }, "Chat request completed");
+      });
+
+      document.getElementById("supportBtn").addEventListener("click", function () {
+        run("POST /support/technical-email", function () {
+          var attachmentInput = document.getElementById("supportAttachment");
+          var attachment = attachmentInput.files && attachmentInput.files[0] ? attachmentInput.files[0] : null;
+
+          return client.sendSupportEmail({
+            reporter_email: document.getElementById("supportReporter").value.trim(),
+            issue_type: document.getElementById("supportIssueType").value.trim(),
+            subject: document.getElementById("supportSubject").value.trim(),
+            description: document.getElementById("supportDescription").value.trim(),
+            attachment: attachment
+          });
+        }, "Support email request completed");
+      });
+
+      var savedBackend = sessionStorage.getItem("testwebbackend.baseUrl");
+      var query = new URLSearchParams(window.location.search);
+      if (savedBackend) {
+        backendInput.value = savedBackend;
+      } else {
+        backendInput.value = DEFAULT_BACKEND;
+      }
+
+      updateMeta();
+      responseBox.textContent = "Choose an action to begin.\n\nRecommended order:\n1. Open Google Login\n2. Run GET /oidc/me\n3. Run Smoke Test\n4. Test POST /oidc/logout\n5. Re-run GET /oidc/me to confirm unauthorized state\n6. Open Google Login again if you want to continue protected endpoint testing";
+
+      if (oidcDone) {
+        badgeOidc.className = "badge ok";
+        badgeOidcText.textContent = "detected";
+        if (window.history && typeof window.history.replaceState === "function") {
+          var cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete("backend");
+          window.history.replaceState({}, "", cleanUrl.toString());
+        }
+        setStatus("OIDC return detected. Checking backend session...", "warn");
+        refreshSessionState().then(function (me) {
+          if (me && me.authenticated) {
+            setStatus("OIDC session verified for " + (me.email || "current user"), "ok");
+            showResponse("GET /oidc/me", me);
+          } else {
+            setStatus("OIDC return detected, but backend session is not ready yet.", "warn");
+          }
+        }).catch(function () {
+          setStatus("OIDC return detected, but session verification failed.", "bad");
+        });
+      } else {
+        refreshSessionState();
+      }
+    }());
+  </script>
+</body>
+</html>
