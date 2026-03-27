@@ -1,0 +1,373 @@
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import React from 'react';
+import Navbar from './Navbar'
+import Footer from './Footer'
+import axios from 'axios'
+import { encryptPayload, encryptAndKeepKey, decryptResponse } from './crypto' 
+
+export default function Home() {
+  const navigate = useNavigate();
+  const [selectedLabel, setSelectedLabel] = useState(sessionStorage.getItem('last_label') || 'ป.ตรี');
+  const [degree, setDegree] = useState(sessionStorage.getItem('last_degree') || 'bachelor');
+  const [searchTerm, setSearchTerm] = useState(sessionStorage.getItem('last_search') || ''); 
+  const [forms, setForms] = useState([]); 
+  const [publicKey, setPublicKey] = useState(null);
+  const levels = ['ป.ตรี', 'ป.โท', 'ป.เอก'];
+  const [selectedForm, setSelectedForm] = useState(() => {
+    const savedForm = sessionStorage.getItem('last_selected_form');
+    return savedForm ? JSON.parse(savedForm) : null;
+  });
+
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    { sender: 'bot', text: 'สวัสดีครับ มีอะไรให้ผมช่วยแนะนำเกี่ยวกับการยื่นคำร้องไหมครับ?' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+  
+  // 💡 เพิ่ม ref สำหรับดักการรันเบิ้ลของ React Strict Mode
+  const initRef = useRef(false);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages]);
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      // 💡 ดักไว้ไม่ให้มันทำงาน 2 รอบตอนโหลดหน้าเว็บ
+      if (initRef.current) return;
+      initRef.current = true;
+
+      try {
+        let pubKey = sessionStorage.getItem('public_key');
+        
+        if (pubKey === 'null' || pubKey === 'undefined') {
+          pubKey = null;
+          sessionStorage.removeItem('public_key');
+          sessionStorage.removeItem('is_initialized');
+        }
+
+        const isInit = sessionStorage.getItem('is_initialized');
+
+        if (!pubKey || !isInit) {
+          const keyRes = await axios.get('/api/v1/auth/public-key');
+          pubKey = keyRes.data?.publicKey || keyRes.data?.data?.publicKey || (typeof keyRes.data === 'string' ? keyRes.data : null);
+          
+          if (pubKey) {
+            const encryptedBody = await encryptPayload({}, pubKey);
+            await axios.post('/api/v1/session/init', encryptedBody);
+            sessionStorage.setItem('public_key', pubKey);
+            sessionStorage.setItem('is_initialized', 'true');
+          }
+        }
+        
+        setPublicKey(pubKey);
+        fetchForms(degree); 
+      } catch (err) {
+        console.error("Initialization failed:", err);
+      }
+    };
+    initializeApp();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchForms = async (degreeLevel) => {
+    const cacheKey = `forms_cache_${degreeLevel}`;
+    try {
+      const cachedData = sessionStorage.getItem(cacheKey);
+      if (cachedData) {
+        setForms(JSON.parse(cachedData));
+        return;
+      }
+
+      const res = await axios.get(`/api/v1/forms`, { params: { degree_level: degreeLevel } });
+      const fetchedData = res.data.data || [];
+      
+      sessionStorage.setItem(cacheKey, JSON.stringify(fetchedData));
+      setForms(fetchedData);
+    } catch (err) {
+      console.error("Fetch forms failed:", err);
+    }
+  };
+
+  const filteredForms = Array.isArray(forms) ? forms.filter(form => 
+    form.name_th?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    form.form_code?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) : [];
+
+  const handleDegreeChange = (label) => {
+    const nextDegree = label === 'ป.ตรี' ? 'bachelor' : 'graduate';
+    sessionStorage.setItem('last_label', label);
+    sessionStorage.setItem('last_degree', nextDegree);
+
+    if (degree !== nextDegree) {
+      fetchForms(nextDegree);
+    }
+    setSelectedLabel(label);
+    setDegree(nextDegree);
+    setSelectedForm(null); 
+    sessionStorage.removeItem('last_selected_form'); 
+  };
+
+  const handleInputChange = (e) => {
+    const text = e.target.value;
+    setSearchTerm(text);
+    sessionStorage.setItem('last_search', text);
+  };
+  
+  const handleSearch = () => {console.log("กำลังค้นหาคำว่า:", searchTerm);};
+
+  const handleFormClick = (form) => {
+    if (form.has_sub_types && form.sub_categories) {
+      setSelectedForm(form);
+      sessionStorage.setItem('last_selected_form', JSON.stringify(form)); 
+    } else {
+      navigate(`/form/${form.form_code}`, { 
+        state: { 
+          name_th: form.name_th,
+          degree_level: degree 
+        } 
+      });
+    }
+  };
+
+  const handleSubCategoryClick = (subCat) => {
+    navigate(`/form/${selectedForm.form_code}`, { 
+      state: { 
+        name_th: `${selectedForm.name_th} (${subCat.label})`, 
+        degree_level: degree,
+        sub_type: subCat.value 
+      } 
+    });
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMessage = chatInput;
+    setChatMessages(prev => [...prev, { sender: 'user', text: userMessage }]);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    try {
+      if (!publicKey || publicKey === 'null' || publicKey === 'undefined') {
+        sessionStorage.removeItem('public_key');
+        sessionStorage.removeItem('is_initialized');
+        throw new Error("เซสชันความปลอดภัยหมดอายุ กรุณารีเฟรชหน้าเว็บ (F5) เพื่อเชื่อมต่อใหม่ครับ");
+      }
+
+      const chatPayload = { message: userMessage };
+      const { requestPayload, aesKeyRaw } = await encryptAndKeepKey(chatPayload, publicKey);
+      
+      const reqConfig = { headers: { 'Content-Type': 'application/json' }, withCredentials: true };
+      const res = await axios.post('/api/v1/chat/recommend', requestPayload, reqConfig);
+      
+      let responseData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+
+      let encryptedPkg = null;
+      if (responseData.payload && responseData.iv) encryptedPkg = responseData;
+      else if (responseData.data && responseData.data.payload && responseData.data.iv) encryptedPkg = responseData.data;
+
+      if (encryptedPkg) {
+        const decryptedResult = await decryptResponse(encryptedPkg, aesKeyRaw);
+        if (responseData.data && responseData.data.payload) responseData.data = decryptedResult;
+        else responseData = decryptedResult;
+      }
+
+      const actualData = responseData?.data || responseData;
+      const botReply = actualData.reply || actualData.message || actualData || 'ได้รับข้อความแล้ว แต่เซิร์ฟเวอร์ตอบกลับผิดรูปแบบ';
+
+      setChatMessages(prev => [...prev, { sender: 'bot', text: typeof botReply === 'string' ? botReply : JSON.stringify(botReply) }]);
+
+    } catch (err) {
+      console.error("Chat API Error:", err);
+      let errMsg = 'ขออภัย เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง';
+      if (err.message) errMsg = err.message; 
+      if (err.response?.data?.user_message) errMsg = err.response.data.user_message;
+      setChatMessages(prev => [...prev, { sender: 'bot', text: errMsg }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col font-sans relative">
+      <Navbar />
+      <div className='flex flex-row ml-5 mt-10 mr-5 flex-grow'>
+        <div className='basis-64 outline outline-[#D9D9D9] mr-10 p-4 rounded-md h-fit sticky top-10 bg-white'>
+          <p className='text-[#999999] text-[15px] pb-3 text-left'>ระดับการศึกษา</p>
+          <div className='flex flex-col gap-6'>
+            {levels.map((level) => (
+              <label key={level} className='flex items-center cursor-pointer group'>
+                <div className='relative flex items-center justify-center'>
+                  <input type="radio" name="degree" 
+                    checked={selectedLabel === level}
+                    onChange={() => handleDegreeChange(level)}
+                    className='sr-only' 
+                  />
+                  <div className={`w-6 h-6 border-2 rounded-full transition-all duration-200 
+                    ${selectedLabel === level ? 'border-[#EA580C]' : 'border-[#999999]'}`}>
+                  </div>
+                  <div className={`absolute w-4 h-4 bg-[#EA580C] rounded-full transition-transform duration-200 
+                    ${selectedLabel === level ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}`}>
+                  </div>
+                </div>
+                <span className='ml-3 text-[15px] font-bold text-black'>{level}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className='flex-1'>
+          {!selectedForm ? (
+            <>
+              <p className='text-[25px] font-extrabold text-[#7B542F] text-left mb-4'>ค้นหาเอกสารยื่นคำร้อง</p>
+              
+              <div className="relative group mb-10">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={handleInputChange} 
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="ค้นหาชื่อเอกสารยื่นคำร้อง"
+                  className="w-full p-3 pl-6 pr-12 text-lg border border-[#D9D9D9] rounded-xl shadow-sm outline-none transition-all duration-200 placeholder:text-[#999999] focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C]"
+                />
+                <button onClick={handleSearch} className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer pr-2">
+                    <svg className="h-6 w-6 text-[#999999] hover:text-[#EA580C] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                {filteredForms.length > 0 ? (
+                  filteredForms.map((form) => (
+                    <div key={form.form_code} onClick={() => handleFormClick(form)} className="bg-white border border-[#D9D9D9] p-5 rounded-xl shadow-sm hover:shadow-md hover:border-[#EA580C] transition-all cursor-pointer flex flex-col items-center">
+                      <div className="flex flex-col h-full w-full">
+                        <img src="/file.png" alt="file icon" className="w-24 h-24 mx-auto mt-2 mb-4 opacity-90"/>
+                        <h3 className="text-[#7B542F] font-bold text-lg mb-2 line-clamp-2 text-center">{form.name_th}</h3>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full flex flex-col items-center justify-center py-16 bg-white border border-[#D9D9D9] rounded-xl shadow-sm">
+                    <p className="text-xl font-bold text-[#999999]">ไม่พบชื่อเอกสาร</p>
+                    <p className="text-sm text-[#999999] mt-2">ลองตรวจสอบการสะกด หรือเปลี่ยนคำค้นหาดูอีกครั้ง</p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-4 mb-6">
+                <button onClick={() => {setSelectedForm(null);
+                  sessionStorage.removeItem('last_selected_form');}} className="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-[#D9D9D9] hover:border-[#EA580C] hover:text-[#EA580C] transition-colors text-[#999999] cursor-pointer shadow-sm">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <div className="flex flex-col">
+                  <p className='text-[22px] font-extrabold text-[#7B542F] text-left'>โปรดระบุประเภทของคำร้อง</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10 animate-fade-in">
+                {selectedForm.sub_categories.map((subCat) => (
+                  <div key={subCat.value} onClick={() => handleSubCategoryClick(subCat)} className="bg-white border border-[#D9D9D9] p-5 rounded-xl shadow-sm hover:shadow-md hover:border-[#EA580C] transition-all cursor-pointer flex flex-col items-center">
+                    <div className="flex flex-col h-full w-full">
+                      <img src="/file.png" alt="file icon" className="w-20 h-20 mx-auto mt-2 mb-4 opacity-80"/>
+                      <h3 className="text-[#7B542F] font-bold text-base mb-2 line-clamp-3 text-center leading-relaxed">
+                        {subCat.label}
+                      </h3>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+        </div>
+      </div>
+      <Footer/>
+
+      <button 
+        onClick={() => setIsChatOpen(!isChatOpen)} 
+        className="fixed bottom-8 right-8 z-50 w-16 h-16 bg-[#FF9D00] rounded-full shadow-lg hover:scale-105 transition-transform cursor-pointer flex items-center justify-center"
+      >
+        <img 
+          src="/assistant.png" 
+          alt="Chatbot" 
+          className="w-10 h-10 object-contain" 
+          onError={(e) => { e.target.src = '/file.png'; }}
+        />
+      </button>
+
+      {isChatOpen && (
+        <div className="fixed bottom-28 right-8 z-50 w-[350px] h-[450px] bg-white rounded-2xl shadow-2xl border border-[#D9D9D9] flex flex-col overflow-hidden animate-fade-in">
+          
+          <div className="bg-[#7B542F] text-white p-4 flex justify-between items-center shadow-sm z-10">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="font-bold text-[16px]">ผู้ช่วยยื่นคำร้อง (Bot)</span>
+            </div>
+            <button onClick={() => setIsChatOpen(false)} className="text-white hover:text-[#FF9D00] transition-colors cursor-pointer">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex-grow p-4 overflow-y-auto flex flex-col gap-4 bg-gray-50/50">
+            {chatMessages.map((msg, index) => (
+              <div 
+                key={index}
+                className={`max-w-[85%] p-3 text-[14px] leading-relaxed shadow-sm text-left ${
+                  msg.sender === 'user' 
+                    ? 'bg-[#FF9D00] text-white self-end rounded-2xl rounded-tr-sm' 
+                    : 'bg-white border border-[#D9D9D9] text-black self-start rounded-2xl rounded-tl-sm'
+                }`}
+              >
+                {msg.text}
+              </div>
+            ))}
+            
+            {isChatLoading && (
+              <div className="self-start bg-white border border-[#D9D9D9] p-3 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-[#D9D9D9] flex gap-2">
+            <input 
+              type="text" 
+              value={chatInput} 
+              onChange={e => setChatInput(e.target.value)} 
+              placeholder="พิมพ์คำถามที่นี่..." 
+              className="flex-grow px-4 py-2 border border-[#D9D9D9] rounded-full text-[14px] focus:outline-none focus:border-[#FF9D00] focus:ring-1 focus:ring-[#FF9D00] transition-all"
+            />
+            <button 
+              type="submit" 
+              disabled={isChatLoading || !chatInput.trim()} 
+              className="bg-[#7B542F] text-white p-2 w-10 h-10 rounded-full flex items-center justify-center hover:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg className="w-5 h-5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </form>
+
+        </div>
+      )}
+
+    </div>
+  )
+}
