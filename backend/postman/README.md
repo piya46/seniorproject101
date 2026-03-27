@@ -20,12 +20,12 @@ Last updated: `2026-03-27`
 ## Base URLs
 
 - Local: `http://localhost:8080/api/v1`
-- Production: `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1`
-- Canonical OAuth callback: `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
+- Production: `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1`
+- Canonical OAuth callback: `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback`
 
 ## Production Auth Flow
 
-1. เปิด `GET /oidc/google/login?return_to=https://pstpyst.com`
+1. เปิด `GET /oidc/google/login?return_to=https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app`
 2. login ผ่าน Google
 3. backend callback ตั้ง session cookie
 4. เรียก `GET /oidc/me`

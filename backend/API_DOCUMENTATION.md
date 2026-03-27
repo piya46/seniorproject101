@@ -54,7 +54,7 @@ flow ที่แนะนำ:
   production ควรใช้ `FRONTEND_URL` เป็นหลัก
   และใช้ `FRONTEND_EXTRA_URLS` เป็น temporary dev/QA override เท่านั้น
 - Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:
-  `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
+  `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback`
 - `POST /session/init` ตอนนี้ต้องมี OIDC-backed session ก่อนแล้ว
 - state-changing requests ที่ใช้ session cookie ต้องแนบ `x-csrf-token` ให้ตรงกับ token ปัจจุบัน
 

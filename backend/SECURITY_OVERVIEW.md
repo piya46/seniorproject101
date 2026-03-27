@@ -8,12 +8,12 @@ Last updated: `2026-03-27`
 
 production topology ใหม่:
 
-- `pstpyst.com` = frontend
-- `https://sci-request-system-466086429766.asia-southeast3.run.app` = backend Cloud Run
+- `https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app` = frontend
+- `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app` = backend Cloud Run
 - auth = Google OIDC ที่ backend
 - transport security = HTTPS/TLS
 - session = `sci_session_token` แบบ `HttpOnly`
-- canonical OAuth callback = `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
+- canonical OAuth callback = `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback`
 
 ## Security Layers ที่ยังคงอยู่
 
@@ -208,7 +208,7 @@ origin allowlist ฝั่ง frontend มีผลกับ:
 production ที่แนะนำ:
 
 ```text
-FRONTEND_URL=https://pstpyst.com
+FRONTEND_URL=https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app
 FRONTEND_EXTRA_URLS=
 ```
 
@@ -225,7 +225,7 @@ FRONTEND_EXTRA_URLS=
 - `OIDC_ENABLED=true`
 - `OIDC_ALLOWED_DOMAINS=chula.ac.th,student.chula.ac.th`
 - `OIDC_REQUIRE_HOSTED_DOMAIN=true`
-- `FRONTEND_URL=https://pstpyst.com`
+- `FRONTEND_URL=https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app`
 - `FRONTEND_EXTRA_URLS=` (เว้นว่างใน production ปกติ)
 - Google OIDC credentials เก็บใน Secret Manager
 

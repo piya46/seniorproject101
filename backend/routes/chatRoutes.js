@@ -8,7 +8,7 @@ const { assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUti
 const { validate } = require('../middlewares/validationMiddleware');
 const { chatRecommendSchema } = require('../validators/schemas');
 
-const project = process.env.GCP_PROJECT_ID || 'seniorproject101';
+    const project = process.env.GCP_PROJECT_ID || 'ai-formcheck';
 const location = process.env.AI_LOCATION || 'us-central1';
 
 const getFormsContext = () => {

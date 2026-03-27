@@ -10,12 +10,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # แก้ค่าได้ 2 วิธี:
 # 1) แก้ default ในไฟล์นี้โดยตรง
 # 2) ส่ง env ตอนรัน เช่น SMTP_HOST_VALUE=mail.example.com ./deploy.sh
-PROJECT_ID="${PROJECT_ID:-seniorproject101}"
-SERVICE_NAME="${SERVICE_NAME:-sci-request-system}"
-BUCKET_NAME="${BUCKET_NAME:-sci-request-files-prod}"
+PROJECT_ID="${PROJECT_ID:-ai-formcheck}"
+APP_NAME="${APP_NAME:-ai-formcheck}"
+SERVICE_NAME="${SERVICE_NAME:-${APP_NAME}-backend}"
+FRONTEND_SERVICE_NAME="${FRONTEND_SERVICE_NAME:-${APP_NAME}-frontend}"
+BUCKET_NAME="${BUCKET_NAME:-${SERVICE_NAME}-files}"
 BUCKET_LOCATION="${BUCKET_LOCATION:-}"
 BUCKET_STORAGE_CLASS="${BUCKET_STORAGE_CLASS:-STANDARD}"
-FIRESTORE_DATABASE_ID="${FIRESTORE_DATABASE_ID:-sessiondd}"
+FIRESTORE_DATABASE_ID="${FIRESTORE_DATABASE_ID:-${APP_NAME}}"
 FIRESTORE_LOCATION="${FIRESTORE_LOCATION:-}"
 FIRESTORE_TYPE="${FIRESTORE_TYPE:-firestore-native}"
 FIRESTORE_COLLECTION_NAME="${FIRESTORE_COLLECTION_NAME:-SESSION}"
@@ -26,12 +28,12 @@ ENABLE_BUCKET_LIFECYCLE_CLEANUP="${ENABLE_BUCKET_LIFECYCLE_CLEANUP:-false}"
 BUCKET_DELETE_AFTER_DAYS="${BUCKET_DELETE_AFTER_DAYS:-1}"
 BUCKET_LIFECYCLE_FILE="${BUCKET_LIFECYCLE_FILE:-$SCRIPT_DIR/scripts/lifecycle.json}"
 ENABLE_DAILY_FILE_CLEANUP_FUNCTION="${ENABLE_DAILY_FILE_CLEANUP_FUNCTION:-true}"
-CLEANUP_SERVICE_NAME="${CLEANUP_SERVICE_NAME:-delete-file-cleanup}"
+CLEANUP_SERVICE_NAME="${CLEANUP_SERVICE_NAME:-${SERVICE_NAME}-cleanup}"
 CLEANUP_SERVICE_REGION="${CLEANUP_SERVICE_REGION:-}"
 CLEANUP_SERVICE_SOURCE_DIR="${CLEANUP_SERVICE_SOURCE_DIR:-$SCRIPT_DIR/services/delete-file-cleanup}"
-CLEANUP_SERVICE_ACCOUNT_NAME="${CLEANUP_SERVICE_ACCOUNT_NAME:-delete-file-cleanup-sa}"
+CLEANUP_SERVICE_ACCOUNT_NAME="${CLEANUP_SERVICE_ACCOUNT_NAME:-${CLEANUP_SERVICE_NAME}-sa}"
 APP_SERVICE_ACCOUNT_NAME="${APP_SERVICE_ACCOUNT_NAME:-${SERVICE_NAME}-sa}"
-CLEANUP_SCHEDULER_JOB_NAME="${CLEANUP_SCHEDULER_JOB_NAME:-delete-file-cleanup-daily}"
+CLEANUP_SCHEDULER_JOB_NAME="${CLEANUP_SCHEDULER_JOB_NAME:-${CLEANUP_SERVICE_NAME}-daily}"
 CLEANUP_SCHEDULER_LOCATION="${CLEANUP_SCHEDULER_LOCATION:-}"
 CLEANUP_SCHEDULER_FALLBACK_LOCATION="${CLEANUP_SCHEDULER_FALLBACK_LOCATION:-asia-southeast1}"
 CLEANUP_SCHEDULE_CRON="${CLEANUP_SCHEDULE_CRON:-0 3 * * *}"
@@ -45,16 +47,16 @@ BUCKET_MIGRATION_TEMP_NAME="${BUCKET_MIGRATION_TEMP_NAME:-}"
 DELETE_TEMP_BUCKET_AFTER_MIGRATION="${DELETE_TEMP_BUCKET_AFTER_MIGRATION:-true}"
 AUTO_CLEANUP_LEFTOVER_TEMP_BUCKET="${AUTO_CLEANUP_LEFTOVER_TEMP_BUCKET:-false}"
 SECRET_NAME="${SECRET_NAME:-JWT_SECRET}"
-# ค่า default สำหรับ production ควรแคบที่สุด แล้วค่อย append dev origins ผ่าน FRONTEND_EXTRA_URLS ตอนต้องการ
-FRONTEND_URL="${FRONTEND_URL:-https://pstpyst.com}"
+# ถ้าไม่กำหนด FRONTEND_URL สคริปต์จะ derive จาก FRONTEND_SERVICE_NAME เป็น Cloud Run run.app URL ให้
+FRONTEND_URL="${FRONTEND_URL:-}"
 FRONTEND_EXTRA_URLS="${FRONTEND_EXTRA_URLS:-}"
-TECH_SUPPORT_TARGET_EMAIL="${TECH_SUPPORT_TARGET_EMAIL:-piyaton56@gmail.com}"
+TECH_SUPPORT_TARGET_EMAIL="${TECH_SUPPORT_TARGET_EMAIL:-}"
 SMTP_PORT="${SMTP_PORT:-465}"
 SMTP_SECURE="${SMTP_SECURE:-true}"
-SMTP_HOST_VALUE="${SMTP_HOST_VALUE:-pstpyst.com}"
-SMTP_USER_VALUE="${SMTP_USER_VALUE:-no-reply@pstpyst.com}"
-SMTP_FROM_EMAIL_VALUE="${SMTP_FROM_EMAIL_VALUE:-no-reply@pstpyst.com}"
-SMTP_FROM_NAME_VALUE="${SMTP_FROM_NAME_VALUE:-Sci Request Support}"
+SMTP_HOST_VALUE="${SMTP_HOST_VALUE:-}"
+SMTP_USER_VALUE="${SMTP_USER_VALUE:-}"
+SMTP_FROM_EMAIL_VALUE="${SMTP_FROM_EMAIL_VALUE:-}"
+SMTP_FROM_NAME_VALUE="${SMTP_FROM_NAME_VALUE:-AI FormCheck Support}"
 SMTP_PASS_VALUE="${SMTP_PASS_VALUE:-}"
 NODE_ENV="${NODE_ENV:-production}"
 OIDC_ENABLED="${OIDC_ENABLED:-true}"
@@ -108,10 +110,13 @@ trim_value() {
 }
 
 derive_canonical_run_app_base_url() {
-    local PROJECT_NUMBER_VALUE=$1
-    printf 'https://%s-%s.%s.run.app' "$SERVICE_NAME" "$PROJECT_NUMBER_VALUE" "$REGION"
+    local SERVICE_NAME_VALUE=$1
+    local PROJECT_NUMBER_VALUE=$2
+    printf 'https://%s-%s.%s.run.app' "$SERVICE_NAME_VALUE" "$PROJECT_NUMBER_VALUE" "$REGION"
 }
 
+APP_NAME="$(trim_value "$APP_NAME")"
+FRONTEND_SERVICE_NAME="$(trim_value "$FRONTEND_SERVICE_NAME")"
 SMTP_HOST_VALUE="$(trim_value "$SMTP_HOST_VALUE")"
 SMTP_USER_VALUE="$(trim_value "$SMTP_USER_VALUE")"
 SMTP_FROM_EMAIL_VALUE="$(trim_value "$SMTP_FROM_EMAIL_VALUE")"
@@ -232,7 +237,12 @@ if [ "$CURRENT_PROJECT" != "$PROJECT_ID" ]; then
 fi
 
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
-CANONICAL_RUN_APP_BASE_URL=$(derive_canonical_run_app_base_url "$PROJECT_NUMBER")
+CANONICAL_RUN_APP_BASE_URL=$(derive_canonical_run_app_base_url "$SERVICE_NAME" "$PROJECT_NUMBER")
+CANONICAL_FRONTEND_RUN_APP_BASE_URL=$(derive_canonical_run_app_base_url "$FRONTEND_SERVICE_NAME" "$PROJECT_NUMBER")
+
+if [ -z "$FRONTEND_URL" ]; then
+    FRONTEND_URL="$CANONICAL_FRONTEND_RUN_APP_BASE_URL"
+fi
 
 if [ -z "$GOOGLE_OIDC_CALLBACK_URL" ]; then
     GOOGLE_OIDC_CALLBACK_URL="${CANONICAL_RUN_APP_BASE_URL}/api/v1/oidc/google/callback"
@@ -1118,13 +1128,13 @@ reuse_oidc_credentials_from_secret_manager() {
 
 prompt_for_missing_config() {
     echo -e "${YELLOW}📝 Review SMTP/support config. Leave blank to use the shown default.${NC}"
-    prompt_value_if_empty TECH_SUPPORT_TARGET_EMAIL "Support target email" "piyaton56@gmail.com"
-    prompt_value_if_empty SMTP_HOST_VALUE "SMTP host" "pstpyst.com"
+    prompt_value_if_empty TECH_SUPPORT_TARGET_EMAIL "Support target email" "support@example.com"
+    prompt_value_if_empty SMTP_HOST_VALUE "SMTP host" "smtp.example.com"
     prompt_value_if_empty SMTP_PORT "SMTP port" "465"
     prompt_value_if_empty SMTP_SECURE "SMTP secure (true/false)" "true"
-    prompt_value_if_empty SMTP_USER_VALUE "SMTP username/email" "no-reply@pstpyst.com"
-    prompt_value_if_empty SMTP_FROM_EMAIL_VALUE "SMTP from email" "no-reply@pstpyst.com"
-    prompt_value_if_empty SMTP_FROM_NAME_VALUE "SMTP from name" "Sci Request Support"
+    prompt_value_if_empty SMTP_USER_VALUE "SMTP username/email" "no-reply@example.com"
+    prompt_value_if_empty SMTP_FROM_EMAIL_VALUE "SMTP from email" "no-reply@example.com"
+    prompt_value_if_empty SMTP_FROM_NAME_VALUE "SMTP from name" "AI FormCheck Support"
     reuse_oidc_credentials_from_secret_manager
     echo -e "${YELLOW}🪪 Review Google OIDC config. Callback URL defaults to the canonical Cloud Run URL if GOOGLE_OIDC_CALLBACK_URL is left unset.${NC}"
     prompt_value_if_empty GOOGLE_OIDC_CLIENT_ID_VALUE "Google OIDC client ID"
@@ -1345,7 +1355,9 @@ resolve_deploy_mode_settings() {
 print_deploy_summary() {
     echo -e "${YELLOW}📋 Deployment configuration summary${NC}"
     echo -e "   Project ID              : ${YELLOW}$PROJECT_ID${NC}"
+    echo -e "   App Name                : ${YELLOW}$APP_NAME${NC}"
     echo -e "   Service Name            : ${YELLOW}$SERVICE_NAME${NC}"
+    echo -e "   Frontend Service Name   : ${YELLOW}$FRONTEND_SERVICE_NAME${NC}"
     echo -e "   Bucket                  : ${YELLOW}$BUCKET_NAME${NC}"
     echo -e "   Bucket Location         : ${YELLOW}$BUCKET_LOCATION${NC}"
     echo -e "   Bucket Storage Class    : ${YELLOW}$BUCKET_STORAGE_CLASS${NC}"
@@ -1392,6 +1404,7 @@ print_deploy_summary() {
     echo -e "   OIDC Allowed Domains    : ${YELLOW}$OIDC_ALLOWED_DOMAINS${NC}"
     echo -e "   OIDC Require HD         : ${YELLOW}$OIDC_REQUIRE_HOSTED_DOMAIN${NC}"
     echo -e "   Canonical run.app URL   : ${YELLOW}${CANONICAL_RUN_APP_BASE_URL}${NC}"
+    echo -e "   Canonical frontend URL  : ${YELLOW}${CANONICAL_FRONTEND_RUN_APP_BASE_URL}${NC}"
     echo -e "   OIDC Callback URL       : ${YELLOW}${GOOGLE_OIDC_CALLBACK_URL}${NC}"
     echo -e "   Public Entry Point      : ${YELLOW}Cloud Run run.app${NC}"
     echo -e "   OIDC Client ID Secret   : ${YELLOW}$OIDC_CLIENT_ID_SECRET${NC}"

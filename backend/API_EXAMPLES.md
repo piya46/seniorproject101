@@ -16,13 +16,13 @@ Last updated: `2026-03-27`
 Production:
 
 ```text
-https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1
+https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1
 ```
 
 Public liveness endpoint:
 
 ```text
-https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/status
+https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/system/status
 ```
 
 ตัวอย่าง response:
@@ -30,7 +30,7 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/st
 ```json
 {
   "status": "ok",
-  "service": "sci-request-system",
+  "service": "ai-formcheck-backend",
   "message": "Service is available",
   "checks": {
     "configuration": {
@@ -50,7 +50,7 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/st
 Authenticated details endpoint:
 
 ```text
-https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/status/details
+https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/system/status/details
 ```
 
 หมายเหตุ:
@@ -61,7 +61,7 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/st
 Public storage-signing smoke probe:
 
 ```text
-https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/status/storage-signing
+https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/system/status/storage-signing
 ```
 
 หมายเหตุ:
@@ -72,7 +72,7 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/system/st
 Canonical Google OAuth callback:
 
 ```text
-https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback
+https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback
 ```
 
 ## 1. Open Google OIDC Login
@@ -80,29 +80,29 @@ https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/goog
 ตัวอย่าง URL:
 
 ```text
-GET https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=https://pstpyst.com
+GET https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app
 ```
 
 ### Browser URL
 
 ```text
-https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=https://pstpyst.com
+https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app
 ```
 
 ### JavaScript
 
 ```js
 window.location.href =
-  "https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=" +
-  encodeURIComponent("https://pstpyst.com");
+  "https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=" +
+  encodeURIComponent("https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app");
 ```
 
 ### PHP
 
 ```php
 <?php
-$returnTo = 'https://pstpyst.com';
-$url = 'https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=' . rawurlencode($returnTo);
+$returnTo = 'https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app';
+$url = 'https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=' . rawurlencode($returnTo);
 header('Location: ' . $url, true, 302);
 exit;
 ```
@@ -112,8 +112,8 @@ exit;
 ```python
 from urllib.parse import quote
 
-return_to = "https://pstpyst.com"
-url = "https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=" + quote(return_to, safe="")
+return_to = "https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app"
+url = "https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/login?return_to=" + quote(return_to, safe="")
 print(url)
 ```
 
@@ -124,7 +124,7 @@ print(url)
 ### cURL
 
 ```bash
-curl -i https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/me
+curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/me
 ```
 
 หมายเหตุ:
@@ -135,7 +135,7 @@ curl -i https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/o
 ### JavaScript
 
 ```js
-const response = await fetch("https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/me", {
+const response = await fetch("https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/me", {
   method: "GET",
   credentials: "include"
 });
@@ -156,7 +156,7 @@ $context = stream_context_create([
     ],
 ]);
 
-$body = file_get_contents('https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/me', false, $context);
+$body = file_get_contents('https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/me', false, $context);
 echo $body;
 ```
 
@@ -166,7 +166,7 @@ echo $body;
 import requests
 
 response = requests.get(
-    "https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/me",
+    "https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/me",
     allow_redirects=False,
 )
 print(response.status_code)
@@ -178,13 +178,13 @@ print(response.text)
 ### cURL
 
 ```bash
-curl -s https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/auth/public-key
+curl -s https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/auth/public-key
 ```
 
 ### JavaScript
 
 ```js
-const response = await fetch("https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/auth/public-key", {
+const response = await fetch("https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/auth/public-key", {
   method: "GET",
   credentials: "include"
 });
@@ -198,7 +198,7 @@ console.log(data.publicKey);
 ### JavaScript
 
 ```js
-const csrfResponse = await fetch("https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/auth/csrf-token", {
+const csrfResponse = await fetch("https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/auth/csrf-token", {
   method: "GET",
   credentials: "include"
 });
@@ -241,7 +241,7 @@ console.log(csrfData.csrf_token);
 ### cURL
 
 ```bash
-curl -X POST https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/session/init \
+curl -X POST https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/session/init \
   -H 'Content-Type: application/json' \
   -H 'x-csrf-token: <csrf-token>' \
   -d '{"encKey":"<base64>","iv":"<base64>","tag":"<base64>","payload":"<base64>"}'
@@ -257,7 +257,7 @@ const transportBody = {
   payload: "<base64>"
 };
 
-const response = await fetch("https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/session/init", {
+const response = await fetch("https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/session/init", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",

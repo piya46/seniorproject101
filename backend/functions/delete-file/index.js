@@ -3,7 +3,7 @@ const { Storage } = require('@google-cloud/storage');
 
 const storage = new Storage();
 const firestore = new Firestore({
-  databaseId: process.env.FIRESTORE_DATABASE_ID || 'sessiondd',
+  databaseId: process.env.FIRESTORE_DATABASE_ID || 'ai-formcheck',
 });
 
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;

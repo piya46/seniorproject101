@@ -106,7 +106,7 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     `
       : '';
 
-    const project = process.env.GCP_PROJECT_ID || 'seniorproject101';
+    const project = process.env.GCP_PROJECT_ID || 'ai-formcheck';
     const location = process.env.AI_LOCATION || 'us-central1';
     const bucketName = process.env.GCS_BUCKET_NAME;
 

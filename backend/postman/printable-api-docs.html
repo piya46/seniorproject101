@@ -172,7 +172,7 @@
 <ul>
 <li>Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:</li>
 </ul>
-<p>  `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`</p>
+<p>  `https://ai-formcheck-backend-&lt;project-number&gt;.asia-southeast3.run.app/api/v1/oidc/google/callback`</p>
 <ul>
 <li>`POST /session/init` ตอนนี้ต้องมี OIDC-backed session ก่อนแล้ว</li>
 <li>state-changing requests ที่ใช้ session cookie ต้องแนบ `x-csrf-token` ให้ตรงกับ token ปัจจุบัน</li>

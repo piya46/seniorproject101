@@ -97,7 +97,7 @@ const probeSignedUrlGeneration = async () => {
 
 app.get(`${BASE_URL}/system/status`, (req, res) => {
     const keyStatus = getKeyStatus();
-    const serviceName = process.env.K_SERVICE || 'sci-request-system';
+    const serviceName = process.env.K_SERVICE || 'ai-formcheck-backend';
     const missingCriticalEnv = requiredEnv.filter(key => !process.env[key]);
     const healthy = missingCriticalEnv.length === 0;
     const status = {
@@ -153,7 +153,7 @@ app.get(`${BASE_URL}/system/status/storage-signing`, async (req, res) => {
 
 app.get(`${BASE_URL}/system/status/details`, authMiddleware, (req, res) => {
     const keyStatus = getKeyStatus();
-    const serviceName = process.env.K_SERVICE || 'sci-request-system';
+    const serviceName = process.env.K_SERVICE || 'ai-formcheck-backend';
     const serviceRegion = process.env.K_REGION || process.env.APP_REGION || process.env.REGION || null;
     const projectNumber = process.env.GCP_PROJECT_NUMBER || null;
     const runAppUrl = serviceRegion && projectNumber
