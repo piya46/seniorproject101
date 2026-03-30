@@ -51,10 +51,26 @@ DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS="${DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS:-900}
 DOCUMENT_JOB_WORKER_MAX_INSTANCES="${DOCUMENT_JOB_WORKER_MAX_INSTANCES:-3}"
 DOCUMENT_JOB_WORKER_CPU="${DOCUMENT_JOB_WORKER_CPU:-1}"
 DOCUMENT_JOB_WORKER_CONCURRENCY="${DOCUMENT_JOB_WORKER_CONCURRENCY:-1}"
+ENABLE_DOCUMENT_AV_SCANNER="${ENABLE_DOCUMENT_AV_SCANNER:-false}"
+DOCUMENT_AV_SCANNER_SERVICE_NAME="${DOCUMENT_AV_SCANNER_SERVICE_NAME:-${SERVICE_NAME}-document-av-scanner}"
+DOCUMENT_AV_SCANNER_REGION="${DOCUMENT_AV_SCANNER_REGION:-}"
+DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_NAME="${DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_NAME:-${APP_NAME}-docav-sa}"
+DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY="${DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY:-${APP_NAME}-workers}"
+DOCUMENT_AV_SCANNER_IMAGE_TAG="${DOCUMENT_AV_SCANNER_IMAGE_TAG:-latest}"
+DOCUMENT_AV_SCANNER_MEMORY="${DOCUMENT_AV_SCANNER_MEMORY:-1Gi}"
+DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS="${DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS:-120}"
+DOCUMENT_AV_SCANNER_MAX_INSTANCES="${DOCUMENT_AV_SCANNER_MAX_INSTANCES:-2}"
+DOCUMENT_AV_SCANNER_CPU="${DOCUMENT_AV_SCANNER_CPU:-1}"
+DOCUMENT_AV_SCANNER_CONCURRENCY="${DOCUMENT_AV_SCANNER_CONCURRENCY:-4}"
+DOCUMENT_AV_SCANNER_MAX_BYTES="${DOCUMENT_AV_SCANNER_MAX_BYTES:-10485760}"
+CLAMAV_HOST="${CLAMAV_HOST:-}"
+CLAMAV_PORT="${CLAMAV_PORT:-3310}"
+CLAMAV_TIMEOUT_MS="${CLAMAV_TIMEOUT_MS:-30000}"
 DOCUMENT_JOB_RETENTION_DAYS="${DOCUMENT_JOB_RETENTION_DAYS:-7}"
 DOCUMENT_JOB_PROCESSING_TIMEOUT_MS="${DOCUMENT_JOB_PROCESSING_TIMEOUT_MS:-600000}"
 DOCUMENT_AV_SCAN_MODE="${DOCUMENT_AV_SCAN_MODE:-off}"
 DOCUMENT_AV_SCAN_URL="${DOCUMENT_AV_SCAN_URL:-}"
+DOCUMENT_AV_SCAN_AUDIENCE="${DOCUMENT_AV_SCAN_AUDIENCE:-}"
 DOCUMENT_AV_SCAN_TIMEOUT_MS="${DOCUMENT_AV_SCAN_TIMEOUT_MS:-30000}"
 DOCUMENT_INTAKE_KMS_LOCATION="${DOCUMENT_INTAKE_KMS_LOCATION:-}"
 DOCUMENT_INTAKE_KMS_KEYRING="${DOCUMENT_INTAKE_KMS_KEYRING:-${APP_NAME}-document-intake}"
@@ -237,10 +253,26 @@ DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS="$(trim_value "$DOCUMENT_JOB_WORKER_TIMEOUT_
 DOCUMENT_JOB_WORKER_MAX_INSTANCES="$(trim_value "$DOCUMENT_JOB_WORKER_MAX_INSTANCES")"
 DOCUMENT_JOB_WORKER_CPU="$(trim_value "$DOCUMENT_JOB_WORKER_CPU")"
 DOCUMENT_JOB_WORKER_CONCURRENCY="$(trim_value "$DOCUMENT_JOB_WORKER_CONCURRENCY")"
+ENABLE_DOCUMENT_AV_SCANNER="$(trim_value "$ENABLE_DOCUMENT_AV_SCANNER")"
+DOCUMENT_AV_SCANNER_SERVICE_NAME="$(trim_value "$DOCUMENT_AV_SCANNER_SERVICE_NAME")"
+DOCUMENT_AV_SCANNER_REGION="$(trim_value "$DOCUMENT_AV_SCANNER_REGION")"
+DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_NAME="$(trim_value "$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_NAME")"
+DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY="$(trim_value "$DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY")"
+DOCUMENT_AV_SCANNER_IMAGE_TAG="$(trim_value "$DOCUMENT_AV_SCANNER_IMAGE_TAG")"
+DOCUMENT_AV_SCANNER_MEMORY="$(trim_value "$DOCUMENT_AV_SCANNER_MEMORY")"
+DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS="$(trim_value "$DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS")"
+DOCUMENT_AV_SCANNER_MAX_INSTANCES="$(trim_value "$DOCUMENT_AV_SCANNER_MAX_INSTANCES")"
+DOCUMENT_AV_SCANNER_CPU="$(trim_value "$DOCUMENT_AV_SCANNER_CPU")"
+DOCUMENT_AV_SCANNER_CONCURRENCY="$(trim_value "$DOCUMENT_AV_SCANNER_CONCURRENCY")"
+DOCUMENT_AV_SCANNER_MAX_BYTES="$(trim_value "$DOCUMENT_AV_SCANNER_MAX_BYTES")"
+CLAMAV_HOST="$(trim_value "$CLAMAV_HOST")"
+CLAMAV_PORT="$(trim_value "$CLAMAV_PORT")"
+CLAMAV_TIMEOUT_MS="$(trim_value "$CLAMAV_TIMEOUT_MS")"
 DOCUMENT_JOB_RETENTION_DAYS="$(trim_value "$DOCUMENT_JOB_RETENTION_DAYS")"
 DOCUMENT_JOB_PROCESSING_TIMEOUT_MS="$(trim_value "$DOCUMENT_JOB_PROCESSING_TIMEOUT_MS")"
 DOCUMENT_AV_SCAN_MODE="$(trim_value "$DOCUMENT_AV_SCAN_MODE")"
 DOCUMENT_AV_SCAN_URL="$(trim_value "$DOCUMENT_AV_SCAN_URL")"
+DOCUMENT_AV_SCAN_AUDIENCE="$(trim_value "$DOCUMENT_AV_SCAN_AUDIENCE")"
 DOCUMENT_AV_SCAN_TIMEOUT_MS="$(trim_value "$DOCUMENT_AV_SCAN_TIMEOUT_MS")"
 DOCUMENT_INTAKE_KMS_LOCATION="$(trim_value "$DOCUMENT_INTAKE_KMS_LOCATION")"
 DOCUMENT_INTAKE_KMS_KEYRING="$(trim_value "$DOCUMENT_INTAKE_KMS_KEYRING")"
@@ -268,6 +300,7 @@ fi
 
 CLEANUP_SERVICE_ACCOUNT_EMAIL="${CLEANUP_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 DOCUMENT_JOB_WORKER_SERVICE_ACCOUNT_EMAIL="${DOCUMENT_JOB_WORKER_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL="${DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 APP_SERVICE_ACCOUNT_EMAIL="${APP_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 FRONTEND_SERVICE_ACCOUNT_EMAIL="${FRONTEND_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 if [ -n "$FRONTEND_INVOKER_SERVICE_ACCOUNT" ]; then
@@ -298,7 +331,12 @@ if [ -z "$DOCUMENT_JOB_WORKER_REGION" ]; then
     DOCUMENT_JOB_WORKER_REGION="$REGION"
 fi
 
+if [ -z "$DOCUMENT_AV_SCANNER_REGION" ]; then
+    DOCUMENT_AV_SCANNER_REGION="$DOCUMENT_JOB_WORKER_REGION"
+fi
+
 DOCUMENT_JOB_WORKER_IMAGE_URI="${DOCUMENT_JOB_WORKER_REGION}-docker.pkg.dev/${PROJECT_ID}/${DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY}/${DOCUMENT_JOB_WORKER_SERVICE_NAME}:${DOCUMENT_JOB_WORKER_IMAGE_TAG}"
+DOCUMENT_AV_SCANNER_IMAGE_URI="${DOCUMENT_AV_SCANNER_REGION}-docker.pkg.dev/${PROJECT_ID}/${DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY}/${DOCUMENT_AV_SCANNER_SERVICE_NAME}:${DOCUMENT_AV_SCANNER_IMAGE_TAG}"
 
 if [ -z "$CLEANUP_SCHEDULER_LOCATION" ]; then
     CLEANUP_SCHEDULER_LOCATION="$CLEANUP_SERVICE_REGION"
@@ -310,6 +348,10 @@ fi
 
 if [ -z "$DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT" ]; then
     DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT="$APP_SERVICE_ACCOUNT_EMAIL"
+fi
+
+if [ "$DOCUMENT_AV_SCAN_MODE" != "off" ] && [ -z "$DOCUMENT_AV_SCAN_URL" ] && [ "$ENABLE_DOCUMENT_AV_SCANNER" != "true" ]; then
+    ENABLE_DOCUMENT_AV_SCANNER="true"
 fi
 
 require_command() {
@@ -892,6 +934,18 @@ ensure_document_job_worker_source_exists() {
     fi
 }
 
+ensure_document_av_scanner_source_exists() {
+    if [ ! -f "$SCRIPT_DIR/services/document-av-scanner/index.js" ] || [ ! -f "$SCRIPT_DIR/services/document-av-scanner/package.json" ]; then
+        echo -e "${RED}❌ Document AV scanner source is incomplete: $SCRIPT_DIR/services/document-av-scanner${NC}"
+        exit 1
+    fi
+
+    if [ ! -f "$SCRIPT_DIR/Dockerfile.document-av-scanner" ] || [ ! -f "$SCRIPT_DIR/cloudbuild.document-av-scanner.yaml" ]; then
+        echo -e "${RED}❌ Document AV scanner build files are incomplete in $SCRIPT_DIR${NC}"
+        exit 1
+    fi
+}
+
 ensure_document_job_worker_artifact_repository() {
     if ! gcloud artifacts repositories describe "$DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY" \
         --location "$DOCUMENT_JOB_WORKER_REGION" \
@@ -913,6 +967,29 @@ build_document_job_worker_image() {
         --project "$PROJECT_ID" \
         --config "$SCRIPT_DIR/cloudbuild.document-worker.yaml" \
         --substitutions "_IMAGE_URI=$DOCUMENT_JOB_WORKER_IMAGE_URI"
+}
+
+ensure_document_av_scanner_artifact_repository() {
+    if ! gcloud artifacts repositories describe "$DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY" \
+        --location "$DOCUMENT_AV_SCANNER_REGION" \
+        --project "$PROJECT_ID" >/dev/null 2>&1; then
+        echo -e "   📦 Creating Artifact Registry repository: ${YELLOW}$DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY${NC}"
+        gcloud artifacts repositories create "$DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY" \
+            --repository-format docker \
+            --location "$DOCUMENT_AV_SCANNER_REGION" \
+            --project "$PROJECT_ID" \
+            --description "Document AV scanner images for ${APP_NAME}"
+    else
+        echo -e "   ✅ Artifact Registry repository exists: ${YELLOW}$DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY${NC}"
+    fi
+}
+
+build_document_av_scanner_image() {
+    echo -e "   🏗️  Building document AV scanner image: ${YELLOW}$DOCUMENT_AV_SCANNER_IMAGE_URI${NC}"
+    gcloud builds submit "$SCRIPT_DIR" \
+        --project "$PROJECT_ID" \
+        --config "$SCRIPT_DIR/cloudbuild.document-av-scanner.yaml" \
+        --substitutions "_IMAGE_URI=$DOCUMENT_AV_SCANNER_IMAGE_URI"
 }
 
 deploy_cleanup_service() {
@@ -948,8 +1025,30 @@ deploy_document_job_worker_service() {
         --max-instances "$DOCUMENT_JOB_WORKER_MAX_INSTANCES" \
         --cpu "$DOCUMENT_JOB_WORKER_CPU" \
         --concurrency "$DOCUMENT_JOB_WORKER_CONCURRENCY" \
-        --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__DOCUMENT_JOB_RETENTION_DAYS=${DOCUMENT_JOB_RETENTION_DAYS}__ENV_DELIM__DOCUMENT_JOB_PROCESSING_TIMEOUT_MS=${DOCUMENT_JOB_PROCESSING_TIMEOUT_MS}__ENV_DELIM__MERGED_DOWNLOAD_URL_TTL_MS=${MERGED_DOWNLOAD_URL_TTL_MS:-900000}__ENV_DELIM__MERGE_TOTAL_SOURCE_BYTES_LIMIT=${MERGE_TOTAL_SOURCE_BYTES_LIMIT:-26214400}__ENV_DELIM__MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-10485760}__ENV_DELIM__MAX_PDF_SOURCE_BYTES=${MAX_PDF_SOURCE_BYTES:-5242880}__ENV_DELIM__DOCUMENT_INTAKE_KMS_KEY_NAME=${DOCUMENT_INTAKE_KMS_KEY_NAME}__ENV_DELIM__DOCUMENT_INTAKE_KMS_ACCESS_MODE=decrypt__ENV_DELIM__DOCUMENT_AV_SCAN_MODE=${DOCUMENT_AV_SCAN_MODE}__ENV_DELIM__DOCUMENT_AV_SCAN_URL=${DOCUMENT_AV_SCAN_URL}__ENV_DELIM__DOCUMENT_AV_SCAN_TIMEOUT_MS=${DOCUMENT_AV_SCAN_TIMEOUT_MS}" \
+        --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__DOCUMENT_JOB_RETENTION_DAYS=${DOCUMENT_JOB_RETENTION_DAYS}__ENV_DELIM__DOCUMENT_JOB_PROCESSING_TIMEOUT_MS=${DOCUMENT_JOB_PROCESSING_TIMEOUT_MS}__ENV_DELIM__MERGED_DOWNLOAD_URL_TTL_MS=${MERGED_DOWNLOAD_URL_TTL_MS:-900000}__ENV_DELIM__MERGE_TOTAL_SOURCE_BYTES_LIMIT=${MERGE_TOTAL_SOURCE_BYTES_LIMIT:-26214400}__ENV_DELIM__MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-10485760}__ENV_DELIM__MAX_PDF_SOURCE_BYTES=${MAX_PDF_SOURCE_BYTES:-5242880}__ENV_DELIM__DOCUMENT_INTAKE_KMS_KEY_NAME=${DOCUMENT_INTAKE_KMS_KEY_NAME}__ENV_DELIM__DOCUMENT_INTAKE_KMS_ACCESS_MODE=decrypt__ENV_DELIM__DOCUMENT_AV_SCAN_MODE=${DOCUMENT_AV_SCAN_MODE}__ENV_DELIM__DOCUMENT_AV_SCAN_URL=${DOCUMENT_AV_SCAN_URL}__ENV_DELIM__DOCUMENT_AV_SCAN_AUDIENCE=${DOCUMENT_AV_SCAN_AUDIENCE}__ENV_DELIM__DOCUMENT_AV_SCAN_TIMEOUT_MS=${DOCUMENT_AV_SCAN_TIMEOUT_MS}" \
         --set-secrets "DB_ENCRYPTION_KEY=${DB_KEY_SECRET}:latest"
+}
+
+deploy_document_av_scanner_service() {
+    local TARGET_REGION=$1
+
+    ensure_document_av_scanner_artifact_repository
+    build_document_av_scanner_image
+
+    gcloud run deploy "$DOCUMENT_AV_SCANNER_SERVICE_NAME" \
+        --project "$PROJECT_ID" \
+        --region "$TARGET_REGION" \
+        --image "$DOCUMENT_AV_SCANNER_IMAGE_URI" \
+        --port 8080 \
+        --ingress all \
+        --no-allow-unauthenticated \
+        --service-account "$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL" \
+        --memory "$DOCUMENT_AV_SCANNER_MEMORY" \
+        --timeout "${DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS}s" \
+        --max-instances "$DOCUMENT_AV_SCANNER_MAX_INSTANCES" \
+        --cpu "$DOCUMENT_AV_SCANNER_CPU" \
+        --concurrency "$DOCUMENT_AV_SCANNER_CONCURRENCY" \
+        --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__DOCUMENT_AV_SCANNER_MAX_BYTES=${DOCUMENT_AV_SCANNER_MAX_BYTES}__ENV_DELIM__CLAMAV_HOST=${CLAMAV_HOST}__ENV_DELIM__CLAMAV_PORT=${CLAMAV_PORT}__ENV_DELIM__CLAMAV_TIMEOUT_MS=${CLAMAV_TIMEOUT_MS}"
 }
 
 grant_cleanup_service_invoker_binding() {
@@ -970,6 +1069,18 @@ grant_document_job_worker_invoker_binding() {
     echo -e "   🔐 Granting Cloud Run Invoker on document worker to ${YELLOW}$INVOKER_SERVICE_ACCOUNT${NC}"
     gcloud run services add-iam-policy-binding "$DOCUMENT_JOB_WORKER_SERVICE_NAME" \
         --region="$DOCUMENT_JOB_WORKER_REGION" \
+        --project "$PROJECT_ID" \
+        --member="serviceAccount:$INVOKER_SERVICE_ACCOUNT" \
+        --role="roles/run.invoker" \
+        --quiet >/dev/null
+}
+
+grant_document_av_scanner_invoker_binding() {
+    local INVOKER_SERVICE_ACCOUNT=$1
+
+    echo -e "   🔐 Granting Cloud Run Invoker on document AV scanner to ${YELLOW}$INVOKER_SERVICE_ACCOUNT${NC}"
+    gcloud run services add-iam-policy-binding "$DOCUMENT_AV_SCANNER_SERVICE_NAME" \
+        --region="$DOCUMENT_AV_SCANNER_REGION" \
         --project "$PROJECT_ID" \
         --member="serviceAccount:$INVOKER_SERVICE_ACCOUNT" \
         --role="roles/run.invoker" \
@@ -1190,6 +1301,37 @@ ensure_document_job_worker_service_account_and_permissions() {
 
     grant_secret_accessor_on_secret "$DB_KEY_SECRET" "$DOCUMENT_JOB_WORKER_SERVICE_ACCOUNT_EMAIL"
     grant_kms_role_on_document_intake_key "$DOCUMENT_JOB_WORKER_SERVICE_ACCOUNT_EMAIL" "roles/cloudkms.cryptoKeyDecrypter"
+}
+
+ensure_document_av_scanner_service_account_and_permissions() {
+    if [ "$ENABLE_DOCUMENT_AV_SCANNER" != "true" ]; then
+        return
+    fi
+
+    if ! gcloud iam service-accounts describe "$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL" --project "$PROJECT_ID" >/dev/null 2>&1; then
+        echo -e "   🔐 Creating dedicated document AV scanner service account: ${YELLOW}$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_NAME${NC}"
+        gcloud iam service-accounts create "$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_NAME" \
+            --project "$PROJECT_ID" \
+            --display-name "Document AV Scanner Service"
+    else
+        echo -e "   ✅ Document AV scanner service account exists: ${YELLOW}$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL${NC}"
+    fi
+
+    local ATTEMPT=1
+    local MAX_ATTEMPTS=20
+    while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
+        if gcloud iam service-accounts describe "$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL" --project "$PROJECT_ID" >/dev/null 2>&1; then
+            break
+        fi
+        echo -e "   ⏳ Waiting for document AV scanner service account propagation (${ATTEMPT}/${MAX_ATTEMPTS})..."
+        sleep 3
+        ATTEMPT=$((ATTEMPT + 1))
+    done
+
+    if ! gcloud iam service-accounts describe "$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL" --project "$PROJECT_ID" >/dev/null 2>&1; then
+        echo -e "${RED}❌ Document AV scanner service account did not become available in time: $DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL${NC}"
+        exit 1
+    fi
 }
 
 ensure_daily_cleanup_function_and_scheduler() {
@@ -1417,6 +1559,42 @@ ensure_document_job_worker_and_scheduler() {
 
     rm -f "$SCHEDULER_STDERR_LOG"
     echo -e "   ✅ Document job worker and scheduler are ready."
+}
+
+ensure_document_av_scanner_service() {
+    if [ "$ENABLE_DOCUMENT_AV_SCANNER" != "true" ]; then
+        return
+    fi
+
+    ensure_document_av_scanner_source_exists
+
+    echo -e "${YELLOW}🛡️ Ensuring document AV scanner service...${NC}"
+    echo -e "   AV scanner service      : ${YELLOW}$DOCUMENT_AV_SCANNER_SERVICE_NAME${NC}"
+    echo -e "   AV scanner region       : ${YELLOW}$DOCUMENT_AV_SCANNER_REGION${NC}"
+    echo -e "   AV scanner service acct : ${YELLOW}$DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL${NC}"
+    echo -e "   AV scanner memory       : ${YELLOW}$DOCUMENT_AV_SCANNER_MEMORY${NC}"
+    echo -e "   AV scanner timeout      : ${YELLOW}${DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS}s${NC}"
+    echo -e "   AV scanner CPU          : ${YELLOW}$DOCUMENT_AV_SCANNER_CPU${NC}"
+    echo -e "   AV scanner concurrency  : ${YELLOW}$DOCUMENT_AV_SCANNER_CONCURRENCY${NC}"
+    echo -e "   AV scanner max inst     : ${YELLOW}$DOCUMENT_AV_SCANNER_MAX_INSTANCES${NC}"
+
+    deploy_document_av_scanner_service "$DOCUMENT_AV_SCANNER_REGION"
+    grant_document_av_scanner_invoker_binding "$DOCUMENT_JOB_WORKER_SERVICE_ACCOUNT_EMAIL"
+
+    local AV_SCANNER_SERVICE_URL
+    AV_SCANNER_SERVICE_URL=$(gcloud run services describe "$DOCUMENT_AV_SCANNER_SERVICE_NAME" \
+        --region "$DOCUMENT_AV_SCANNER_REGION" \
+        --project "$PROJECT_ID" \
+        --format='value(status.url)')
+
+    if [ -z "$AV_SCANNER_SERVICE_URL" ]; then
+        echo -e "${RED}❌ Failed to resolve document AV scanner URL.${NC}"
+        exit 1
+    fi
+
+    DOCUMENT_AV_SCAN_URL="${AV_SCANNER_SERVICE_URL}/scan"
+    DOCUMENT_AV_SCAN_AUDIENCE="$AV_SCANNER_SERVICE_URL"
+    echo -e "   ✅ Document AV scanner ready at ${YELLOW}$DOCUMENT_AV_SCAN_URL${NC}"
 }
 
 migrate_bucket_if_requested() {
@@ -1826,6 +2004,11 @@ validate_smtp_config() {
         exit 1
     fi
 
+    if ! validate_boolean_string "$ENABLE_DOCUMENT_AV_SCANNER"; then
+        echo -e "${RED}❌ Invalid ENABLE_DOCUMENT_AV_SCANNER: $ENABLE_DOCUMENT_AV_SCANNER (must be true or false)${NC}"
+        exit 1
+    fi
+
     if ! validate_positive_integer "$DOCUMENT_JOB_RETENTION_DAYS"; then
         echo -e "${RED}❌ Invalid DOCUMENT_JOB_RETENTION_DAYS: $DOCUMENT_JOB_RETENTION_DAYS (must be a positive integer)${NC}"
         exit 1
@@ -1860,6 +2043,13 @@ validate_smtp_config() {
         fi
     fi
 
+    if [ "$ENABLE_DOCUMENT_AV_SCANNER" = "true" ]; then
+        if [ -z "$DOCUMENT_AV_SCANNER_SERVICE_NAME" ] || [ -z "$DOCUMENT_AV_SCANNER_REGION" ] || [ -z "$DOCUMENT_AV_SCANNER_ARTIFACT_REPOSITORY" ] || [ -z "$DOCUMENT_AV_SCANNER_IMAGE_TAG" ] || [ -z "$DOCUMENT_AV_SCANNER_MEMORY" ]; then
+            echo -e "${RED}❌ Document AV scanner config is incomplete.${NC}"
+            exit 1
+        fi
+    fi
+
     if ! validate_positive_integer "$DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS"; then
         echo -e "${RED}❌ Invalid DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS: $DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS (must be a positive integer)${NC}"
         exit 1
@@ -1880,6 +2070,41 @@ validate_smtp_config() {
         exit 1
     fi
 
+    if ! validate_positive_integer "$DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS: $DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_AV_SCANNER_MAX_INSTANCES"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_AV_SCANNER_MAX_INSTANCES: $DOCUMENT_AV_SCANNER_MAX_INSTANCES (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_AV_SCANNER_CPU"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_AV_SCANNER_CPU: $DOCUMENT_AV_SCANNER_CPU (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_AV_SCANNER_CONCURRENCY"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_AV_SCANNER_CONCURRENCY: $DOCUMENT_AV_SCANNER_CONCURRENCY (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_AV_SCANNER_MAX_BYTES"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_AV_SCANNER_MAX_BYTES: $DOCUMENT_AV_SCANNER_MAX_BYTES (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$CLAMAV_PORT"; then
+        echo -e "${RED}❌ Invalid CLAMAV_PORT: $CLAMAV_PORT (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$CLAMAV_TIMEOUT_MS"; then
+        echo -e "${RED}❌ Invalid CLAMAV_TIMEOUT_MS: $CLAMAV_TIMEOUT_MS (must be a positive integer)${NC}"
+        exit 1
+    fi
+
     if ! validate_document_av_scan_mode "$DOCUMENT_AV_SCAN_MODE"; then
         echo -e "${RED}❌ Invalid DOCUMENT_AV_SCAN_MODE: $DOCUMENT_AV_SCAN_MODE (must be off, log-only, or required)${NC}"
         exit 1
@@ -1890,7 +2115,7 @@ validate_smtp_config() {
         exit 1
     fi
 
-    if [ "$DOCUMENT_AV_SCAN_MODE" != "off" ] && [ -z "$DOCUMENT_AV_SCAN_URL" ]; then
+    if [ "$DOCUMENT_AV_SCAN_MODE" != "off" ] && [ -z "$DOCUMENT_AV_SCAN_URL" ] && [ "$ENABLE_DOCUMENT_AV_SCANNER" != "true" ]; then
         echo -e "${RED}❌ DOCUMENT_AV_SCAN_URL is required when DOCUMENT_AV_SCAN_MODE is not off.${NC}"
         exit 1
     fi
@@ -2115,6 +2340,16 @@ print_deploy_summary() {
     echo -e "   Document Worker CPU     : ${YELLOW}$DOCUMENT_JOB_WORKER_CPU${NC}"
     echo -e "   Document Worker Concur. : ${YELLOW}$DOCUMENT_JOB_WORKER_CONCURRENCY${NC}"
     echo -e "   Document Worker Max Inst: ${YELLOW}$DOCUMENT_JOB_WORKER_MAX_INSTANCES${NC}"
+    echo -e "   Document AV Svc Enabled : ${YELLOW}$ENABLE_DOCUMENT_AV_SCANNER${NC}"
+    echo -e "   Document AV Svc Name    : ${YELLOW}$DOCUMENT_AV_SCANNER_SERVICE_NAME${NC}"
+    echo -e "   Document AV Svc Region  : ${YELLOW}$DOCUMENT_AV_SCANNER_REGION${NC}"
+    echo -e "   Document AV Svc SA      : ${YELLOW}${DOCUMENT_AV_SCANNER_SERVICE_ACCOUNT_EMAIL:-<pending>}${NC}"
+    echo -e "   Document AV Svc Image   : ${YELLOW}$DOCUMENT_AV_SCANNER_IMAGE_URI${NC}"
+    echo -e "   Document AV Svc Memory  : ${YELLOW}$DOCUMENT_AV_SCANNER_MEMORY${NC}"
+    echo -e "   Document AV Svc Timeout : ${YELLOW}${DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS}s${NC}"
+    echo -e "   Document AV Svc CPU     : ${YELLOW}$DOCUMENT_AV_SCANNER_CPU${NC}"
+    echo -e "   Document AV Svc Concur. : ${YELLOW}$DOCUMENT_AV_SCANNER_CONCURRENCY${NC}"
+    echo -e "   Document AV Svc Max Inst: ${YELLOW}$DOCUMENT_AV_SCANNER_MAX_INSTANCES${NC}"
     echo -e "   Document Job Retention  : ${YELLOW}$DOCUMENT_JOB_RETENTION_DAYS${NC}"
     echo -e "   Document Job Timeout ms : ${YELLOW}$DOCUMENT_JOB_PROCESSING_TIMEOUT_MS${NC}"
     echo -e "   Document KMS Location   : ${YELLOW}$DOCUMENT_INTAKE_KMS_LOCATION${NC}"
@@ -2122,7 +2357,9 @@ print_deploy_summary() {
     echo -e "   Document KMS Key        : ${YELLOW}$DOCUMENT_INTAKE_KMS_KEY${NC}"
     echo -e "   Document AV Scan Mode   : ${YELLOW}$DOCUMENT_AV_SCAN_MODE${NC}"
     echo -e "   Document AV Scan URL    : ${YELLOW}${DOCUMENT_AV_SCAN_URL:-<disabled>}${NC}"
+    echo -e "   Document AV Audience    : ${YELLOW}${DOCUMENT_AV_SCAN_AUDIENCE:-<derived from url>}${NC}"
     echo -e "   Document AV Timeout ms  : ${YELLOW}$DOCUMENT_AV_SCAN_TIMEOUT_MS${NC}"
+    echo -e "   ClamAV Host            : ${YELLOW}${CLAMAV_HOST:-<eicar-fallback-only>}${NC}"
     echo -e "   Bucket Migration        : ${YELLOW}$ENABLE_BUCKET_MIGRATION${NC}"
     echo -e "   Bucket Source           : ${YELLOW}${BUCKET_MIGRATION_SOURCE_NAME:-<not set>}${NC}"
     echo -e "   Delete Source Bucket    : ${YELLOW}$DELETE_SOURCE_BUCKET_AFTER_MIGRATION${NC}"
@@ -2467,10 +2704,12 @@ echo -e "   Service Account: $SERVICE_ACCOUNT"
 ensure_kms_keyring_and_crypto_key
 ensure_app_service_account_and_permissions
 ensure_document_job_worker_service_account_and_permissions
+ensure_document_av_scanner_service_account_and_permissions
 
 echo -e "   ✅ Permissions granted."
 
 ensure_daily_cleanup_function_and_scheduler
+ensure_document_av_scanner_service
 ensure_document_job_worker_and_scheduler
 
 # 7. Deploy to Cloud Run

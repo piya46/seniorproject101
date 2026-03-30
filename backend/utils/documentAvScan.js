@@ -1,7 +1,9 @@
 const fs = require('fs/promises');
 const path = require('path');
+const { GoogleAuth } = require('google-auth-library');
 
 const {
+    getDocumentAvScanAudience,
     getDocumentAvScanMode,
     getDocumentAvScanTimeoutMs,
     getDocumentAvScanUrl,
@@ -9,9 +11,14 @@ const {
 } = require('./documentAvConfig');
 
 let fetchOverride = null;
+let authHeadersOverride = null;
 
 const setDocumentAvFetchForTests = (value) => {
     fetchOverride = value || null;
+};
+
+const setDocumentAvAuthHeadersForTests = (value) => {
+    authHeadersOverride = value || null;
 };
 
 const getFetchImpl = () => {
@@ -24,6 +31,21 @@ const getFetchImpl = () => {
     }
 
     return fetch;
+};
+
+const getAuthenticatedHeaders = async (audience) => {
+    if (typeof authHeadersOverride === 'function') {
+        return authHeadersOverride(audience);
+    }
+
+    const normalizedAudience = String(audience || '').trim();
+    if (!normalizedAudience) {
+        return {};
+    }
+
+    const auth = new GoogleAuth();
+    const client = await auth.getIdTokenClient(normalizedAudience);
+    return client.getRequestHeaders();
 };
 
 const scanDocumentFile = async (filePath, context = {}) => {
@@ -57,10 +79,13 @@ const scanDocumentFile = async (filePath, context = {}) => {
     const timeout = setTimeout(() => controller.abort(), getDocumentAvScanTimeoutMs());
 
     try {
+        const audience = getDocumentAvScanAudience() || url;
+        const authHeaders = await getAuthenticatedHeaders(audience);
         const response = await getFetchImpl()(url, {
             method: 'POST',
             body: form,
-            signal: controller.signal
+            signal: controller.signal,
+            headers: authHeaders
         });
 
         let payload = {};
@@ -101,5 +126,6 @@ const scanDocumentFile = async (filePath, context = {}) => {
 
 module.exports = {
     scanDocumentFile,
+    setDocumentAvAuthHeadersForTests,
     setDocumentAvFetchForTests
 };

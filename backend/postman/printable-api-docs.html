@@ -168,6 +168,7 @@
 <li>runtime ของ app และ worker ถูกแยก `DOCUMENT_INTAKE_KMS_ACCESS_MODE` เป็น `encrypt` และ `decrypt` ตามลำดับเพื่อลด capability ของแต่ละ service</li>
 <li>document worker รันบน distroless/nonroot image และ deploy ด้วย memory/timeout/CPU/concurrency policy แยกจาก API หลัก</li>
 <li>worker สามารถต่อ AV scanning chain ก่อนขั้น sanitize ได้ผ่าน `DOCUMENT_AV_SCAN_MODE`, `DOCUMENT_AV_SCAN_URL`, และ `DOCUMENT_AV_SCAN_TIMEOUT_MS`</li>
+<li>ถ้าเปิด AV mode โดยยังไม่มี URL และเลือกใช้ deploy scaffold ของระบบ `deploy.sh` สามารถสร้าง private document AV scanner service ให้เองและ derive `DOCUMENT_AV_SCAN_URL`/audience กลับเข้า worker ได้</li>
 <li>DB field encryption สำหรับข้อมูลใหม่ใช้ format แบบ versioned (`vN:iv:ciphertext:authTag`) และ backend ยังอ่าน legacy format เดิมได้</li>
 <li>operator สามารถใช้ [migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js) เพื่อ dry-run / migrate legacy DB records ก่อน flip `DB_ENCRYPTION_KEY_VERSION`</li>
 <li>secure transport รุ่นถัดไปที่มี PFS ถูกแยกเป็น design doc และ backend รองรับ handshake + protected route transport แล้วใน [PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)</li>

@@ -204,9 +204,22 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 | `DOCUMENT_JOB_WORKER_CONCURRENCY` | `1` | concurrency ต่อ worker instance เพื่อลด memory contention จาก PDF/image processing |
 | `DOCUMENT_INTAKE_KMS_KEY_NAME` | derived from deploy | Cloud KMS crypto key ที่ใช้ห่อ/แกะ DEK สำหรับ raw intake object |
 | `DOCUMENT_INTAKE_KMS_ACCESS_MODE` | deploy-set (`encrypt` app / `decrypt` worker) | จำกัด capability ของ service นั้น ๆ ให้ทำได้เฉพาะ encrypt หรือ decrypt ตาม role |
+| `ENABLE_DOCUMENT_AV_SCANNER` | `false` | เมื่อเป็น `true` จะ deploy Cloud Run document AV scanner ให้และผูก URL กลับเข้า worker อัตโนมัติ |
+| `DOCUMENT_AV_SCANNER_SERVICE_NAME` | `${SERVICE_NAME}-document-av-scanner` | ชื่อ Cloud Run service ของ AV scanner |
+| `DOCUMENT_AV_SCANNER_REGION` | same as worker | region ของ AV scanner |
+| `DOCUMENT_AV_SCANNER_MEMORY` | `1Gi` | memory limit ของ AV scanner service |
+| `DOCUMENT_AV_SCANNER_TIMEOUT_SECONDS` | `120` | timeout ของ endpoint `/scan` |
+| `DOCUMENT_AV_SCANNER_MAX_INSTANCES` | `2` | จำนวน instance สูงสุดของ AV scanner |
+| `DOCUMENT_AV_SCANNER_CPU` | `1` | จำนวน vCPU ของ AV scanner |
+| `DOCUMENT_AV_SCANNER_CONCURRENCY` | `4` | concurrency ต่อ AV scanner instance |
+| `DOCUMENT_AV_SCANNER_MAX_BYTES` | `10485760` | ขนาดไฟล์สูงสุดที่ AV scanner ยอมรับ |
 | `DOCUMENT_AV_SCAN_MODE` | `off` | policy สำหรับ AV scanning chain: `off`, `log-only`, หรือ `required` |
-| `DOCUMENT_AV_SCAN_URL` | unset | URL ของ external AV scanner ที่ worker จะเรียกก่อน sanitize ไฟล์ |
+| `DOCUMENT_AV_SCAN_URL` | unset/derived | URL ของ AV scanner ที่ worker จะเรียกก่อน sanitize ไฟล์; ถ้าเปิด `ENABLE_DOCUMENT_AV_SCANNER=true` สคริปต์จะ derive ให้เองหลัง deploy |
+| `DOCUMENT_AV_SCAN_AUDIENCE` | unset/derived | audience สำหรับ Google-signed identity token ที่ worker ใช้เรียก private AV scanner |
 | `DOCUMENT_AV_SCAN_TIMEOUT_MS` | `30000` | timeout ของการเรียก AV scanner |
+| `CLAMAV_HOST` | unset | host ของ ClamAV daemon ถ้าต้องการใช้ AV เต็มรูปแบบ; ถ้าไม่ตั้งจะเหลือเพียง baseline EICAR fallback scanner |
+| `CLAMAV_PORT` | `3310` | port ของ ClamAV daemon |
+| `CLAMAV_TIMEOUT_MS` | `30000` | timeout สำหรับการคุยกับ ClamAV daemon |
 | `DB_ENCRYPTION_KEY_VERSION` | `v1` | version ของ DB encryption key ที่ใช้เข้ารหัสข้อมูลใหม่ |
 | `DB_ENCRYPTION_KEY_V2` เป็นต้นไป | unset | key เพิ่มเติมสำหรับ decrypt ข้อมูลที่ถูกเข้ารหัสด้วย version ใหม่ในอนาคต |
 
@@ -241,6 +254,8 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - runtime ของ worker ใช้ distroless + nonroot และ application tree ถูกทำให้เป็น read-only ภายใน image โดยเหลือ `/tmp` สำหรับไฟล์ชั่วคราว
 - Cloud Run worker ถูกตั้ง resource policy ผ่าน `DOCUMENT_JOB_WORKER_MEMORY`, `DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS`, `DOCUMENT_JOB_WORKER_CPU`, `DOCUMENT_JOB_WORKER_CONCURRENCY`, และ `DOCUMENT_JOB_WORKER_MAX_INSTANCES`
 - ถ้าเปิด `DOCUMENT_AV_SCAN_MODE=log-only` หรือ `required` worker จะเรียก AV scanner ผ่าน `DOCUMENT_AV_SCAN_URL` ก่อนเข้าสู่ขั้น sanitize ด้วย `sharp` หรือ `pdf-lib`
+- ถ้า `DOCUMENT_AV_SCAN_MODE` ไม่ใช่ `off` และยังไม่ได้ตั้ง `DOCUMENT_AV_SCAN_URL` แต่เปิด `ENABLE_DOCUMENT_AV_SCANNER=true` หรือปล่อยให้สคริปต์ auto-enable เอง `deploy.sh` จะ deploy [services/document-av-scanner/index.js](/Users/pst./senior/backend/services/document-av-scanner/index.js) แล้วผูก URL/Audience ให้ worker อัตโนมัติ
+- scanner scaffold ที่สคริปต์ deploy ให้รองรับ baseline EICAR detection ทันที และสามารถยกระดับเป็น AV เต็มรูปแบบได้เมื่อกำหนด `CLAMAV_HOST`
 - แนะนำเริ่มจาก `DOCUMENT_AV_SCAN_MODE=log-only` ก่อนเพื่อเก็บสถิติ false positive แล้วค่อยขยับเป็น `required`
 
 ถ้าจะรัน worker จาก backend root:
