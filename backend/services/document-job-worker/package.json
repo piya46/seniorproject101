@@ -1,0 +1,20 @@
+{
+  "name": "document-job-worker-service",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.11.0",
+    "@google-cloud/storage": "^7.16.0",
+    "express": "^4.21.2",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.34.5",
+    "uuid": "^9.0.0"
+  }
+}

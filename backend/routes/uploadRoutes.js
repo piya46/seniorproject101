@@ -9,17 +9,21 @@ const { pipeline } = require('stream/promises');
 const { Storage } = require('@google-cloud/storage');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
-const sharp = require('sharp');
-const { PDFDocument } = require('pdf-lib');
 
 const authMiddleware = require('../middlewares/authMiddleware');
 const { strictLimiter, createScopedLimiter } = require('../middlewares/rateLimitMiddleware'); 
-const { addFileToSession, deleteFileRecord, getDecryptedSessionFiles } = require('../utils/dbUtils');
-const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc } = require('../utils/fileSelection');
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 const { decryptEnvelopeKey } = require('../utils/cryptoUtils');
 const { getMaxPdfSourceBytes, getMaxUploadBytes } = require('../utils/uploadSecurity');
 const { wipeBufferList } = require('../utils/memorySecurity');
+const { sanitizeFormCode } = require('../utils/documentJobProcessor');
+const {
+    DOCUMENT_JOB_TYPES,
+    createDocumentJob,
+    ensureDocumentJobAccess,
+    getDocumentJob,
+    sanitizeDocumentJobForResponse
+} = require('../utils/documentJobs');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -45,11 +49,6 @@ const upload = multer({
       files: 1 
   }
 });
-
-const sanitizeFormCode = (code) => {
-    if (!code) return 'general';
-    return code.replace(/[^a-zA-Z0-9-_]/g, '');
-};
 
 // Browser uploads use cookie auth, so enforce the frontend allowlist.
 const checkBrowserOrigin = (req, res, next) => {
@@ -121,7 +120,6 @@ const uploadProcessedFileToGcs = async (blob, filePath, contentType, sessionId) 
 router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimiter, upload.single('file'), async (req, res) => {
   let verifiedInputPath = null;
   let decryptedPath = null;
-  let processedPath = null;
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
@@ -194,78 +192,47 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
         });
     }
 
-    // ... Process Upload ...
     const sessionId = req.user.session_id; 
     const { file_key, form_code } = req.body; 
     if (!file_key) return res.status(400).json({ error: 'Missing file_key.' });
     const safeFormCode = sanitizeFormCode(form_code);
+    const rawExt = detectedType.ext ? `.${detectedType.ext}` : '.bin';
+    const rawObjectPath = `${sessionId}/intake/${uuidv4()}${rawExt}`;
+    const rawObject = bucket.file(rawObjectPath);
+    await uploadProcessedFileToGcs(rawObject, verifiedInputPath, detectedType.mime, sessionId);
 
-    // Sanitize Logic
-    let finalMimeType = detectedType.mime;
-    let fileExtension = `.${detectedType.ext}`;
-
-    try {
-        if (['image/jpeg', 'image/png', 'image/webp'].includes(finalMimeType)) {
-            processedPath = path.join(TEMP_UPLOAD_DIR, `processed-${uuidv4()}.jpg`);
-            await sharp(verifiedInputPath).rotate().toFormat('jpeg', { quality: 80 }).toFile(processedPath);
-            finalMimeType = 'image/jpeg';
-            fileExtension = '.jpg';
-        } else if (finalMimeType === 'application/pdf') {
-            if (verifiedInputBytes > maxPdfSourceBytes) {
-                return res.status(413).json({
-                    error: 'PDF too large',
-                    message: 'PDF file exceeds the maximum allowed size for safe processing.',
-                    data: {
-                        source_bytes: verifiedInputBytes,
-                        source_bytes_limit: maxPdfSourceBytes
-                    }
-                });
-            }
-            const finalBuffer = await fsp.readFile(verifiedInputPath);
-            const pdfDoc = await PDFDocument.load(finalBuffer, { ignoreEncryption: true });
-            processedPath = path.join(TEMP_UPLOAD_DIR, `processed-${uuidv4()}.pdf`);
-            await fsp.writeFile(processedPath, Buffer.from(await pdfDoc.save()));
-        } else {
-            processedPath = path.join(TEMP_UPLOAD_DIR, `processed-${uuidv4()}${fileExtension}`);
-            await fsp.copyFile(verifiedInputPath, processedPath);
+    const job = await createDocumentJob({
+        type: DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE,
+        sessionId,
+        requestedBy: {
+            email: req.user.email || null,
+            session_id: sessionId
+        },
+        payload: {
+            file_key,
+            form_code: safeFormCode,
+            raw_gcs_path: rawObjectPath,
+            detected_mime: detectedType.mime,
+            detected_ext: detectedType.ext,
+            source_bytes: verifiedInputBytes
+        },
+        metadata: {
+            source_bytes: verifiedInputBytes
         }
-    } catch (processErr) {
-        console.error('Sanitization Error:', processErr);
-        return res.status(400).json({ error: 'File verification failed.' });
-    }
-
-    // Upload to GCS
-    const uniqueFileName = `${uuidv4()}${fileExtension}`;
-    const gcsPath = `${sessionId}/${safeFormCode}/${uniqueFileName}`;
-    const blob = bucket.file(gcsPath);
-    await uploadProcessedFileToGcs(blob, processedPath, finalMimeType, sessionId);
-
-    const existingFiles = await getDecryptedSessionFiles(sessionId);
-    const obsoleteFiles = sortFilesByUploadedAtDesc(
-        findFilesByKeyAndForm(existingFiles, file_key, safeFormCode)
-    );
-
-    for (const obsoleteFile of obsoleteFiles) {
-        try {
-            await bucket.file(obsoleteFile.gcs_path).delete({ ignoreNotFound: true });
-        } catch (storageDeleteError) {
-            console.warn(`⚠️ Skip deleting old GCS file ${obsoleteFile.gcs_path}:`, storageDeleteError.message);
-        }
-
-        await deleteFileRecord(sessionId, obsoleteFile.id);
-    }
-
-    await addFileToSession(sessionId, {
-        file_key, gcs_path: gcsPath, file_type: finalMimeType, form_code: safeFormCode
     });
-    req.log?.audit('file_uploaded', {
+
+    req.log?.audit('upload_job_queued', {
         file_key,
         form_code: safeFormCode,
-        mime_type: finalMimeType,
-        gcs_path: gcsPath,
+        mime_type: detectedType.mime,
+        job_id: job.id,
+        raw_gcs_path: rawObjectPath,
         source_bytes: verifiedInputBytes
     });
-    res.json({ status: 'success', data: { file_key, form_code: safeFormCode } });
+    res.status(202).json({
+        status: 'queued',
+        job: sanitizeDocumentJobForResponse(job)
+    });
 
   } catch (error) {
     req.log?.error('upload_handler_error', { message: error.message });
@@ -273,8 +240,23 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
   } finally {
     await cleanupTempFile(req.file?.path);
     await cleanupTempFile(decryptedPath);
-    await cleanupTempFile(processedPath);
   }
+});
+
+router.get('/jobs/:jobId', authMiddleware, async (req, res) => {
+    const job = await getDocumentJob(req.params.jobId);
+    if (!job || job.type !== DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE) {
+        return res.status(404).json({ error: 'Job not found.' });
+    }
+
+    if (!ensureDocumentJobAccess(job, req.user)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    return res.status(200).json({
+        status: 'success',
+        job: sanitizeDocumentJobForResponse(job)
+    });
 });
 
 module.exports = router;

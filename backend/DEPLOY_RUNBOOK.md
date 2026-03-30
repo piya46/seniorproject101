@@ -188,6 +188,8 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 | `MERGE_TOTAL_SOURCE_BYTES_LIMIT` | `26214400` | เพดานขนาดรวม source files สำหรับ merge route (25MB) |
 | `MAX_UPLOAD_BYTES` | `10485760` | เพดานอัปโหลดทั่วไปต่อไฟล์ (10MB) |
 | `MAX_PDF_SOURCE_BYTES` | `5242880` | เพดาน PDF ที่ backend ยอม sanitize อย่างปลอดภัย (5MB) |
+| `DOCUMENT_JOB_RETENTION_DAYS` | `7` | ระยะเวลาที่เก็บ job records/result metadata ใน Firestore |
+| `DOCUMENT_JOB_PROCESSING_TIMEOUT_MS` | `600000` | timeout เชิงตรรกะสำหรับ job ที่ถูก claim ไปประมวลผล |
 | `DB_ENCRYPTION_KEY_VERSION` | `v1` | version ของ DB encryption key ที่ใช้เข้ารหัสข้อมูลใหม่ |
 | `DB_ENCRYPTION_KEY_V2` เป็นต้นไป | unset | key เพิ่มเติมสำหรับ decrypt ข้อมูลที่ถูกเข้ารหัสด้วย version ใหม่ในอนาคต |
 
@@ -206,6 +208,22 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - ถ้าใช้ BFF production flow ต้องเพิ่ม frontend callback เช่น `https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app/auth/callback`
 - ถ้ายังต้องการรองรับ legacy/direct mode ค่อยเพิ่ม backend callback `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback` แยกอีกตัว
 - ถ้าจะเปิด `TRUSTED_BFF_AUTH_ENABLED=true` ควรสร้าง shared secret แบบสุ่มยาวและเก็บเฉพาะใน Secret Manager เท่านั้น
+
+## Async Document Worker Model
+
+งานหนักอย่าง sanitize upload และ merge เอกสารถูกแยกออกจาก request cycle แล้ว:
+
+- `POST /api/v1/upload` จะ enqueue job ประเภท `upload_sanitize`
+- `POST /api/v1/documents/merge` จะ enqueue job ประเภท `merge_documents`
+- worker ใช้ Firestore collection `DOCUMENT_JOBS` เป็น queue/status store
+- worker scaffold อยู่ที่ [services/document-job-worker/index.js](/Users/pst./senior/backend/services/document-job-worker/index.js)
+
+ถ้าจะรัน worker จาก backend root:
+
+```bash
+cd /Users/pst./senior/backend
+npm run worker:document-jobs
+```
 
 ## DB Encryption Key Rotation And Migration
 

@@ -133,6 +133,7 @@ store ของ rate limit ตอนนี้ใช้ Firestore แทน in-me
 
 upload/support routes ก็รับไฟล์ลง temp file ใน `/tmp` ก่อน และพยายาม process จาก path ให้มากที่สุด เพื่อลด peak RAM จาก concurrent upload
 backend จะ cleanup temp files ที่ค้างจากรอบก่อนตอน startup อีกชั้นหนึ่ง โดยลบเฉพาะไฟล์ที่ระบบสร้างเอง (`upload-`, `decrypted-`, `processed-`, `support-`) และเก่ากว่า `TEMP_FILE_MAX_AGE_MS`
+ล่าสุด upload sanitize และ document merge ถูกย้ายไป async job model แล้ว ทำให้ API หลักหยุดทำงานหนักใน request cycle และลดความเสี่ยง OOM/timeout จากงานเอกสารลงอีกชั้นหนึ่ง
 
 AI usage รายวันถูกเก็บใน Firestore collection `AI_USAGE_DAILY` และตั้ง `expire_at` สำหรับ TTL แล้ว โดย retention กำหนดได้ผ่าน `AI_USAGE_RETENTION_DAYS`
 
