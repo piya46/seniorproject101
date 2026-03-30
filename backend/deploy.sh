@@ -52,13 +52,13 @@ SECRET_NAME="${SECRET_NAME:-JWT_SECRET}"
 # ถ้าไม่กำหนด FRONTEND_URL สคริปต์จะ derive จาก FRONTEND_SERVICE_NAME เป็น Cloud Run run.app URL ให้
 FRONTEND_URL="${FRONTEND_URL:-}"
 FRONTEND_EXTRA_URLS="${FRONTEND_EXTRA_URLS:-}"
-TECH_SUPPORT_TARGET_EMAIL="${TECH_SUPPORT_TARGET_EMAIL:-}"
+TECH_SUPPORT_TARGET_EMAIL="${TECH_SUPPORT_TARGET_EMAIL:-piyaton56@gmail.com}"
 SMTP_PORT="${SMTP_PORT:-465}"
 SMTP_SECURE="${SMTP_SECURE:-true}"
 SMTP_HOST_VALUE="${SMTP_HOST_VALUE:-}"
 SMTP_USER_VALUE="${SMTP_USER_VALUE:-}"
 SMTP_FROM_EMAIL_VALUE="${SMTP_FROM_EMAIL_VALUE:-}"
-SMTP_FROM_NAME_VALUE="${SMTP_FROM_NAME_VALUE:-AI FormCheck Support}"
+SMTP_FROM_NAME_VALUE="${SMTP_FROM_NAME_VALUE:-แจ้งปัญหา/ข้อเสนอแนะ}"
 SMTP_PASS_VALUE="${SMTP_PASS_VALUE:-}"
 NODE_ENV="${NODE_ENV:-production}"
 OIDC_ENABLED="${OIDC_ENABLED:-true}"
@@ -1158,24 +1158,16 @@ prompt_value_if_empty() {
     local SECRET_INPUT=${4:-false}
     local CURRENT_VALUE=${!VAR_NAME:-}
     local USER_INPUT=""
-    local PROMPT_TEXT="$LABEL"
-
-    if [ -n "$DEFAULT_VALUE" ]; then
-        PROMPT_TEXT="$PROMPT_TEXT [$DEFAULT_VALUE]"
-    fi
-    PROMPT_TEXT="$PROMPT_TEXT: "
 
     if [ -n "$CURRENT_VALUE" ]; then
         return
     fi
 
     if [ "$SECRET_INPUT" = "true" ]; then
-        printf '%s' "$PROMPT_TEXT"
-        read -r -s USER_INPUT
+        read -r -s "?$LABEL${DEFAULT_VALUE:+ [$DEFAULT_VALUE]}: " USER_INPUT
         echo
     else
-        printf '%s' "$PROMPT_TEXT"
-        read -r USER_INPUT
+        read -r "?$LABEL${DEFAULT_VALUE:+ [$DEFAULT_VALUE]}: " USER_INPUT
     fi
 
     USER_INPUT="$(trim_value "$USER_INPUT")"
@@ -1332,8 +1324,7 @@ ensure_smtp_password() {
     fi
 
     echo -e "${YELLOW}🔐 SMTP password not found in env or Secret Manager. Please enter it now.${NC}"
-    printf 'SMTP Password: '
-    read -r -s SMTP_PASS_VALUE
+    read -s "SMTP_PASS_VALUE?SMTP Password: "
     echo
 
     if [ -z "$SMTP_PASS_VALUE" ]; then
