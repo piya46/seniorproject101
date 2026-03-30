@@ -191,6 +191,7 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 | `MAX_PDF_SOURCE_BYTES` | `5242880` | เพดาน PDF ที่ backend ยอม sanitize อย่างปลอดภัย (5MB) |
 | `DOCUMENT_JOB_RETENTION_DAYS` | `7` | ระยะเวลาที่เก็บ job records/result metadata ใน Firestore |
 | `DOCUMENT_JOB_PROCESSING_TIMEOUT_MS` | `600000` | timeout เชิงตรรกะสำหรับ job ที่ถูก claim ไปประมวลผล |
+| `DOCUMENT_INTAKE_ENCRYPTION_KEY` | generated secret | key สำหรับเข้ารหัส raw intake object ก่อนเก็บลง GCS ระหว่างรอ worker |
 | `DB_ENCRYPTION_KEY_VERSION` | `v1` | version ของ DB encryption key ที่ใช้เข้ารหัสข้อมูลใหม่ |
 | `DB_ENCRYPTION_KEY_V2` เป็นต้นไป | unset | key เพิ่มเติมสำหรับ decrypt ข้อมูลที่ถูกเข้ารหัสด้วย version ใหม่ในอนาคต |
 

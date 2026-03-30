@@ -17,6 +17,7 @@ const { decryptEnvelopeKey } = require('../utils/cryptoUtils');
 const { getMaxPdfSourceBytes, getMaxUploadBytes } = require('../utils/uploadSecurity');
 const { wipeBufferList } = require('../utils/memorySecurity');
 const { sanitizeFormCode } = require('../utils/documentJobProcessor');
+const { encryptDocumentIntakeToFile } = require('../utils/documentIntakeEncryption');
 const {
     DOCUMENT_JOB_TYPES,
     createDocumentJob,
@@ -120,6 +121,7 @@ const uploadProcessedFileToGcs = async (blob, filePath, contentType, sessionId) 
 router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimiter, upload.single('file'), async (req, res) => {
   let verifiedInputPath = null;
   let decryptedPath = null;
+  let encryptedIntakePath = null;
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
@@ -199,7 +201,21 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
     const rawExt = detectedType.ext ? `.${detectedType.ext}` : '.bin';
     const rawObjectPath = `${sessionId}/intake/${uuidv4()}${rawExt}`;
     const rawObject = bucket.file(rawObjectPath);
-    await uploadProcessedFileToGcs(rawObject, verifiedInputPath, detectedType.mime, sessionId);
+    encryptedIntakePath = path.join(TEMP_UPLOAD_DIR, `intake-encrypted-${uuidv4()}.bin`);
+    const intakeEncryption = await encryptDocumentIntakeToFile(verifiedInputPath, encryptedIntakePath);
+    await uploadProcessedFileToGcs(rawObject, encryptedIntakePath, 'application/octet-stream', sessionId);
+    await rawObject.setMetadata({
+        contentType: 'application/octet-stream',
+        metadata: {
+            originalName: 'secure_upload_intake',
+            uploadedBy: sessionId,
+            intake_encrypted: 'true',
+            intake_iv_base64: intakeEncryption.iv_base64,
+            intake_tag_base64: intakeEncryption.tag_base64,
+            intake_original_mime: detectedType.mime,
+            intake_original_ext: detectedType.ext
+        }
+    });
 
     const job = await createDocumentJob({
         type: DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE,
@@ -240,6 +256,7 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
   } finally {
     await cleanupTempFile(req.file?.path);
     await cleanupTempFile(decryptedPath);
+    await cleanupTempFile(encryptedIntakePath);
   }
 });
 

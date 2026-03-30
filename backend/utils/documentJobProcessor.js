@@ -12,6 +12,7 @@ const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc, filterFilesForForm, se
 const { departments, getFormConfig } = require('../data/staticData');
 const { getMaxPdfSourceBytes } = require('./uploadSecurity');
 const { getMergedDownloadUrlTtlMs, getMergeTotalSourceBytesLimit } = require('./documentMergeSecurity');
+const { decryptDocumentIntakeToFile } = require('./documentIntakeEncryption');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -67,10 +68,17 @@ const processUploadSanitizeJob = async (job) => {
 
     let sourcePath = null;
     let processedPath = null;
+    let encryptedIntakePath = null;
     try {
         const sourceExt = detectedExt ? `.${detectedExt}` : '.bin';
+        encryptedIntakePath = path.join(TEMP_UPLOAD_DIR, `job-intake-${uuidv4()}.bin`);
         sourcePath = path.join(TEMP_UPLOAD_DIR, `job-source-${uuidv4()}${sourceExt}`);
-        await rawFile.download({ destination: sourcePath });
+        const [metadata] = await rawFile.getMetadata();
+        await rawFile.download({ destination: encryptedIntakePath });
+        await decryptDocumentIntakeToFile(encryptedIntakePath, sourcePath, {
+            iv_base64: metadata?.metadata?.intake_iv_base64,
+            tag_base64: metadata?.metadata?.intake_tag_base64
+        });
 
         const sourceStat = await fsp.stat(sourcePath);
         const sourceBytes = Number(sourceStat.size || 0);
@@ -137,6 +145,7 @@ const processUploadSanitizeJob = async (job) => {
         };
     } finally {
         await rawFile.delete({ ignoreNotFound: true }).catch(() => {});
+        await cleanupTempFile(encryptedIntakePath);
         await cleanupTempFile(sourcePath);
         await cleanupTempFile(processedPath);
     }
