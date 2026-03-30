@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { initSessionRecord, revokeSessionRecord } = require('./dbUtils');
 const { ensureCsrfCookie, setCsrfCookie } = require('./csrfUtils');
+const { getCookieSameSitePolicy, shouldUseSecureCookies } = require('./runtimeSecurityConfig');
 
 function generateSecureSessionId() {
   return 'sess_' + crypto.randomBytes(16).toString('hex');
@@ -46,12 +47,10 @@ function extractIdentityFromCookie(existingToken) {
 }
 
 function buildSessionCookieOptions() {
-  const isProduction = process.env.NODE_ENV === 'production';
-
   return {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'None' : 'Lax',
+    secure: shouldUseSecureCookies(),
+    sameSite: getCookieSameSitePolicy(),
     maxAge: 86400 * 1000
   };
 }

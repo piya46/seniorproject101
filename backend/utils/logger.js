@@ -7,6 +7,10 @@ const SAFE_TOKEN_METRIC_FIELDS = new Set([
   'used_tokens',
   'daily_limit'
 ]);
+const SENSITIVE_KEY_PATTERN =
+  /token|secret|password|authorization|cookie|encKey|payload|jwt|csrf|nonce|bearer|private[_-]?key|refresh[_-]?token|access[_-]?token|id[_-]?token/i;
+const SENSITIVE_STRING_VALUE_PATTERN =
+  /bearer\s+[a-z0-9\-._~+/]+=*|eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/;
 
 const redactValue = (value) => {
   if (value === undefined) {
@@ -18,6 +22,10 @@ const redactValue = (value) => {
   }
 
   if (typeof value === 'string') {
+    if (SENSITIVE_STRING_VALUE_PATTERN.test(value)) {
+      return '[REDACTED]';
+    }
+
     return value.length > 400 ? `${value.slice(0, 397)}...` : value;
   }
 
@@ -34,7 +42,7 @@ const redactValue = (value) => {
         continue;
       }
 
-      if (/token|secret|password|authorization|cookie|encKey|payload_base64/i.test(key)) {
+      if (SENSITIVE_KEY_PATTERN.test(key)) {
         redacted[key] = '[REDACTED]';
         continue;
       }

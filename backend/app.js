@@ -13,6 +13,7 @@ const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
 const { getKeyStatus } = require('./utils/cryptoUtils');
 const { cleanupStaleTempFilesOnStartup } = require('./utils/tempFileCleanup');
 const { getAllowedOrigins } = require('./utils/browserOrigin');
+const { parseTrustProxySetting } = require('./utils/runtimeSecurityConfig');
 
 // Swagger Imports
 const swaggerUi = require('swagger-ui-express');
@@ -31,7 +32,7 @@ if (missingEnv.length > 0) {
   process.exit(1);
 }
 
-app.set('trust proxy', 1);
+app.set('trust proxy', parseTrustProxySetting());
 
 // ✅ SECURITY UPGRADE: Helmet with strict CSP
 app.use(helmet({

@@ -1,15 +1,14 @@
 const crypto = require('crypto');
+const { getCookieSameSitePolicy, shouldUseSecureCookies } = require('./runtimeSecurityConfig');
 
 const CSRF_COOKIE_NAME = 'sci_csrf_token';
 const CSRF_HEADER_NAME = 'x-csrf-token';
 
 function buildCsrfCookieOptions() {
-  const isProduction = process.env.NODE_ENV === 'production';
-
   return {
     httpOnly: false,
-    secure: isProduction,
-    sameSite: isProduction ? 'None' : 'Lax',
+    secure: shouldUseSecureCookies(),
+    sameSite: getCookieSameSitePolicy(),
     maxAge: 86400 * 1000
   };
 }
