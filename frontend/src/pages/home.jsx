@@ -59,8 +59,20 @@ export default function Home() {
           pubKey = keyRes.data?.publicKey || keyRes.data?.data?.publicKey || (typeof keyRes.data === 'string' ? keyRes.data : null);
           
           if (pubKey) {
-            const encryptedBody = await encryptPayload({}, pubKey);
-            await axios.post('/api/v1/session/init', encryptedBody);
+            // 💡 สร้าง Payload พร้อม _ts และ nonce ตามที่ Backend ต้องการก่อนนำไปเข้ารหัส
+            const initPayload = {
+              _ts: Date.now(),
+              nonce: `req-init-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+            };
+
+            const encryptedBody = await encryptPayload(initPayload, pubKey);
+            
+            // 💡 ใส่ withCredentials: true เพื่อให้บราวเซอร์เซฟ Cookie session_token ที่แบ็คเอนด์ส่งมา
+            await axios.post('/api/v1/session/init', encryptedBody, {
+              headers: { 'Content-Type': 'application/json' },
+              withCredentials: true 
+            });
+            
             sessionStorage.setItem('public_key', pubKey);
             sessionStorage.setItem('is_initialized', 'true');
           }
@@ -84,7 +96,11 @@ export default function Home() {
         return;
       }
 
-      const res = await axios.get(`/api/v1/forms`, { params: { degree_level: degreeLevel } });
+      // 💡 หาก API get forms ต้องใช้ Cookie ด้วย แนะนำให้เติม withCredentials: true ในอนาคต
+      const res = await axios.get(`/api/v1/forms`, { 
+        params: { degree_level: degreeLevel },
+        withCredentials: true 
+      });
       const fetchedData = res.data.data || [];
       
       sessionStorage.setItem(cacheKey, JSON.stringify(fetchedData));
