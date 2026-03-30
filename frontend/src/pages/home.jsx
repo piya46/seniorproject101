@@ -90,7 +90,11 @@ export default function Home() {
         return;
       }
 
-      const res = await axios.get(`/api/v1/forms`, { params: { degree_level: degreeLevel } });
+      // 💡 หาก API get forms ต้องใช้ Cookie ด้วย แนะนำให้เติม withCredentials: true ในอนาคต
+      const res = await axios.get(`/api/v1/forms`, { 
+        params: { degree_level: degreeLevel },
+        withCredentials: true 
+      });
       const fetchedData = res.data.data || [];
       
       sessionStorage.setItem(cacheKey, JSON.stringify(fetchedData));
