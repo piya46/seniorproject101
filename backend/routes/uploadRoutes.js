@@ -128,7 +128,9 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
     verifiedInputPath = req.file.path;
 
     if (req.body.encKey && req.body.iv && req.body.tag) {
-        console.log(`🔐 Decrypting file: ${req.body.file_key || 'unknown'}`);
+        req.log?.info('upload_file_decryption_started', {
+            file_key: req.body.file_key || 'unknown'
+        });
         try {
             decryptedPath = path.join(TEMP_UPLOAD_DIR, `decrypted-${uuidv4()}.bin`);
             await decryptFileToPath(
@@ -139,8 +141,14 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
                 req.body.tag
             );
             verifiedInputPath = decryptedPath;
-            console.log('✅ Decryption Successful');
+            req.log?.info('upload_file_decryption_succeeded', {
+                file_key: req.body.file_key || 'unknown'
+            });
         } catch (decryptErr) {
+            req.log?.warn('upload_file_decryption_failed', {
+                file_key: req.body.file_key || 'unknown',
+                message: decryptErr.message
+            });
             return res.status(400).json({ error: 'Security Error: Cannot decrypt file.', details: decryptErr.message });
         }
     }
@@ -148,7 +156,7 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
     const detector = await getFileTypeDetector();
 
     if (!detector) {
-        console.error('❌ File Type Library Error: No detection method found');
+        req.log?.error('upload_file_type_detector_missing');
         return res.status(500).json({ error: 'Internal Configuration Error: file-type library mismatch' });
     }
 

@@ -6,8 +6,9 @@ const validate = (schema) => (req, res, next) => {
     next();
   } catch (err) {
     if (err instanceof z.ZodError) {
-
-        console.warn(`⚠️ Validation Failed from IP ${req.ip}:`, err.errors);
+        req.log?.warn('validation_failed', {
+            details: err.errors.map((e) => ({ field: e.path.join('.'), message: e.message }))
+        });
         return res.status(400).json({ 
             error: 'Validation Error', 
             message: 'Invalid data format or missing fields.',

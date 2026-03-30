@@ -1,5 +1,6 @@
 const { Firestore } = require('@google-cloud/firestore');
 const crypto = require('crypto');
+const { baseLog } = require('./logger');
 
 const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || 'ai-formcheck';
 const firestore = new Firestore({
@@ -283,7 +284,7 @@ exports.getFileRecordByKey = async (sessionId, fileKey, formCode) => {
         }
         return null;
     } catch (error) {
-        console.error('❌ Get File By Key Error:', error.message);
+        baseLog('error', 'db_get_file_by_key_failed', { message: error.message });
         return null;
     }
 };
@@ -293,9 +294,16 @@ exports.deleteFileRecord = async (sessionId, docId) => {
     try {
         await firestore.collection(COLLECTION_NAME).doc(sessionId)
             .collection(SUB_COLLECTION_NAME).doc(docId).delete();
-        console.log(`✅ DB Record Deleted: ${docId}`);
+        baseLog('info', 'db_file_record_deleted', {
+            doc_id: docId,
+            session_id: sessionId
+        });
     } catch (error) {
-        console.error('❌ Delete DB Record Error:', error.message);
+        baseLog('error', 'db_delete_file_record_failed', {
+            doc_id: docId,
+            session_id: sessionId,
+            message: error.message
+        });
         throw error;
     }
 };

@@ -15,6 +15,7 @@ const { getMergedDownloadUrlTtlMs, getMergeTotalSourceBytesLimit } = require('./
 const { getDocumentAvScanMode } = require('./documentAvConfig');
 const { scanDocumentFile } = require('./documentAvScan');
 const { decryptDocumentIntakeToFile } = require('./documentIntakeEncryption');
+const { baseLog } = require('./logger');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -97,27 +98,23 @@ const processUploadSanitizeJob = async (job) => {
             });
 
             if (avScanResult.status === 'clean') {
-                console.log(JSON.stringify({
-                    level: 'info',
-                    event: 'document_av_scan_passed',
+                baseLog('info', 'document_av_scan_passed', {
                     session_id: sessionId,
                     file_key: fileKey,
                     mime_type: detectedMime,
                     av_scan_mode: avScanMode,
                     av_engine: avScanResult.engine || null
-                }));
+                });
             }
         } catch (error) {
             if (avScanMode === 'log-only') {
-                console.warn(JSON.stringify({
-                    level: 'warn',
-                    event: 'document_av_scan_bypassed',
+                baseLog('warn', 'document_av_scan_bypassed', {
                     session_id: sessionId,
                     file_key: fileKey,
                     mime_type: detectedMime,
                     av_scan_mode: avScanMode,
                     message: error.message
-                }));
+                });
             } else {
                 throw error;
             }
