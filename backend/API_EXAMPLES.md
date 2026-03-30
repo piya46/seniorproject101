@@ -1,7 +1,7 @@
 # API Examples
 
-Version: `v1.9.5`
-Last updated: `2026-03-30`
+Version: `v1.9.7`
+Last updated: `2026-03-31`
 
 ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only โดย production target ใหม่คือ frontend BFF + private backend ส่วน direct backend browser flow ให้ถือเป็น legacy/direct mode
 
@@ -10,9 +10,11 @@ Last updated: `2026-03-30`
 3. Google redirect กลับ `GET /auth/callback` ของ frontend
 4. frontend BFF เรียก backend `GET /oidc/bff/google/callback`
 5. ตรวจ session ด้วย `GET /oidc/me`
-6. ดึง CSRF token ด้วย `GET /auth/csrf-token`
-7. ดึง public key
-8. เริ่ม session ด้วย `POST /session/init`
+6. ถ้าต้อง bind ข้อมูลส่วนตัวลง UI ให้เรียก `GET /profile/me`
+7. ดึง CSRF token ด้วย `GET /auth/csrf-token`
+8. ดึง public key
+9. เริ่ม session ด้วย `POST /session/init`
+10. ถ้าต้องอ่านข้อมูลส่วนตัวระดับเข้ม ให้เรียก `POST /profile/details` แบบ secure JSON
 
 ## Base URL
 
@@ -223,7 +225,54 @@ const data = await response.json();
 console.log(data.publicKey);
 ```
 
-## 5. Fetch CSRF Token
+## 5. Read Safe Profile For UI Binding
+
+### cURL
+
+```bash
+curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/profile/me
+```
+
+### JavaScript
+
+```js
+const response = await fetch("https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/profile/me", {
+  method: "GET",
+  credentials: "include"
+});
+
+const data = await response.json();
+console.log(data.display_name, data.student_id, data.account_type);
+```
+
+ตัวอย่าง response:
+
+```json
+{
+  "authenticated": true,
+  "email": "6534440323@student.chula.ac.th",
+  "hosted_domain": "student.chula.ac.th",
+  "name": "Piya Saenchu",
+  "picture": null,
+  "auth_provider": "google_oidc",
+  "display_name": "Piya Saenchu",
+  "display_email": "6534440323@student.chula.ac.th",
+  "avatar_url": null,
+  "account_type": "student",
+  "domain_verified": true,
+  "allowed_domains": ["chula.ac.th", "student.chula.ac.th"],
+  "auth_mode": "private",
+  "role": "user",
+  "student_id": "6534440323",
+  "faculty": null,
+  "department": null,
+  "degree_level": null,
+  "phone": null,
+  "profile_completed": false
+}
+```
+
+## 6. Fetch CSRF Token
 
 ### JavaScript
 
@@ -242,7 +291,7 @@ console.log(csrfData.csrf_token);
 - browser/BFF client ควรเรียก endpoint นี้หลัง `GET /oidc/me`
 - นำ token ที่ได้ไปใส่ใน header `x-csrf-token` ของทุก `POST`, `PUT`, `PATCH`, `DELETE`
 
-## 6. Initialize Session
+## 7. Initialize Session
 
 `POST /session/init` เป็น secure JSON endpoint:
 
@@ -296,6 +345,68 @@ const response = await fetch("https://ai-formcheck-backend-<project-number>.asia
   body: JSON.stringify(transportBody),
   credentials: "include"
 });
+```
+
+## 8. Read Encrypted Personal Profile Details
+
+plaintext body ก่อนเข้ารหัส:
+
+```json
+{
+  "_ts": 1711886400000,
+  "nonce": "profile-details-12345",
+  "include_sensitive_personal_data": true
+}
+```
+
+หมายเหตุ:
+
+- route นี้คือ `POST /profile/details`
+- ต้องใช้ secure JSON transport เหมือน `POST /session/init`
+- ต้องมี authenticated session และ `x-csrf-token` ก่อน
+
+ตัวอย่าง response หลังถอดรหัส:
+
+```json
+{
+  "authenticated": true,
+  "email": "6534440323@student.chula.ac.th",
+  "hosted_domain": "student.chula.ac.th",
+  "name": "Piya Saenchu",
+  "picture": null,
+  "auth_provider": "google_oidc",
+  "display_name": "Piya Saenchu",
+  "display_email": "6534440323@student.chula.ac.th",
+  "avatar_url": null,
+  "account_type": "student",
+  "domain_verified": true,
+  "allowed_domains": ["chula.ac.th", "student.chula.ac.th"],
+  "auth_mode": "private",
+  "role": "user",
+  "student_id": "6534440323",
+  "faculty": null,
+  "department": null,
+  "degree_level": null,
+  "phone": null,
+  "profile_completed": false,
+  "personal_data": {
+    "legal_name": "Piya Saenchu",
+    "display_name": "Piya Saenchu",
+    "email": "6534440323@student.chula.ac.th",
+    "hosted_domain": "student.chula.ac.th",
+    "picture": null,
+    "student_id": "6534440323",
+    "faculty": null,
+    "department": null,
+    "degree_level": null,
+    "phone": null
+  },
+  "privacy": {
+    "classification": "personal_data",
+    "transport": "secure_json",
+    "encrypted": true
+  }
+}
 ```
 
 ## Recommended Browser Flow (Legacy/Direct Mode)

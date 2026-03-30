@@ -1,7 +1,7 @@
 # Postman Guide
 
-Version: `v1.9.5`
-Last updated: `2026-03-30`
+Version: `v1.9.7`
+Last updated: `2026-03-31`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
 
@@ -39,8 +39,10 @@ legacy/direct mode ที่ยังคงอยู่เพื่อ backward 
 2. login ผ่าน Google
 3. backend callback ตั้ง session cookie
 4. เรียก `GET /oidc/me`
-5. เรียก `GET /auth/csrf-token`
-6. ค่อยเรียก `POST /session/init` และ endpoint อื่น
+5. ถ้าต้อง bind ข้อมูลส่วนตัวลง UI ให้เรียก `GET /profile/me`
+6. ถ้าต้องอ่านข้อมูลส่วนตัวระดับเข้มขึ้น ให้เรียก `POST /profile/details` แบบ secure JSON
+7. เรียก `GET /auth/csrf-token`
+8. ค่อยเรียก `POST /session/init` และ endpoint อื่น
 
 ## Collection Notes
 

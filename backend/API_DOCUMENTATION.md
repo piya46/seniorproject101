@@ -1,7 +1,7 @@
 # API Documentation
 
-Version: `v1.9.5`
-Last updated: `2026-03-30`
+Version: `v1.9.7`
+Last updated: `2026-03-31`
 
 เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client
 
@@ -85,6 +85,8 @@ legacy/direct mode ที่ยังมีอยู่เพื่อ backward 
 | `/oidc/bff/google/login-url` | `GET` | ไม่ใช้ session แต่ต้อง trusted BFF header | ไม่ต้อง | ออก Google login URL สำหรับ frontend BFF flow |
 | `/oidc/bff/google/callback` | `GET` | ไม่ใช้ session แต่ต้อง trusted BFF header | ไม่ต้อง | backend BFF callback bridge ที่ verify Google identity และออก session cookie |
 | `/oidc/me` | `GET` | ต้อง | ไม่ต้อง | อ่านสถานะ session และ identity ปัจจุบัน |
+| `/profile/me` | `GET` | ต้อง | ไม่ต้อง | อ่าน safe profile ที่พร้อม bind ลง UI |
+| `/profile/details` | `POST` | ต้อง | ต้อง | อ่านข้อมูลส่วนตัวแบบเข้ารหัสผ่าน secure JSON |
 | `/oidc/logout` | `POST` | ต้อง | ไม่ต้อง | ลบ app session cookie และ revoke session record |
 | `/session/init` | `POST` | ต้อง | ต้อง | bootstrap secure JSON flow/reuse session |
 | `/departments` | `GET` | ต้อง | ไม่ต้อง | โหลด metadata คณะ/ภาควิชา |
@@ -177,6 +179,107 @@ response ตัวอย่าง:
   "auth_provider": "google_oidc"
 }
 ```
+
+### `GET /profile/me`
+
+ใช้สำหรับ frontend/BFF ที่ต้อง bind ข้อมูลส่วนตัวลง UI โดยคัดเฉพาะ field ที่ปลอดภัยสำหรับแสดงผลจริง และไม่คืนค่า internal identifiers เช่น `session_id`, `google_sub`, token หรือ secret ภายในระบบ
+
+response ตัวอย่าง:
+
+```json
+{
+  "authenticated": true,
+  "email": "6534440323@student.chula.ac.th",
+  "hosted_domain": "student.chula.ac.th",
+  "name": "Piya Saenchu",
+  "picture": null,
+  "auth_provider": "google_oidc",
+  "display_name": "Piya Saenchu",
+  "display_email": "6534440323@student.chula.ac.th",
+  "avatar_url": null,
+  "account_type": "student",
+  "domain_verified": true,
+  "allowed_domains": ["chula.ac.th", "student.chula.ac.th"],
+  "auth_mode": "private",
+  "role": "user",
+  "student_id": "6534440323",
+  "faculty": null,
+  "department": null,
+  "degree_level": null,
+  "phone": null,
+  "profile_completed": false
+}
+```
+
+หมายเหตุ:
+
+- `faculty`, `department`, `degree_level`, `phone` เป็น `null` จนกว่าจะมีแหล่งข้อมูล profile ที่ระบบเชื่อถือได้
+- ถ้าต้องการแค่ตรวจว่า login แล้วหรือยัง ให้ใช้ `GET /oidc/me`
+- ถ้าต้องการ bind profile ลงหน้าเว็บ ให้ใช้ `GET /profile/me`
+- endpoint นี้ไม่คืนค่า token, `session_id`, หรือ `google_sub`
+
+### `POST /profile/details`
+
+ใช้สำหรับอ่านข้อมูลส่วนตัวในระดับที่เข้มขึ้น โดย route นี้อยู่หลัง `authMiddleware`, ต้องมี `x-csrf-token`, และใช้ secure JSON transport เช่นเดียวกับ `POST /session/init`
+
+plaintext request body ก่อนเข้ารหัส:
+
+```json
+{
+  "_ts": 1711886400000,
+  "nonce": "profile-details-12345",
+  "include_sensitive_personal_data": true
+}
+```
+
+response ตัวอย่างหลังถอดรหัส:
+
+```json
+{
+  "authenticated": true,
+  "email": "6534440323@student.chula.ac.th",
+  "hosted_domain": "student.chula.ac.th",
+  "name": "Piya Saenchu",
+  "picture": null,
+  "auth_provider": "google_oidc",
+  "display_name": "Piya Saenchu",
+  "display_email": "6534440323@student.chula.ac.th",
+  "avatar_url": null,
+  "account_type": "student",
+  "domain_verified": true,
+  "allowed_domains": ["chula.ac.th", "student.chula.ac.th"],
+  "auth_mode": "private",
+  "role": "user",
+  "student_id": "6534440323",
+  "faculty": null,
+  "department": null,
+  "degree_level": null,
+  "phone": null,
+  "profile_completed": false,
+  "personal_data": {
+    "legal_name": "Piya Saenchu",
+    "display_name": "Piya Saenchu",
+    "email": "6534440323@student.chula.ac.th",
+    "hosted_domain": "student.chula.ac.th",
+    "picture": null,
+    "student_id": "6534440323",
+    "faculty": null,
+    "department": null,
+    "degree_level": null,
+    "phone": null
+  },
+  "privacy": {
+    "classification": "personal_data",
+    "transport": "secure_json",
+    "encrypted": true
+  }
+}
+```
+
+หมายเหตุ:
+
+- route นี้เหมาะกับข้อมูลส่วนตัวที่ต้องการป้องกันระดับสูงกว่า summary profile
+- backend จะยังไม่คืนค่า internal identifiers เช่น `session_id`, `google_sub`, token หรือ secret ภายใน
 
 ### `POST /oidc/logout`
 

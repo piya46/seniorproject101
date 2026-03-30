@@ -9,6 +9,11 @@ const secureBase = z.object({
 // 1. Session Init Schema
 exports.sessionInitSchema = secureBase; // ไม่ต้องการ field อื่นเพิ่ม
 
+// 1.1 Profile Details Schema
+exports.profileDetailsSchema = secureBase.extend({
+    include_sensitive_personal_data: z.boolean().optional().default(true)
+});
+
 // 2. Chat Recommend Schema
 exports.chatRecommendSchema = secureBase.extend({
     message: z.string().min(1, "Message is required").max(1000, "Message is too long"),

@@ -128,7 +128,7 @@
       <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
     </section>
     <h1>API Documentation</h1>
-<p>Version: `v1.9.5` Last updated: `2026-03-30`</p>
+<p>Version: `v1.9.7` Last updated: `2026-03-31`</p>
 <p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
 <p>เอกสารที่เกี่ยวข้อง:</p>
 <ul>
@@ -263,6 +263,20 @@
 <td>ต้อง</td>
 <td>ไม่ต้อง</td>
 <td>อ่านสถานะ session และ identity ปัจจุบัน</td>
+</tr>
+<tr>
+<td>`/profile/me`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>อ่าน safe profile ที่พร้อม bind ลง UI</td>
+</tr>
+<tr>
+<td>`/profile/details`</td>
+<td>`POST`</td>
+<td>ต้อง</td>
+<td>ต้อง</td>
+<td>อ่านข้อมูลส่วนตัวแบบเข้ารหัสผ่าน secure JSON</td>
 </tr>
 <tr>
 <td>`/oidc/logout`</td>
@@ -415,6 +429,163 @@
 }
 
 </code></pre>
+<h3>`GET /profile/me`</h3>
+<p>ใช้สำหรับ frontend/BFF ที่ต้อง bind ข้อมูลส่วนตัวลง UI โดยคัดเฉพาะ field ที่ปลอดภัยสำหรับแสดงผลจริง และไม่คืนค่า internal identifiers เช่น `session_id`, `google_sub`, token หรือ secret ภายในระบบ</p>
+<p>response ตัวอย่าง:</p>
+<pre><code>
+{
+
+  &quot;authenticated&quot;: true,
+
+  &quot;email&quot;: &quot;6534440323@student.chula.ac.th&quot;,
+
+  &quot;hosted_domain&quot;: &quot;student.chula.ac.th&quot;,
+
+  &quot;name&quot;: &quot;Piya Saenchu&quot;,
+
+  &quot;picture&quot;: null,
+
+  &quot;auth_provider&quot;: &quot;google_oidc&quot;,
+
+  &quot;display_name&quot;: &quot;Piya Saenchu&quot;,
+
+  &quot;display_email&quot;: &quot;6534440323@student.chula.ac.th&quot;,
+
+  &quot;avatar_url&quot;: null,
+
+  &quot;account_type&quot;: &quot;student&quot;,
+
+  &quot;domain_verified&quot;: true,
+
+  &quot;allowed_domains&quot;: [&quot;chula.ac.th&quot;, &quot;student.chula.ac.th&quot;],
+
+  &quot;auth_mode&quot;: &quot;private&quot;,
+
+  &quot;role&quot;: &quot;user&quot;,
+
+  &quot;student_id&quot;: &quot;6534440323&quot;,
+
+  &quot;faculty&quot;: null,
+
+  &quot;department&quot;: null,
+
+  &quot;degree_level&quot;: null,
+
+  &quot;phone&quot;: null,
+
+  &quot;profile_completed&quot;: false
+
+}
+
+</code></pre>
+<p>หมายเหตุ:</p>
+<ul>
+<li>`faculty`, `department`, `degree_level`, `phone` เป็น `null` จนกว่าจะมีแหล่งข้อมูล profile ที่ระบบเชื่อถือได้</li>
+<li>ถ้าต้องการแค่ตรวจว่า login แล้วหรือยัง ให้ใช้ `GET /oidc/me`</li>
+<li>ถ้าต้องการ bind profile ลงหน้าเว็บ ให้ใช้ `GET /profile/me`</li>
+<li>endpoint นี้ไม่คืนค่า token, `session_id`, หรือ `google_sub`</li>
+</ul>
+<h3>`POST /profile/details`</h3>
+<p>ใช้สำหรับอ่านข้อมูลส่วนตัวในระดับที่เข้มขึ้น โดย route นี้อยู่หลัง `authMiddleware`, ต้องมี `x-csrf-token`, และใช้ secure JSON transport เช่นเดียวกับ `POST /session/init`</p>
+<p>plaintext request body ก่อนเข้ารหัส:</p>
+<pre><code>
+{
+
+  &quot;_ts&quot;: 1711886400000,
+
+  &quot;nonce&quot;: &quot;profile-details-12345&quot;,
+
+  &quot;include_sensitive_personal_data&quot;: true
+
+}
+
+</code></pre>
+<p>response ตัวอย่างหลังถอดรหัส:</p>
+<pre><code>
+{
+
+  &quot;authenticated&quot;: true,
+
+  &quot;email&quot;: &quot;6534440323@student.chula.ac.th&quot;,
+
+  &quot;hosted_domain&quot;: &quot;student.chula.ac.th&quot;,
+
+  &quot;name&quot;: &quot;Piya Saenchu&quot;,
+
+  &quot;picture&quot;: null,
+
+  &quot;auth_provider&quot;: &quot;google_oidc&quot;,
+
+  &quot;display_name&quot;: &quot;Piya Saenchu&quot;,
+
+  &quot;display_email&quot;: &quot;6534440323@student.chula.ac.th&quot;,
+
+  &quot;avatar_url&quot;: null,
+
+  &quot;account_type&quot;: &quot;student&quot;,
+
+  &quot;domain_verified&quot;: true,
+
+  &quot;allowed_domains&quot;: [&quot;chula.ac.th&quot;, &quot;student.chula.ac.th&quot;],
+
+  &quot;auth_mode&quot;: &quot;private&quot;,
+
+  &quot;role&quot;: &quot;user&quot;,
+
+  &quot;student_id&quot;: &quot;6534440323&quot;,
+
+  &quot;faculty&quot;: null,
+
+  &quot;department&quot;: null,
+
+  &quot;degree_level&quot;: null,
+
+  &quot;phone&quot;: null,
+
+  &quot;profile_completed&quot;: false,
+
+  &quot;personal_data&quot;: {
+
+    &quot;legal_name&quot;: &quot;Piya Saenchu&quot;,
+
+    &quot;display_name&quot;: &quot;Piya Saenchu&quot;,
+
+    &quot;email&quot;: &quot;6534440323@student.chula.ac.th&quot;,
+
+    &quot;hosted_domain&quot;: &quot;student.chula.ac.th&quot;,
+
+    &quot;picture&quot;: null,
+
+    &quot;student_id&quot;: &quot;6534440323&quot;,
+
+    &quot;faculty&quot;: null,
+
+    &quot;department&quot;: null,
+
+    &quot;degree_level&quot;: null,
+
+    &quot;phone&quot;: null
+
+  },
+
+  &quot;privacy&quot;: {
+
+    &quot;classification&quot;: &quot;personal_data&quot;,
+
+    &quot;transport&quot;: &quot;secure_json&quot;,
+
+    &quot;encrypted&quot;: true
+
+  }
+
+}
+
+</code></pre>
+<p>หมายเหตุ:</p>
+<ul>
+<li>route นี้เหมาะกับข้อมูลส่วนตัวที่ต้องการป้องกันระดับสูงกว่า summary profile</li>
+<li>backend จะยังไม่คืนค่า internal identifiers เช่น `session_id`, `google_sub`, token หรือ secret ภายใน</li>
+</ul>
 <h3>`POST /oidc/logout`</h3>
 <p>ลบ `sci_session_token` และ revoke session record ฝั่ง server</p>
 <p>เงื่อนไขเพิ่มเติม:</p>

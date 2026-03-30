@@ -229,6 +229,7 @@ app.use(securityMiddleware);
 
 app.use(`${BASE_URL}/auth`, authRoutes);
 app.use(`${BASE_URL}/oidc`, oidcAuthRoutes);
+app.use(`${BASE_URL}/profile`, require('./routes/profileRoutes'));
 app.use(`${BASE_URL}/session`, require('./routes/sessionRoutes'));
 app.use(`${BASE_URL}/departments`, require('./routes/metaRoutes'));
 app.use(`${BASE_URL}/forms`, require('./routes/formRoutes'));

@@ -1,7 +1,43 @@
 # Changelog Postman Docs
 
-Current version: `v1.9.5`
-Last updated: `2026-03-30`
+Current version: `v1.9.7`
+Last updated: `2026-03-31`
+
+## v1.9.7
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เพิ่ม `POST /api/v1/profile/details` สำหรับข้อมูลส่วนตัวที่ต้องใช้ secure JSON transport
+- คง `GET /api/v1/profile/me` ไว้เป็น summary/safe profile สำหรับ UI binding ทั่วไป
+- อธิบาย policy ใหม่ให้ชัดว่าข้อมูลส่วนตัวที่เข้มขึ้นควรใช้ encrypted route
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime เดิม; เป็นการเพิ่ม encrypted profile details route ใหม่
+
+ผลกระทบฝั่งทีม:
+
+- frontend ควรใช้ `GET /api/v1/profile/me` สำหรับ summary binding
+- ถ้าต้องดึง personal profile ที่เข้มขึ้น ให้ใช้ `POST /api/v1/profile/details` พร้อม secure JSON และ CSRF
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.7`
+
+## v1.9.6
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เพิ่ม `GET /api/v1/profile/me` สำหรับ safe profile binding บน frontend UI
+- แยกบทบาทของ `GET /api/v1/oidc/me` กับ `GET /api/v1/profile/me` ให้ชัดขึ้น
+- อัปเดต integration/docs ให้ยึด profile allowlist response แทนการคาดหวังข้อมูล internal identity ทั้งก้อน
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็นการเพิ่ม endpoint ใหม่และ sync เอกสารให้ตรงกับ profile binding model ปัจจุบัน
+
+ผลกระทบฝั่งทีม:
+
+- frontend ควรใช้ `GET /api/v1/profile/me` เป็น source of truth สำหรับ profile card หรือ personal info binding
+- `GET /api/v1/oidc/me` ควรใช้สำหรับ session/auth state check เป็นหลัก
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.6`
 
 ## v1.9.5
 

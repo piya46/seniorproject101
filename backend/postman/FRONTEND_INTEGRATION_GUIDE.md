@@ -1,7 +1,7 @@
 # Frontend Integration Guide
 
-Version: `v1.9.5`
-Last updated: `2026-03-30`
+Version: `v1.9.7`
+Last updated: `2026-03-31`
 
 คู่มือนี้อธิบายสิ่งที่ frontend ต้องทำเพื่อเชื่อมต่อ backend ในโหมด Google OIDC + session cookie + secure JSON transport โดย direct backend browser flow ให้ถือเป็น legacy/direct mode และ production target ใหม่คือ frontend BFF + private backend
 
@@ -18,9 +18,11 @@ Last updated: `2026-03-30`
 3. Google redirect กลับ `/auth/callback` ที่ frontend
 4. frontend BFF เรียก backend `GET /oidc/bff/google/callback`
 5. frontend/BFF เรียก `GET /oidc/me`
-6. frontend/BFF เรียก `GET /auth/csrf-token`
-7. จากนั้นค่อยเรียก `POST /session/init`
-8. endpoint ที่เปลี่ยน state ทุกตัวต้องส่ง header `x-csrf-token` ให้ตรงกับ token ปัจจุบัน
+6. frontend/BFF เรียก `GET /profile/me` ถ้าต้อง bind ข้อมูลส่วนตัวลงหน้าเว็บ
+7. frontend/BFF เรียก `GET /auth/csrf-token`
+8. จากนั้นค่อยเรียก `POST /session/init`
+9. endpoint ที่เปลี่ยน state ทุกตัวต้องส่ง header `x-csrf-token` ให้ตรงกับ token ปัจจุบัน
+10. ถ้าต้องอ่านข้อมูลส่วนตัวระดับเข้มขึ้น ให้ใช้ `POST /profile/details` ผ่าน secure JSON transport
 
 ## Legacy/Direct Mode
 
