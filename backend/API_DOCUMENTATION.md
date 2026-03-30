@@ -11,6 +11,7 @@ Last updated: `2026-03-31`
 - [SECURITY_OVERVIEW.md](/Users/pst./senior/backend/SECURITY_OVERVIEW.md)
 - [DEPLOY_RUNBOOK.md](/Users/pst./senior/backend/DEPLOY_RUNBOOK.md)
 - [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+- [PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)
 - [backend/postman/README.md](/Users/pst./senior/backend/postman/README.md)
 - [backend/postman/FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)
 
@@ -38,6 +39,7 @@ Last updated: `2026-03-31`
 - secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด
 - DB field encryption สำหรับข้อมูลใหม่ใช้ format แบบ versioned (`vN:iv:ciphertext:authTag`) และ backend ยังอ่าน legacy format เดิมได้
 - operator สามารถใช้ [migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js) เพื่อ dry-run / migrate legacy DB records ก่อน flip `DB_ENCRYPTION_KEY_VERSION`
+- secure transport รุ่นถัดไปที่มี PFS ถูกแยกเป็น design doc แล้วใน [PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)
 
 ## Authentication Flow
 

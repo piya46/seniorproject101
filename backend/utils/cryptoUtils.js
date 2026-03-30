@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { wipeBuffer, wipeBufferList } = require('./memorySecurity');
 
 const decodeBase64Pem = (base64Value) => Buffer.from(base64Value, 'base64').toString('utf8').trim();
 
@@ -33,26 +34,33 @@ const normalizePublicMaterial = (value) => {
 
 const validateKeyPair = (privateKeyPem, publicKeyPem, label) => {
     const probe = crypto.randomBytes(32);
-    const encrypted = crypto.publicEncrypt(
-        {
-            key: publicKeyPem,
-            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-            oaepHash: 'sha256'
-        },
-        probe
-    );
+    let encrypted = null;
+    let decrypted = null;
 
-    const decrypted = crypto.privateDecrypt(
-        {
-            key: privateKeyPem,
-            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-            oaepHash: 'sha256'
-        },
-        encrypted
-    );
+    try {
+        encrypted = crypto.publicEncrypt(
+            {
+                key: publicKeyPem,
+                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+                oaepHash: 'sha256'
+            },
+            probe
+        );
 
-    if (!crypto.timingSafeEqual(probe, decrypted)) {
-        throw new Error(`Key validation failed for ${label}: public/private key pair mismatch.`);
+        decrypted = crypto.privateDecrypt(
+            {
+                key: privateKeyPem,
+                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+                oaepHash: 'sha256'
+            },
+            encrypted
+        );
+
+        if (!crypto.timingSafeEqual(probe, decrypted)) {
+            throw new Error(`Key validation failed for ${label}: public/private key pair mismatch.`);
+        }
+    } finally {
+        wipeBufferList([probe, encrypted, decrypted]);
     }
 };
 
@@ -100,15 +108,22 @@ const loadKeySlots = () => {
     };
 };
 
-const tryDecryptWithPrivateKey = (slot, encKey) =>
-    crypto.privateDecrypt(
-        {
-            key: slot.privateKeyPem,
-            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-            oaepHash: "sha256",
-        },
-        Buffer.from(encKey, 'base64')
-    );
+const tryDecryptWithPrivateKey = (slot, encKey) => {
+    const encryptedKeyBuffer = Buffer.from(encKey, 'base64');
+
+    try {
+        return crypto.privateDecrypt(
+            {
+                key: slot.privateKeyPem,
+                padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+                oaepHash: "sha256",
+            },
+            encryptedKeyBuffer
+        );
+    } finally {
+        wipeBuffer(encryptedKeyBuffer);
+    }
+};
 
 let ACTIVE_CRYPTO_PROVIDER = null;
 
@@ -185,16 +200,21 @@ exports.getKeyStatus = () => ACTIVE_CRYPTO_PROVIDER?.getKeyStatus?.() || {
 };
 
 exports.decryptHybridPayload = (encryptedPackage) => {
+    let aesKeyBuffer = null;
+    let ivBuffer = null;
+    let authTagBuffer = null;
     try {
         const { encKey, iv, tag, payload } = encryptedPackage;
         if (!encKey || !iv || !tag || !payload) return null; // Validate structure
 
         // ขั้นที่ 1: ใช้ Private Key แกะ AES Key ออกมา
-        const aesKeyBuffer = decryptEnvelopeKey(encKey);
+        aesKeyBuffer = decryptEnvelopeKey(encKey);
+        ivBuffer = Buffer.from(iv, 'base64');
+        authTagBuffer = Buffer.from(tag, 'base64');
 
         // ขั้นที่ 2: ใช้ AES Key แกะข้อมูลจริง
-        const decipher = crypto.createDecipheriv('aes-256-gcm', aesKeyBuffer, Buffer.from(iv, 'base64'));
-        decipher.setAuthTag(Buffer.from(tag, 'base64'));
+        const decipher = crypto.createDecipheriv('aes-256-gcm', aesKeyBuffer, ivBuffer);
+        decipher.setAuthTag(authTagBuffer);
         
         let decrypted = decipher.update(payload, 'base64', 'utf8');
         decrypted += decipher.final('utf8');
@@ -207,13 +227,17 @@ exports.decryptHybridPayload = (encryptedPackage) => {
     } catch (error) {
         // Log แค่ message พอ อย่า Log error เต็มๆ เพราะอาจมี Sensitive Data
         console.error('Decryption Failed:', error.message);
+        wipeBuffer(aesKeyBuffer);
         return null;
+    } finally {
+        wipeBufferList([ivBuffer, authTagBuffer]);
     }
 };
 
 exports.encryptSymmetric = (data, aesKeyBuffer) => {
+    let iv = null;
     try {
-        const iv = crypto.randomBytes(12);
+        iv = crypto.randomBytes(12);
         const cipher = crypto.createCipheriv('aes-256-gcm', aesKeyBuffer, iv);
         
         let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'base64');
@@ -227,5 +251,7 @@ exports.encryptSymmetric = (data, aesKeyBuffer) => {
     } catch (error) {
         console.error('Encryption Failed:', error.message);
         throw error;
+    } finally {
+        wipeBuffer(iv);
     }
 };

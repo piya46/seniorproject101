@@ -16,6 +16,7 @@ production topology ใหม่:
 - browser-facing callback ควรจบที่ frontend เมื่อ migration BFF เสร็จ
 
 เอกสาร contract ระหว่าง frontend BFF กับ backend private อยู่ที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+และ roadmap สำหรับ secure transport รุ่นถัดไปอยู่ที่ [PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)
 
 ## Security Layers ที่ยังคงอยู่
 
@@ -137,6 +138,8 @@ AI usage รายวันถูกเก็บใน Firestore collection `AI_
 ข้อมูลที่เข้ารหัสระดับแอปใน Firestore ใช้ format แบบ versioned สำหรับข้อมูลใหม่แล้วในลักษณะ `vN:iv:ciphertext:authTag`
 โดย runtime ยังคง decrypt ข้อมูล legacy format เดิม (`iv:ciphertext:authTag`) ได้เพื่อรองรับ backward compatibility ระหว่างช่วง migration
 และฝั่ง operator มี script สำหรับ dry-run / write migration อยู่ที่ [migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js)
+
+best-effort memory wiping ถูกเพิ่มในจุดที่คุม buffer ได้ เช่น AES session key, IV, auth tag, และ validation probes เพื่อลด lifetime ของข้อมูลลับในหน่วยความจำ แต่ยังต้องถือว่าเป็น defense-in-depth เท่านั้น ไม่ใช่ hard guarantee ใน Node/V8
 
 ข้อมูลที่เก็บไม่ได้มีแค่ token รวม แต่รวม context สำหรับ analytics ด้วย เช่น `degree_levels`, `form_codes`, `success_count`, `failure_count`, และ `last_failure_reason`
 

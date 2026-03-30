@@ -19,6 +19,7 @@ const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc } = require('../utils/f
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 const { decryptEnvelopeKey } = require('../utils/cryptoUtils');
 const { getMaxPdfSourceBytes, getMaxUploadBytes } = require('../utils/uploadSecurity');
+const { wipeBufferList } = require('../utils/memorySecurity');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -70,11 +71,13 @@ const getFileTypeDetector = async () => {
 };
 
 const decryptFileToPath = async (encryptedPath, outputPath, encKey64, iv64, tag64) => {
+    let aesKey = null;
+    let iv = null;
+    let authTag = null;
     try {
-        const aesKey = decryptEnvelopeKey(encKey64);
-
-        const iv = Buffer.from(iv64, 'base64');
-        const authTag = Buffer.from(tag64, 'base64');
+        aesKey = decryptEnvelopeKey(encKey64);
+        iv = Buffer.from(iv64, 'base64');
+        authTag = Buffer.from(tag64, 'base64');
         const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, iv);
         decipher.setAuthTag(authTag);
 
@@ -88,6 +91,8 @@ const decryptFileToPath = async (encryptedPath, outputPath, encKey64, iv64, tag6
     } catch (err) {
         console.error('🔐 Decryption Failed:', err.message);
         throw err;
+    } finally {
+        wipeBufferList([aesKey, iv, authTag]);
     }
 };
 

@@ -2,6 +2,7 @@ const { decryptHybridPayload, encryptSymmetric } = require('../utils/cryptoUtils
 const { checkAndMarkNonce } = require('../utils/dbUtils'); // ✅ Import ฟังก์ชันใหม่
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 const { isValidCsrfToken } = require('../utils/csrfUtils');
+const { wipeBuffer } = require('../utils/memorySecurity');
 
 const MULTIPART_ALLOWED_PATHS = new Set([
     '/api/v1/upload',
@@ -45,6 +46,16 @@ function allowsPlaintextStateChangingRequest(req) {
 }
 
 module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป็น async function
+    const clearSessionKey = () => {
+        wipeBuffer(res.locals.sessionKey);
+        res.locals.sessionKey = null;
+    };
+
+    if (typeof res.once === 'function') {
+        res.once('finish', clearSessionKey);
+        res.once('close', clearSessionKey);
+    }
+
     if (requiresCsrfProtection(req) && !isValidCsrfToken(req)) {
         req.log?.warn('csrf_validation_failed', {
             has_cookie_token: Boolean(req.cookies?.sci_csrf_token),
