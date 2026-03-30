@@ -7,6 +7,9 @@ const MULTIPART_ALLOWED_PATHS = new Set([
     '/api/v1/upload',
     '/api/v1/support/technical-email'
 ]);
+const UNENCRYPTED_STATE_CHANGING_ALLOWED_PATHS = new Set([
+    '/api/v1/oidc/logout'
+]);
 
 function isMultipartRequest(req) {
     const contentType = req.headers['content-type'];
@@ -35,6 +38,10 @@ function requiresCsrfProtection(req) {
     const stateChangingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
     return stateChangingMethods.has(req.method) && Boolean(req.cookies?.sci_session_token);
+}
+
+function allowsPlaintextStateChangingRequest(req) {
+    return UNENCRYPTED_STATE_CHANGING_ALLOWED_PATHS.has(req.path);
 }
 
 module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป็น async function
@@ -126,7 +133,7 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
             req.body = data;
             res.locals.sessionKey = aesKey; 
 
-        } else {
+        } else if (!allowsPlaintextStateChangingRequest(req)) {
             req.log?.warn('unencrypted_request_blocked');
             return res.status(403).json({ 
                 error: 'Access Denied', 
