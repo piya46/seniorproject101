@@ -64,6 +64,11 @@ secure JSON endpoints:
 - `POST /documents/merge`
 - `POST /chat/recommend`
 
+หมายเหตุสำหรับ `POST /documents/merge`:
+
+- `download_url` ที่ได้กลับมาควรถูกใช้ทันที เพราะ signed URL มีอายุสั้นตาม policy ของ backend
+- backend อาจตอบ `413` ถ้าขนาดรวมของไฟล์ต้นฉบับเกินเพดานที่ระบบยอมรับ
+
 และ multipart endpoints ที่ต้องแนบ CSRF เช่นกัน:
 
 - `POST /upload`

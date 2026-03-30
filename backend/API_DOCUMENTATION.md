@@ -349,6 +349,15 @@ response ตัวอย่าง:
 }
 ```
 
+## Document Merge
+
+### `POST /documents/merge`
+
+ข้อจำกัดและพฤติกรรมเพิ่มเติม:
+
+- signed URL สำหรับดาวน์โหลดไฟล์ที่ merge แล้วมีอายุสั้น โดย default คือ 15 นาที
+- backend อาจตอบ `413` ถ้าขนาดรวมของไฟล์ต้นฉบับเกินเพดานที่กำหนดไว้สำหรับการ merge
+
 ## Support Endpoint
 
 ### `POST /support/technical-email`

@@ -9,9 +9,15 @@ const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
 const { validate } = require('../middlewares/validationMiddleware');
 const { docMergeSchema } = require('../validators/schemas');
+const {
+  getMergedDownloadUrlTtlMs,
+  getMergeTotalSourceBytesLimit
+} = require('../utils/documentMergeSecurity');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+const mergedDownloadUrlTtlMs = getMergedDownloadUrlTtlMs();
+const mergeTotalSourceBytesLimit = getMergeTotalSourceBytesLimit();
 
 router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res) => {
   try {
@@ -55,6 +61,7 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
     const mergedPdf = await PDFDocument.create();
     let mergedPageCount = 0;
     const mergeFailures = [];
+    let totalSourceBytes = 0;
 
     for (const fileRecord of filesToMerge) {
       const fileRef = bucket.file(fileRecord.gcs_path);
@@ -64,9 +71,31 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
         continue;
       }
 
-      const [fileBuffer] = await fileRef.download();
       const [metadata] = await fileRef.getMetadata();
       const contentType = metadata.contentType || fileRecord.file_type;
+      const fileSize = Number.parseInt(String(metadata.size || '0'), 10);
+
+      if (Number.isFinite(fileSize) && fileSize > 0) {
+        totalSourceBytes += fileSize;
+      }
+
+      if (totalSourceBytes > mergeTotalSourceBytesLimit) {
+        req.log?.warn('document_merge_source_limit_exceeded', {
+          form_code,
+          total_source_bytes: totalSourceBytes,
+          total_source_bytes_limit: mergeTotalSourceBytesLimit
+        });
+        return res.status(413).json({
+          error: 'Merge input too large',
+          message: 'The total size of source files is too large to merge in a single request.',
+          data: {
+            total_source_bytes: totalSourceBytes,
+            total_source_bytes_limit: mergeTotalSourceBytesLimit
+          }
+        });
+      }
+
+      const [fileBuffer] = await fileRef.download();
 
       try {
         if (contentType === 'application/pdf') {
@@ -119,7 +148,7 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
     await mergedFile.save(mergedPdfBytes, { contentType: 'application/pdf', resumable: false });
 
     const [downloadUrl] = await mergedFile.getSignedUrl({
-      version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000, 
+      version: 'v4', action: 'read', expires: Date.now() + mergedDownloadUrlTtlMs,
     });
 
     const dept = departments.find(d => d.id === formConfig.department_id) || {}; 
@@ -135,7 +164,9 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
     req.log?.audit('documents_merged', {
       form_code,
       merged_page_count: mergedPageCount,
-      merged_file_name: mergedFileName
+      merged_file_name: mergedFileName,
+      total_source_bytes: totalSourceBytes,
+      merged_download_url_ttl_ms: mergedDownloadUrlTtlMs
     });
 
   } catch (error) {
