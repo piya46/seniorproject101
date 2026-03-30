@@ -233,8 +233,12 @@ backend ควรตอบประมาณนี้:
   - session ถูก revoke
   - session id format ไม่ถูกต้อง
 - `403 Forbidden`
+  - trusted BFF shared secret ไม่ถูกต้อง
+  - trusted BFF identity token ไม่ถูกต้องหรือ audience/email ไม่ตรง policy
   - domain policy ไม่ผ่าน
   - origin policy ไม่ผ่าน
+- `503 Service Unavailable`
+  - trusted BFF auth ถูกปิดไว้ที่ backend
 - `415 Unsupported Media Type`
   - multipart มาผิด route
 

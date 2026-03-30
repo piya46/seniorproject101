@@ -44,8 +44,18 @@ DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION="${DOCUMENT_JOB_WORKER_SCHEDULER
 DOCUMENT_JOB_WORKER_SCHEDULE_CRON="${DOCUMENT_JOB_WORKER_SCHEDULE_CRON:-* * * * *}"
 DOCUMENT_JOB_WORKER_TIME_ZONE="${DOCUMENT_JOB_WORKER_TIME_ZONE:-Asia/Bangkok}"
 DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT="${DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT:-}"
+DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY="${DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY:-${APP_NAME}-workers}"
+DOCUMENT_JOB_WORKER_IMAGE_TAG="${DOCUMENT_JOB_WORKER_IMAGE_TAG:-latest}"
+DOCUMENT_JOB_WORKER_MEMORY="${DOCUMENT_JOB_WORKER_MEMORY:-2Gi}"
+DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS="${DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS:-900}"
+DOCUMENT_JOB_WORKER_MAX_INSTANCES="${DOCUMENT_JOB_WORKER_MAX_INSTANCES:-3}"
+DOCUMENT_JOB_WORKER_CPU="${DOCUMENT_JOB_WORKER_CPU:-1}"
+DOCUMENT_JOB_WORKER_CONCURRENCY="${DOCUMENT_JOB_WORKER_CONCURRENCY:-1}"
 DOCUMENT_JOB_RETENTION_DAYS="${DOCUMENT_JOB_RETENTION_DAYS:-7}"
 DOCUMENT_JOB_PROCESSING_TIMEOUT_MS="${DOCUMENT_JOB_PROCESSING_TIMEOUT_MS:-600000}"
+DOCUMENT_AV_SCAN_MODE="${DOCUMENT_AV_SCAN_MODE:-off}"
+DOCUMENT_AV_SCAN_URL="${DOCUMENT_AV_SCAN_URL:-}"
+DOCUMENT_AV_SCAN_TIMEOUT_MS="${DOCUMENT_AV_SCAN_TIMEOUT_MS:-30000}"
 DOCUMENT_INTAKE_KMS_LOCATION="${DOCUMENT_INTAKE_KMS_LOCATION:-}"
 DOCUMENT_INTAKE_KMS_KEYRING="${DOCUMENT_INTAKE_KMS_KEYRING:-${APP_NAME}-document-intake}"
 DOCUMENT_INTAKE_KMS_KEY="${DOCUMENT_INTAKE_KMS_KEY:-intake-key}"
@@ -220,8 +230,18 @@ DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION="$(trim_value "$DOCUMENT_JOB_WOR
 DOCUMENT_JOB_WORKER_SCHEDULE_CRON="$(trim_value "$DOCUMENT_JOB_WORKER_SCHEDULE_CRON")"
 DOCUMENT_JOB_WORKER_TIME_ZONE="$(trim_value "$DOCUMENT_JOB_WORKER_TIME_ZONE")"
 DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT="$(trim_value "$DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT")"
+DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY="$(trim_value "$DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY")"
+DOCUMENT_JOB_WORKER_IMAGE_TAG="$(trim_value "$DOCUMENT_JOB_WORKER_IMAGE_TAG")"
+DOCUMENT_JOB_WORKER_MEMORY="$(trim_value "$DOCUMENT_JOB_WORKER_MEMORY")"
+DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS="$(trim_value "$DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS")"
+DOCUMENT_JOB_WORKER_MAX_INSTANCES="$(trim_value "$DOCUMENT_JOB_WORKER_MAX_INSTANCES")"
+DOCUMENT_JOB_WORKER_CPU="$(trim_value "$DOCUMENT_JOB_WORKER_CPU")"
+DOCUMENT_JOB_WORKER_CONCURRENCY="$(trim_value "$DOCUMENT_JOB_WORKER_CONCURRENCY")"
 DOCUMENT_JOB_RETENTION_DAYS="$(trim_value "$DOCUMENT_JOB_RETENTION_DAYS")"
 DOCUMENT_JOB_PROCESSING_TIMEOUT_MS="$(trim_value "$DOCUMENT_JOB_PROCESSING_TIMEOUT_MS")"
+DOCUMENT_AV_SCAN_MODE="$(trim_value "$DOCUMENT_AV_SCAN_MODE")"
+DOCUMENT_AV_SCAN_URL="$(trim_value "$DOCUMENT_AV_SCAN_URL")"
+DOCUMENT_AV_SCAN_TIMEOUT_MS="$(trim_value "$DOCUMENT_AV_SCAN_TIMEOUT_MS")"
 DOCUMENT_INTAKE_KMS_LOCATION="$(trim_value "$DOCUMENT_INTAKE_KMS_LOCATION")"
 DOCUMENT_INTAKE_KMS_KEYRING="$(trim_value "$DOCUMENT_INTAKE_KMS_KEYRING")"
 DOCUMENT_INTAKE_KMS_KEY="$(trim_value "$DOCUMENT_INTAKE_KMS_KEY")"
@@ -277,6 +297,8 @@ fi
 if [ -z "$DOCUMENT_JOB_WORKER_REGION" ]; then
     DOCUMENT_JOB_WORKER_REGION="$REGION"
 fi
+
+DOCUMENT_JOB_WORKER_IMAGE_URI="${DOCUMENT_JOB_WORKER_REGION}-docker.pkg.dev/${PROJECT_ID}/${DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY}/${DOCUMENT_JOB_WORKER_SERVICE_NAME}:${DOCUMENT_JOB_WORKER_IMAGE_TAG}"
 
 if [ -z "$CLEANUP_SCHEDULER_LOCATION" ]; then
     CLEANUP_SCHEDULER_LOCATION="$CLEANUP_SERVICE_REGION"
@@ -438,6 +460,12 @@ validate_cookie_same_site() {
     local VALUE
     VALUE="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
     [[ "$VALUE" = "strict" || "$VALUE" = "lax" || "$VALUE" = "none" ]]
+}
+
+validate_document_av_scan_mode() {
+    local VALUE
+    VALUE="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    [[ "$VALUE" = "off" || "$VALUE" = "log-only" || "$VALUE" = "required" ]]
 }
 
 add_project_iam_policy_binding_if_enabled() {
@@ -857,6 +885,34 @@ ensure_document_job_worker_source_exists() {
         echo -e "${RED}❌ Document job worker source is incomplete: $SCRIPT_DIR/services/document-job-worker${NC}"
         exit 1
     fi
+
+    if [ ! -f "$SCRIPT_DIR/Dockerfile.document-worker" ] || [ ! -f "$SCRIPT_DIR/cloudbuild.document-worker.yaml" ]; then
+        echo -e "${RED}❌ Document job worker build files are incomplete in $SCRIPT_DIR${NC}"
+        exit 1
+    fi
+}
+
+ensure_document_job_worker_artifact_repository() {
+    if ! gcloud artifacts repositories describe "$DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY" \
+        --location "$DOCUMENT_JOB_WORKER_REGION" \
+        --project "$PROJECT_ID" >/dev/null 2>&1; then
+        echo -e "   📦 Creating Artifact Registry repository: ${YELLOW}$DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY${NC}"
+        gcloud artifacts repositories create "$DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY" \
+            --repository-format docker \
+            --location "$DOCUMENT_JOB_WORKER_REGION" \
+            --project "$PROJECT_ID" \
+            --description "Distroless worker images for ${APP_NAME}"
+    else
+        echo -e "   ✅ Artifact Registry repository exists: ${YELLOW}$DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY${NC}"
+    fi
+}
+
+build_document_job_worker_image() {
+    echo -e "   🏗️  Building distroless document worker image: ${YELLOW}$DOCUMENT_JOB_WORKER_IMAGE_URI${NC}"
+    gcloud builds submit "$SCRIPT_DIR" \
+        --project "$PROJECT_ID" \
+        --config "$SCRIPT_DIR/cloudbuild.document-worker.yaml" \
+        --substitutions "_IMAGE_URI=$DOCUMENT_JOB_WORKER_IMAGE_URI"
 }
 
 deploy_cleanup_service() {
@@ -876,17 +932,23 @@ deploy_cleanup_service() {
 deploy_document_job_worker_service() {
     local TARGET_REGION=$1
 
+    ensure_document_job_worker_artifact_repository
+    build_document_job_worker_image
+
     gcloud run deploy "$DOCUMENT_JOB_WORKER_SERVICE_NAME" \
         --project "$PROJECT_ID" \
         --region "$TARGET_REGION" \
-        --source "$SCRIPT_DIR" \
+        --image "$DOCUMENT_JOB_WORKER_IMAGE_URI" \
         --port 8080 \
         --ingress all \
         --no-allow-unauthenticated \
         --service-account "$DOCUMENT_JOB_WORKER_SERVICE_ACCOUNT_EMAIL" \
-        --command node \
-        --args services/document-job-worker/index.js \
-        --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__DOCUMENT_JOB_RETENTION_DAYS=${DOCUMENT_JOB_RETENTION_DAYS}__ENV_DELIM__DOCUMENT_JOB_PROCESSING_TIMEOUT_MS=${DOCUMENT_JOB_PROCESSING_TIMEOUT_MS}__ENV_DELIM__MERGED_DOWNLOAD_URL_TTL_MS=${MERGED_DOWNLOAD_URL_TTL_MS:-900000}__ENV_DELIM__MERGE_TOTAL_SOURCE_BYTES_LIMIT=${MERGE_TOTAL_SOURCE_BYTES_LIMIT:-26214400}__ENV_DELIM__MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-10485760}__ENV_DELIM__MAX_PDF_SOURCE_BYTES=${MAX_PDF_SOURCE_BYTES:-5242880}__ENV_DELIM__DOCUMENT_INTAKE_KMS_KEY_NAME=${DOCUMENT_INTAKE_KMS_KEY_NAME}__ENV_DELIM__DOCUMENT_INTAKE_KMS_ACCESS_MODE=decrypt" \
+        --memory "$DOCUMENT_JOB_WORKER_MEMORY" \
+        --timeout "${DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS}s" \
+        --max-instances "$DOCUMENT_JOB_WORKER_MAX_INSTANCES" \
+        --cpu "$DOCUMENT_JOB_WORKER_CPU" \
+        --concurrency "$DOCUMENT_JOB_WORKER_CONCURRENCY" \
+        --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__DOCUMENT_JOB_RETENTION_DAYS=${DOCUMENT_JOB_RETENTION_DAYS}__ENV_DELIM__DOCUMENT_JOB_PROCESSING_TIMEOUT_MS=${DOCUMENT_JOB_PROCESSING_TIMEOUT_MS}__ENV_DELIM__MERGED_DOWNLOAD_URL_TTL_MS=${MERGED_DOWNLOAD_URL_TTL_MS:-900000}__ENV_DELIM__MERGE_TOTAL_SOURCE_BYTES_LIMIT=${MERGE_TOTAL_SOURCE_BYTES_LIMIT:-26214400}__ENV_DELIM__MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-10485760}__ENV_DELIM__MAX_PDF_SOURCE_BYTES=${MAX_PDF_SOURCE_BYTES:-5242880}__ENV_DELIM__DOCUMENT_INTAKE_KMS_KEY_NAME=${DOCUMENT_INTAKE_KMS_KEY_NAME}__ENV_DELIM__DOCUMENT_INTAKE_KMS_ACCESS_MODE=decrypt__ENV_DELIM__DOCUMENT_AV_SCAN_MODE=${DOCUMENT_AV_SCAN_MODE}__ENV_DELIM__DOCUMENT_AV_SCAN_URL=${DOCUMENT_AV_SCAN_URL}__ENV_DELIM__DOCUMENT_AV_SCAN_TIMEOUT_MS=${DOCUMENT_AV_SCAN_TIMEOUT_MS}" \
         --set-secrets "DB_ENCRYPTION_KEY=${DB_KEY_SECRET}:latest"
 }
 
@@ -1791,6 +1853,46 @@ validate_smtp_config() {
             echo -e "${RED}❌ Document job worker config is incomplete.${NC}"
             exit 1
         fi
+
+        if [ -z "$DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY" ] || [ -z "$DOCUMENT_JOB_WORKER_IMAGE_TAG" ] || [ -z "$DOCUMENT_JOB_WORKER_MEMORY" ]; then
+            echo -e "${RED}❌ Document job worker build/runtime config is incomplete.${NC}"
+            exit 1
+        fi
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS: $DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_JOB_WORKER_MAX_INSTANCES"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_JOB_WORKER_MAX_INSTANCES: $DOCUMENT_JOB_WORKER_MAX_INSTANCES (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_JOB_WORKER_CPU"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_JOB_WORKER_CPU: $DOCUMENT_JOB_WORKER_CPU (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_JOB_WORKER_CONCURRENCY"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_JOB_WORKER_CONCURRENCY: $DOCUMENT_JOB_WORKER_CONCURRENCY (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_document_av_scan_mode "$DOCUMENT_AV_SCAN_MODE"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_AV_SCAN_MODE: $DOCUMENT_AV_SCAN_MODE (must be off, log-only, or required)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_AV_SCAN_TIMEOUT_MS"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_AV_SCAN_TIMEOUT_MS: $DOCUMENT_AV_SCAN_TIMEOUT_MS (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if [ "$DOCUMENT_AV_SCAN_MODE" != "off" ] && [ -z "$DOCUMENT_AV_SCAN_URL" ]; then
+        echo -e "${RED}❌ DOCUMENT_AV_SCAN_URL is required when DOCUMENT_AV_SCAN_MODE is not off.${NC}"
+        exit 1
     fi
 
     if ! validate_boolean_string "$ENABLE_BUCKET_MIGRATION"; then
@@ -2007,11 +2109,20 @@ print_deploy_summary() {
     echo -e "   Document Worker Schedule: ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULE_CRON${NC}"
     echo -e "   Document Worker TZ      : ${YELLOW}$DOCUMENT_JOB_WORKER_TIME_ZONE${NC}"
     echo -e "   Document Worker SA      : ${YELLOW}${DOCUMENT_JOB_WORKER_SERVICE_ACCOUNT_EMAIL:-<pending>}${NC}"
+    echo -e "   Document Worker Image   : ${YELLOW}$DOCUMENT_JOB_WORKER_IMAGE_URI${NC}"
+    echo -e "   Document Worker Memory  : ${YELLOW}$DOCUMENT_JOB_WORKER_MEMORY${NC}"
+    echo -e "   Document Worker Timeout : ${YELLOW}${DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS}s${NC}"
+    echo -e "   Document Worker CPU     : ${YELLOW}$DOCUMENT_JOB_WORKER_CPU${NC}"
+    echo -e "   Document Worker Concur. : ${YELLOW}$DOCUMENT_JOB_WORKER_CONCURRENCY${NC}"
+    echo -e "   Document Worker Max Inst: ${YELLOW}$DOCUMENT_JOB_WORKER_MAX_INSTANCES${NC}"
     echo -e "   Document Job Retention  : ${YELLOW}$DOCUMENT_JOB_RETENTION_DAYS${NC}"
     echo -e "   Document Job Timeout ms : ${YELLOW}$DOCUMENT_JOB_PROCESSING_TIMEOUT_MS${NC}"
     echo -e "   Document KMS Location   : ${YELLOW}$DOCUMENT_INTAKE_KMS_LOCATION${NC}"
     echo -e "   Document KMS Key Ring   : ${YELLOW}$DOCUMENT_INTAKE_KMS_KEYRING${NC}"
     echo -e "   Document KMS Key        : ${YELLOW}$DOCUMENT_INTAKE_KMS_KEY${NC}"
+    echo -e "   Document AV Scan Mode   : ${YELLOW}$DOCUMENT_AV_SCAN_MODE${NC}"
+    echo -e "   Document AV Scan URL    : ${YELLOW}${DOCUMENT_AV_SCAN_URL:-<disabled>}${NC}"
+    echo -e "   Document AV Timeout ms  : ${YELLOW}$DOCUMENT_AV_SCAN_TIMEOUT_MS${NC}"
     echo -e "   Bucket Migration        : ${YELLOW}$ENABLE_BUCKET_MIGRATION${NC}"
     echo -e "   Bucket Source           : ${YELLOW}${BUCKET_MIGRATION_SOURCE_NAME:-<not set>}${NC}"
     echo -e "   Delete Source Bucket    : ${YELLOW}$DELETE_SOURCE_BUCKET_AFTER_MIGRATION${NC}"

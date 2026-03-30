@@ -195,8 +195,18 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 | `MAX_PDF_SOURCE_BYTES` | `5242880` | เพดาน PDF ที่ backend ยอม sanitize อย่างปลอดภัย (5MB) |
 | `DOCUMENT_JOB_RETENTION_DAYS` | `7` | ระยะเวลาที่เก็บ job records/result metadata ใน Firestore |
 | `DOCUMENT_JOB_PROCESSING_TIMEOUT_MS` | `600000` | timeout เชิงตรรกะสำหรับ job ที่ถูก claim ไปประมวลผล |
+| `DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY` | `${APP_NAME}-workers` | Artifact Registry repository สำหรับ image ของ document worker |
+| `DOCUMENT_JOB_WORKER_IMAGE_TAG` | `latest` | tag ของ image ที่ใช้ deploy document worker |
+| `DOCUMENT_JOB_WORKER_MEMORY` | `2Gi` | memory limit ของ Cloud Run document worker |
+| `DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS` | `900` | request timeout ของ worker endpoint `/process-next` |
+| `DOCUMENT_JOB_WORKER_MAX_INSTANCES` | `3` | จำนวน instance สูงสุดของ worker |
+| `DOCUMENT_JOB_WORKER_CPU` | `1` | จำนวน vCPU ของ worker |
+| `DOCUMENT_JOB_WORKER_CONCURRENCY` | `1` | concurrency ต่อ worker instance เพื่อลด memory contention จาก PDF/image processing |
 | `DOCUMENT_INTAKE_KMS_KEY_NAME` | derived from deploy | Cloud KMS crypto key ที่ใช้ห่อ/แกะ DEK สำหรับ raw intake object |
 | `DOCUMENT_INTAKE_KMS_ACCESS_MODE` | deploy-set (`encrypt` app / `decrypt` worker) | จำกัด capability ของ service นั้น ๆ ให้ทำได้เฉพาะ encrypt หรือ decrypt ตาม role |
+| `DOCUMENT_AV_SCAN_MODE` | `off` | policy สำหรับ AV scanning chain: `off`, `log-only`, หรือ `required` |
+| `DOCUMENT_AV_SCAN_URL` | unset | URL ของ external AV scanner ที่ worker จะเรียกก่อน sanitize ไฟล์ |
+| `DOCUMENT_AV_SCAN_TIMEOUT_MS` | `30000` | timeout ของการเรียก AV scanner |
 | `DB_ENCRYPTION_KEY_VERSION` | `v1` | version ของ DB encryption key ที่ใช้เข้ารหัสข้อมูลใหม่ |
 | `DB_ENCRYPTION_KEY_V2` เป็นต้นไป | unset | key เพิ่มเติมสำหรับ decrypt ข้อมูลที่ถูกเข้ารหัสด้วย version ใหม่ในอนาคต |
 
@@ -227,6 +237,11 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - worker ใช้ Firestore collection `DOCUMENT_JOBS` เป็น queue/status store
 - worker scaffold อยู่ที่ [services/document-job-worker/index.js](/Users/pst./senior/backend/services/document-job-worker/index.js)
 - `deploy.sh` จะ deploy worker service และ scheduler pump ให้อัตโนมัติเมื่อ `ENABLE_DOCUMENT_JOB_WORKER=true`
+- worker image ถูก build จาก [Dockerfile.document-worker](/Users/pst./senior/backend/Dockerfile.document-worker) ผ่าน Cloud Build config [cloudbuild.document-worker.yaml](/Users/pst./senior/backend/cloudbuild.document-worker.yaml)
+- runtime ของ worker ใช้ distroless + nonroot และ application tree ถูกทำให้เป็น read-only ภายใน image โดยเหลือ `/tmp` สำหรับไฟล์ชั่วคราว
+- Cloud Run worker ถูกตั้ง resource policy ผ่าน `DOCUMENT_JOB_WORKER_MEMORY`, `DOCUMENT_JOB_WORKER_TIMEOUT_SECONDS`, `DOCUMENT_JOB_WORKER_CPU`, `DOCUMENT_JOB_WORKER_CONCURRENCY`, และ `DOCUMENT_JOB_WORKER_MAX_INSTANCES`
+- ถ้าเปิด `DOCUMENT_AV_SCAN_MODE=log-only` หรือ `required` worker จะเรียก AV scanner ผ่าน `DOCUMENT_AV_SCAN_URL` ก่อนเข้าสู่ขั้น sanitize ด้วย `sharp` หรือ `pdf-lib`
+- แนะนำเริ่มจาก `DOCUMENT_AV_SCAN_MODE=log-only` ก่อนเพื่อเก็บสถิติ false positive แล้วค่อยขยับเป็น `required`
 
 ถ้าจะรัน worker จาก backend root:
 

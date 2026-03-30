@@ -136,6 +136,7 @@
 <li>[SECURITY_OVERVIEW.md](/Users/pst./senior/backend/SECURITY_OVERVIEW.md)</li>
 <li>[DEPLOY_RUNBOOK.md](/Users/pst./senior/backend/DEPLOY_RUNBOOK.md)</li>
 <li>[BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)</li>
+<li>[PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)</li>
 <li>[backend/postman/README.md](/Users/pst./senior/backend/postman/README.md)</li>
 <li>[backend/postman/FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)</li>
 </ul>
@@ -160,7 +161,16 @@
 <li>backend regenerate `session_id` ใหม่หลัง OIDC login callback</li>
 <li>`POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist</li>
 <li>endpoint ธุรกิจหลักยังต้องผ่าน session-based auth</li>
+<li>upload sanitize และ document merge ทำงานแบบ async job แล้ว โดย API หลักจะ enqueue งานและให้ client poll status</li>
 <li>secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด</li>
+<li>เมื่อเปิด `PFS_V2_ENABLED=true` protected JSON endpoints สามารถรับ envelope แบบ `v2` ได้ด้วย โดย `securityMiddleware` จะ derive request/response keys แยกกัน</li>
+<li>raw intake object ของ upload async flow ถูกเข้ารหัสระดับแอปด้วย KMS envelope encryption ก่อนเก็บลง GCS และ worker จะถอดรหัสเฉพาะตอนประมวลผล</li>
+<li>runtime ของ app และ worker ถูกแยก `DOCUMENT_INTAKE_KMS_ACCESS_MODE` เป็น `encrypt` และ `decrypt` ตามลำดับเพื่อลด capability ของแต่ละ service</li>
+<li>document worker รันบน distroless/nonroot image และ deploy ด้วย memory/timeout/CPU/concurrency policy แยกจาก API หลัก</li>
+<li>worker สามารถต่อ AV scanning chain ก่อนขั้น sanitize ได้ผ่าน `DOCUMENT_AV_SCAN_MODE`, `DOCUMENT_AV_SCAN_URL`, และ `DOCUMENT_AV_SCAN_TIMEOUT_MS`</li>
+<li>DB field encryption สำหรับข้อมูลใหม่ใช้ format แบบ versioned (`vN:iv:ciphertext:authTag`) และ backend ยังอ่าน legacy format เดิมได้</li>
+<li>operator สามารถใช้ [migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js) เพื่อ dry-run / migrate legacy DB records ก่อน flip `DB_ENCRYPTION_KEY_VERSION`</li>
+<li>secure transport รุ่นถัดไปที่มี PFS ถูกแยกเป็น design doc และ backend รองรับ handshake + protected route transport แล้วใน [PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)</li>
 </ul>
 <h2>Authentication Flow</h2>
 <p>flow ที่แนะนำสำหรับ production:</p>
@@ -215,6 +225,13 @@
 <td>ต้อง</td>
 <td>ไม่ต้อง</td>
 <td>detailed runtime/config status สำหรับ internal QA/ops</td>
+</tr>
+<tr>
+<td>`/api/v2/auth/handshake`</td>
+<td>`GET`</td>
+<td>ไม่ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>ขอ PFS `v2` handshake metadata ถ้าเปิด `PFS_V2_ENABLED=true`</td>
 </tr>
 <tr>
 <td>`/auth/public-key`</td>
@@ -319,7 +336,14 @@
 <td>`POST multipart/form-data`</td>
 <td>ต้อง</td>
 <td>ไม่ใช้ secure JSON wrapper</td>
-<td>อัปโหลดไฟล์</td>
+<td>รับไฟล์และ enqueue sanitize/upload job</td>
+</tr>
+<tr>
+<td>`/upload/jobs/:jobId`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>อ่านสถานะ upload sanitize job</td>
 </tr>
 <tr>
 <td>`/validation/check-completeness`</td>
@@ -333,7 +357,21 @@
 <td>`POST`</td>
 <td>ต้อง</td>
 <td>ต้อง</td>
-<td>รวมเอกสาร</td>
+<td>enqueue merge job</td>
+</tr>
+<tr>
+<td>`/documents/jobs/:jobId`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>อ่านสถานะ merge job</td>
+</tr>
+<tr>
+<td>`/documents/jobs/:jobId/download`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>รับ signed URL ของ merged output เมื่อ job สำเร็จ</td>
 </tr>
 <tr>
 <td>`/chat/recommend`</td>
@@ -351,6 +389,27 @@
 </tr>
 </tbody></table>
 <h2>OIDC Endpoints</h2>
+<h2>PFS V2 Handshake</h2>
+<h3>`GET /api/v2/auth/handshake`</h3>
+<p>route นี้เป็น phase 1 ของ secure transport รุ่นใหม่</p>
+<p>พฤติกรรม:</p>
+<ul>
+<li>ถ้า `PFS_V2_ENABLED=false` จะตอบ `404`</li>
+<li>ถ้าเปิดอยู่ จะตอบ server ephemeral public key, key id, expiry, signature, และ signing public key</li>
+<li>protected JSON endpoints สามารถรับ envelope แบบ `v2` ได้แล้ว</li>
+<li>rollout ฝั่ง client/BFF ยังเป็นแบบ opt-in และ `v1` ยังทำงานคู่กันได้</li>
+</ul>
+<h2>Async Document Jobs</h2>
+<p>flow ใหม่สำหรับงานหนัก:</p>
+<p>1. `POST /upload` ตอบ `202` พร้อม `job.id` 2. client poll `GET /upload/jobs/:jobId` จน `status=succeeded` 3. เมื่อไฟล์พร้อมแล้วค่อยเรียก validation หรือ merge 4. `POST /documents/merge` ตอบ `202` พร้อม `job.id` 5. client poll `GET /documents/jobs/:jobId` 6. เมื่อ `status=succeeded` ให้เรียก `GET /documents/jobs/:jobId/download`</p>
+<p>หมายเหตุด้าน operation:</p>
+<ul>
+<li>backend จะ enqueue job อย่างเดียว</li>
+<li>worker service จะเป็นคน claim งานจาก `DOCUMENT_JOBS`</li>
+<li>raw intake files ของ upload job จะถูกลบทิ้งทั้งกรณีสำเร็จและล้มเหลว เพื่อลด object leakage</li>
+<li>ถ้าเปิด AV scan แบบ `required` งานจะ fail ด้วย `422` เมื่อ scanner ระบุว่าไฟล์ไม่ clean และจะ fail ด้วย `503` ถ้า scanner ใช้งานไม่ได้</li>
+<li>ถ้าเปิด AV scan แบบ `log-only` worker จะ log ความผิดปกติแต่ยังเดินหน้าสู่ขั้น sanitize ต่อ</li>
+</ul>
 <h3>`GET /oidc/google/login`</h3>
 <p>ใช้เริ่ม Google OIDC login ใน legacy/direct mode</p>
 <p>query:</p>

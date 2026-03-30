@@ -12,6 +12,8 @@ const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc, filterFilesForForm, se
 const { departments, getFormConfig } = require('../data/staticData');
 const { getMaxPdfSourceBytes } = require('./uploadSecurity');
 const { getMergedDownloadUrlTtlMs, getMergeTotalSourceBytesLimit } = require('./documentMergeSecurity');
+const { getDocumentAvScanMode } = require('./documentAvConfig');
+const { scanDocumentFile } = require('./documentAvScan');
 const { decryptDocumentIntakeToFile } = require('./documentIntakeEncryption');
 
 const storage = new Storage();
@@ -84,6 +86,42 @@ const processUploadSanitizeJob = async (job) => {
         const sourceStat = await fsp.stat(sourcePath);
         const sourceBytes = Number(sourceStat.size || 0);
         const maxPdfSourceBytes = getMaxPdfSourceBytes();
+        const avScanMode = getDocumentAvScanMode();
+
+        try {
+            const avScanResult = await scanDocumentFile(sourcePath, {
+                sessionId,
+                jobType: job.type,
+                fileKey,
+                mimeType: detectedMime
+            });
+
+            if (avScanResult.status === 'clean') {
+                console.log(JSON.stringify({
+                    level: 'info',
+                    event: 'document_av_scan_passed',
+                    session_id: sessionId,
+                    file_key: fileKey,
+                    mime_type: detectedMime,
+                    av_scan_mode: avScanMode,
+                    av_engine: avScanResult.engine || null
+                }));
+            }
+        } catch (error) {
+            if (avScanMode === 'log-only') {
+                console.warn(JSON.stringify({
+                    level: 'warn',
+                    event: 'document_av_scan_bypassed',
+                    session_id: sessionId,
+                    file_key: fileKey,
+                    mime_type: detectedMime,
+                    av_scan_mode: avScanMode,
+                    message: error.message
+                }));
+            } else {
+                throw error;
+            }
+        }
 
         let finalMimeType = detectedMime;
         let fileExtension = sourceExt;
