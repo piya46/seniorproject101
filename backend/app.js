@@ -22,6 +22,7 @@ const path = require('path');
 
 const app = express();
 const oidcEnabled = String(process.env.OIDC_ENABLED !== undefined ? process.env.OIDC_ENABLED : 'true').toLowerCase() === 'true';
+const allowBearerSessionToken = String(process.env.ALLOW_BEARER_SESSION_TOKEN || 'false').toLowerCase() === 'true';
 const storage = new Storage();
 
 // --- Security Check ---
@@ -29,6 +30,11 @@ const requiredEnv = ['JWT_SECRET', 'GCP_PROJECT_ID', 'GCS_BUCKET_NAME', 'Gb_PRIV
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length > 0) {
   console.error(`❌ CRITICAL ERROR: Missing secrets: ${missingEnv.join(', ')}`);
+  process.exit(1);
+}
+
+if (process.env.NODE_ENV === 'production' && allowBearerSessionToken) {
+  console.error('❌ CRITICAL ERROR: ALLOW_BEARER_SESSION_TOKEN must remain disabled in production.');
   process.exit(1);
 }
 

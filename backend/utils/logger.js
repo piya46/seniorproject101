@@ -11,6 +11,10 @@ const SENSITIVE_KEY_PATTERN =
   /token|secret|password|authorization|cookie|encKey|payload|jwt|csrf|nonce|bearer|private[_-]?key|refresh[_-]?token|access[_-]?token|id[_-]?token/i;
 const SENSITIVE_STRING_VALUE_PATTERN =
   /bearer\s+[a-z0-9\-._~+/]+=*|eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/;
+const CONTROL_CHARACTERS_PATTERN = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g;
+
+const sanitizeLogString = (value) =>
+  String(value).replace(CONTROL_CHARACTERS_PATTERN, '');
 
 const redactValue = (value) => {
   if (value === undefined) {
@@ -22,11 +26,13 @@ const redactValue = (value) => {
   }
 
   if (typeof value === 'string') {
-    if (SENSITIVE_STRING_VALUE_PATTERN.test(value)) {
+    const sanitized = sanitizeLogString(value);
+
+    if (SENSITIVE_STRING_VALUE_PATTERN.test(sanitized)) {
       return '[REDACTED]';
     }
 
-    return value.length > 400 ? `${value.slice(0, 397)}...` : value;
+    return sanitized.length > 400 ? `${sanitized.slice(0, 397)}...` : sanitized;
   }
 
   if (Array.isArray(value)) {
@@ -60,7 +66,7 @@ const baseLog = (level, event, payload = {}) => {
   const entry = redactValue({
     timestamp: new Date().toISOString(),
     level,
-    event,
+    event: sanitizeLogString(event),
     ...payload
   });
 
