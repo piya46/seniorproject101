@@ -14,6 +14,8 @@ PROJECT_ID="${PROJECT_ID:-ai-formcheck}"
 APP_NAME="${APP_NAME:-ai-formcheck}"
 SERVICE_NAME="${SERVICE_NAME:-${APP_NAME}-backend}"
 FRONTEND_SERVICE_NAME="${FRONTEND_SERVICE_NAME:-${APP_NAME}-frontend}"
+FRONTEND_SERVICE_ACCOUNT_NAME="${FRONTEND_SERVICE_ACCOUNT_NAME:-${FRONTEND_SERVICE_NAME}-sa}"
+FRONTEND_INVOKER_SERVICE_ACCOUNT="${FRONTEND_INVOKER_SERVICE_ACCOUNT:-}"
 BUCKET_NAME="${BUCKET_NAME:-${SERVICE_NAME}-files}"
 BUCKET_LOCATION="${BUCKET_LOCATION:-}"
 BUCKET_STORAGE_CLASS="${BUCKET_STORAGE_CLASS:-STANDARD}"
@@ -31,7 +33,7 @@ ENABLE_DAILY_FILE_CLEANUP_FUNCTION="${ENABLE_DAILY_FILE_CLEANUP_FUNCTION:-true}"
 CLEANUP_SERVICE_NAME="${CLEANUP_SERVICE_NAME:-${SERVICE_NAME}-cleanup}"
 CLEANUP_SERVICE_REGION="${CLEANUP_SERVICE_REGION:-}"
 CLEANUP_SERVICE_SOURCE_DIR="${CLEANUP_SERVICE_SOURCE_DIR:-$SCRIPT_DIR/services/delete-file-cleanup}"
-CLEANUP_SERVICE_ACCOUNT_NAME="${CLEANUP_SERVICE_ACCOUNT_NAME:-${CLEANUP_SERVICE_NAME}-sa}"
+CLEANUP_SERVICE_ACCOUNT_NAME="${CLEANUP_SERVICE_ACCOUNT_NAME:-${APP_NAME}-cln-sa}"
 APP_SERVICE_ACCOUNT_NAME="${APP_SERVICE_ACCOUNT_NAME:-${SERVICE_NAME}-sa}"
 CLEANUP_SCHEDULER_JOB_NAME="${CLEANUP_SCHEDULER_JOB_NAME:-${CLEANUP_SERVICE_NAME}-daily}"
 CLEANUP_SCHEDULER_LOCATION="${CLEANUP_SCHEDULER_LOCATION:-}"
@@ -65,10 +67,17 @@ OIDC_REQUIRE_HOSTED_DOMAIN="${OIDC_REQUIRE_HOSTED_DOMAIN:-true}"
 GOOGLE_OIDC_CLIENT_ID_VALUE="${GOOGLE_OIDC_CLIENT_ID_VALUE:-}"
 GOOGLE_OIDC_CLIENT_SECRET_VALUE="${GOOGLE_OIDC_CLIENT_SECRET_VALUE:-}"
 GOOGLE_OIDC_CALLBACK_URL="${GOOGLE_OIDC_CALLBACK_URL:-}"
+TRUSTED_BFF_AUTH_ENABLED="${TRUSTED_BFF_AUTH_ENABLED:-false}"
+TRUSTED_BFF_AUTH_HEADER_NAME="${TRUSTED_BFF_AUTH_HEADER_NAME:-x-bff-auth}"
+TRUSTED_BFF_SHARED_SECRET_VALUE="${TRUSTED_BFF_SHARED_SECRET_VALUE:-}"
 CLOUD_RUN_INGRESS="${CLOUD_RUN_INGRESS:-all}"
+CLOUD_RUN_AUTH_MODE="${CLOUD_RUN_AUTH_MODE:-private}"
+TRUST_PROXY_BROWSER_ORIGIN_HEADER="${TRUST_PROXY_BROWSER_ORIGIN_HEADER:-false}"
+BROWSER_ORIGIN_HEADER_NAME="${BROWSER_ORIGIN_HEADER_NAME:-x-browser-origin}"
 POST_DEPLOY_HEALTHCHECK_ENABLED="${POST_DEPLOY_HEALTHCHECK_ENABLED:-false}"
 POST_DEPLOY_HEALTHCHECK_PATH="${POST_DEPLOY_HEALTHCHECK_PATH:-/healthz}"
 SKIP_ENABLE_APIS="${SKIP_ENABLE_APIS:-false}"
+SKIP_PROJECT_IAM_BINDINGS="${SKIP_PROJECT_IAM_BINDINGS:-false}"
 
 # ชื่อ Secret ของ Key ต่างๆ
 PRIV_KEY_SECRET="${PRIV_KEY_SECRET:-Gb_PRIVATE_KEY_BASE64}"
@@ -83,6 +92,7 @@ SMTP_FROM_EMAIL_SECRET="${SMTP_FROM_EMAIL_SECRET:-SMTP_FROM_EMAIL}"
 SMTP_FROM_NAME_SECRET="${SMTP_FROM_NAME_SECRET:-SMTP_FROM_NAME}"
 OIDC_CLIENT_ID_SECRET="${OIDC_CLIENT_ID_SECRET:-GOOGLE_OIDC_CLIENT_ID}"
 OIDC_CLIENT_SECRET_SECRET="${OIDC_CLIENT_SECRET_SECRET:-GOOGLE_OIDC_CLIENT_SECRET}"
+TRUSTED_BFF_SHARED_SECRET_SECRET="${TRUSTED_BFF_SHARED_SECRET_SECRET:-TRUSTED_BFF_SHARED_SECRET}"
 
 # 📍 App Region (แนะนำ asia-southeast1 (Singapore) เป็น Main Hub ใกล้ไทยสุดที่มีฟีเจอร์ครบ)
 # หากต้องการใช้ Server ไทยแท้ๆ ให้เปลี่ยนเป็น "asia-southeast3" (แต่ต้องเช็ค Quota ของโปรเจ็คก่อน)
@@ -118,6 +128,8 @@ derive_canonical_run_app_base_url() {
 
 APP_NAME="$(trim_value "$APP_NAME")"
 FRONTEND_SERVICE_NAME="$(trim_value "$FRONTEND_SERVICE_NAME")"
+FRONTEND_SERVICE_ACCOUNT_NAME="$(trim_value "$FRONTEND_SERVICE_ACCOUNT_NAME")"
+FRONTEND_INVOKER_SERVICE_ACCOUNT="$(trim_value "$FRONTEND_INVOKER_SERVICE_ACCOUNT")"
 SMTP_HOST_VALUE="$(trim_value "$SMTP_HOST_VALUE")"
 SMTP_USER_VALUE="$(trim_value "$SMTP_USER_VALUE")"
 SMTP_FROM_EMAIL_VALUE="$(trim_value "$SMTP_FROM_EMAIL_VALUE")"
@@ -134,8 +146,15 @@ OIDC_REQUIRE_HOSTED_DOMAIN="$(trim_value "$OIDC_REQUIRE_HOSTED_DOMAIN")"
 GOOGLE_OIDC_CLIENT_ID_VALUE="$(trim_value "$GOOGLE_OIDC_CLIENT_ID_VALUE")"
 GOOGLE_OIDC_CLIENT_SECRET_VALUE="$(trim_value "$GOOGLE_OIDC_CLIENT_SECRET_VALUE")"
 GOOGLE_OIDC_CALLBACK_URL="$(trim_value "$GOOGLE_OIDC_CALLBACK_URL")"
+TRUSTED_BFF_AUTH_ENABLED="$(trim_value "$TRUSTED_BFF_AUTH_ENABLED")"
+TRUSTED_BFF_AUTH_HEADER_NAME="$(trim_value "$TRUSTED_BFF_AUTH_HEADER_NAME")"
+TRUSTED_BFF_SHARED_SECRET_VALUE="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_VALUE")"
+CLOUD_RUN_AUTH_MODE="$(trim_value "$CLOUD_RUN_AUTH_MODE")"
+TRUST_PROXY_BROWSER_ORIGIN_HEADER="$(trim_value "$TRUST_PROXY_BROWSER_ORIGIN_HEADER")"
+BROWSER_ORIGIN_HEADER_NAME="$(trim_value "$BROWSER_ORIGIN_HEADER_NAME")"
 OIDC_CLIENT_ID_SECRET="$(trim_value "$OIDC_CLIENT_ID_SECRET")"
 OIDC_CLIENT_SECRET_SECRET="$(trim_value "$OIDC_CLIENT_SECRET_SECRET")"
+TRUSTED_BFF_SHARED_SECRET_SECRET="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_SECRET")"
 BUCKET_LOCATION="$(trim_value "$BUCKET_LOCATION")"
 BUCKET_STORAGE_CLASS="$(trim_value "$BUCKET_STORAGE_CLASS")"
 FIRESTORE_DATABASE_ID="$(trim_value "$FIRESTORE_DATABASE_ID")"
@@ -176,6 +195,10 @@ fi
 
 CLEANUP_SERVICE_ACCOUNT_EMAIL="${CLEANUP_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 APP_SERVICE_ACCOUNT_EMAIL="${APP_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+FRONTEND_SERVICE_ACCOUNT_EMAIL="${FRONTEND_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+if [ -n "$FRONTEND_INVOKER_SERVICE_ACCOUNT" ]; then
+    FRONTEND_SERVICE_ACCOUNT_EMAIL="$FRONTEND_INVOKER_SERVICE_ACCOUNT"
+fi
 
 if [ -z "$BUCKET_LOCATION" ]; then
     BUCKET_LOCATION="$REGION"
@@ -322,9 +345,31 @@ validate_boolean_string() {
     [[ "$VALUE" = "true" || "$VALUE" = "false" ]]
 }
 
+add_project_iam_policy_binding_if_enabled() {
+    local MEMBER=$1
+    local ROLE=$2
+    local LABEL=$3
+
+    if [ "$SKIP_PROJECT_IAM_BINDINGS" = "true" ]; then
+        echo -e "   ℹ️  Skipping project IAM binding for ${YELLOW}$LABEL${NC} because SKIP_PROJECT_IAM_BINDINGS=true"
+        return
+    fi
+
+    echo -e "   🔐 Granting ${LABEL}"
+    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+        --member="$MEMBER" \
+        --role="$ROLE" \
+        --quiet >/dev/null
+}
+
 validate_ingress_setting() {
     local VALUE=$1
     [[ "$VALUE" = "all" || "$VALUE" = "internal" || "$VALUE" = "internal-and-cloud-load-balancing" ]]
+}
+
+validate_cloud_run_auth_mode() {
+    local VALUE=$1
+    [[ "$VALUE" = "public" || "$VALUE" = "private" ]]
 }
 
 validate_bucket_storage_class() {
@@ -694,6 +739,25 @@ grant_cleanup_service_invoker_binding() {
         --quiet >/dev/null
 }
 
+grant_backend_service_invoker_binding_if_needed() {
+    if [ "$CLOUD_RUN_AUTH_MODE" != "private" ]; then
+        return
+    fi
+
+    if [ -z "$FRONTEND_SERVICE_ACCOUNT_EMAIL" ]; then
+        echo -e "${RED}❌ FRONTEND_SERVICE_ACCOUNT_EMAIL could not be resolved for private backend mode.${NC}"
+        exit 1
+    fi
+
+    echo -e "   🔐 Granting Cloud Run Invoker on backend to ${YELLOW}$FRONTEND_SERVICE_ACCOUNT_EMAIL${NC}"
+    gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+        --region="$REGION" \
+        --project "$PROJECT_ID" \
+        --member="serviceAccount:$FRONTEND_SERVICE_ACCOUNT_EMAIL" \
+        --role="roles/run.invoker" \
+        --quiet >/dev/null
+}
+
 grant_secret_accessor_on_secret() {
     local SECRET_NAME=$1
     local SERVICE_ACCOUNT_EMAIL=$2
@@ -772,11 +836,10 @@ ensure_cleanup_service_account_and_permissions() {
         --quiet >/dev/null
     remove_bucket_role_binding_if_exists "gs://$BUCKET_NAME" "$CLEANUP_SERVICE_ACCOUNT_EMAIL" "roles/storage.objectAdmin"
 
-    echo -e "   🔐 Granting datastore.user to cleanup service account"
-    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-        --member="serviceAccount:$CLEANUP_SERVICE_ACCOUNT_EMAIL" \
-        --role="roles/datastore.user" \
-        --quiet >/dev/null
+    add_project_iam_policy_binding_if_enabled \
+        "serviceAccount:$CLEANUP_SERVICE_ACCOUNT_EMAIL" \
+        "roles/datastore.user" \
+        "datastore.user to cleanup service account"
 }
 
 ensure_app_service_account_and_permissions() {
@@ -817,6 +880,9 @@ ensure_app_service_account_and_permissions() {
     grant_secret_accessor_on_secret "$SMTP_FROM_NAME_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
     grant_secret_accessor_on_secret "$OIDC_CLIENT_ID_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
     grant_secret_accessor_on_secret "$OIDC_CLIENT_SECRET_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
+    if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ]; then
+        grant_secret_accessor_on_secret "$TRUSTED_BFF_SHARED_SECRET_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
+    fi
 
     if gcloud secrets describe "$PREV_PRIV_KEY_SECRET" --project "$PROJECT_ID" >/dev/null 2>&1; then
         grant_secret_accessor_on_secret "$PREV_PRIV_KEY_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
@@ -833,17 +899,15 @@ ensure_app_service_account_and_permissions() {
         --quiet >/dev/null
     remove_bucket_role_binding_if_exists "gs://$BUCKET_NAME" "$APP_SERVICE_ACCOUNT_EMAIL" "roles/storage.objectAdmin"
 
-    echo -e "   🔐 Granting aiplatform.user to app service account"
-    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-        --member="serviceAccount:$APP_SERVICE_ACCOUNT_EMAIL" \
-        --role="roles/aiplatform.user" \
-        --quiet >/dev/null
+    add_project_iam_policy_binding_if_enabled \
+        "serviceAccount:$APP_SERVICE_ACCOUNT_EMAIL" \
+        "roles/aiplatform.user" \
+        "aiplatform.user to app service account"
 
-    echo -e "   🔐 Granting datastore.user to app service account"
-    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-        --member="serviceAccount:$APP_SERVICE_ACCOUNT_EMAIL" \
-        --role="roles/datastore.user" \
-        --quiet >/dev/null
+    add_project_iam_policy_binding_if_enabled \
+        "serviceAccount:$APP_SERVICE_ACCOUNT_EMAIL" \
+        "roles/datastore.user" \
+        "datastore.user to app service account"
 
     grant_service_account_token_creator_on_self "$APP_SERVICE_ACCOUNT_EMAIL"
 }
@@ -1131,6 +1195,20 @@ reuse_oidc_credentials_from_secret_manager() {
     fi
 }
 
+reuse_trusted_bff_secret_from_secret_manager() {
+    if [ "$TRUSTED_BFF_AUTH_ENABLED" != "true" ]; then
+        return
+    fi
+
+    if [ -z "$TRUSTED_BFF_SHARED_SECRET_VALUE" ] && gcloud secrets describe "$TRUSTED_BFF_SHARED_SECRET_SECRET" &> /dev/null; then
+        TRUSTED_BFF_SHARED_SECRET_VALUE=$(gcloud secrets versions access latest --secret="$TRUSTED_BFF_SHARED_SECRET_SECRET" 2>/dev/null || true)
+        TRUSTED_BFF_SHARED_SECRET_VALUE="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_VALUE")"
+        if [ -n "$TRUSTED_BFF_SHARED_SECRET_VALUE" ]; then
+            echo -e "   ✅ Reusing existing trusted BFF shared secret from Secret Manager."
+        fi
+    fi
+}
+
 prompt_for_missing_config() {
     echo -e "${YELLOW}📝 Review SMTP/support config. Leave blank to use the shown default.${NC}"
     prompt_value_if_empty TECH_SUPPORT_TARGET_EMAIL "Support target email" "support@example.com"
@@ -1144,6 +1222,11 @@ prompt_for_missing_config() {
     echo -e "${YELLOW}🪪 Review Google OIDC config. Callback URL defaults to the canonical Cloud Run URL if GOOGLE_OIDC_CALLBACK_URL is left unset.${NC}"
     prompt_value_if_empty GOOGLE_OIDC_CLIENT_ID_VALUE "Google OIDC client ID"
     prompt_value_if_empty GOOGLE_OIDC_CLIENT_SECRET_VALUE "Google OIDC client secret" "" true
+    reuse_trusted_bff_secret_from_secret_manager
+    if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ]; then
+        echo -e "${YELLOW}🛡️  Trusted BFF auth is enabled. Backend will accept shared-secret-authenticated proxy requests from the frontend service.${NC}"
+        prompt_value_if_empty TRUSTED_BFF_SHARED_SECRET_VALUE "Trusted BFF shared secret" "" true
+    fi
 
     SMTP_HOST_VALUE="$(trim_value "$SMTP_HOST_VALUE")"
     SMTP_USER_VALUE="$(trim_value "$SMTP_USER_VALUE")"
@@ -1155,6 +1238,7 @@ prompt_for_missing_config() {
     GOOGLE_OIDC_CLIENT_ID_VALUE="$(trim_value "$GOOGLE_OIDC_CLIENT_ID_VALUE")"
     GOOGLE_OIDC_CLIENT_SECRET_VALUE="$(trim_value "$GOOGLE_OIDC_CLIENT_SECRET_VALUE")"
     GOOGLE_OIDC_CALLBACK_URL="$(trim_value "$GOOGLE_OIDC_CALLBACK_URL")"
+    TRUSTED_BFF_SHARED_SECRET_VALUE="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_VALUE")"
 }
 
 ensure_smtp_password() {
@@ -1318,13 +1402,43 @@ validate_smtp_config() {
         exit 1
     fi
 
+    if ! validate_boolean_string "$TRUSTED_BFF_AUTH_ENABLED"; then
+        echo -e "${RED}❌ Invalid TRUSTED_BFF_AUTH_ENABLED: $TRUSTED_BFF_AUTH_ENABLED (must be true or false)${NC}"
+        exit 1
+    fi
+
+    if [ -z "$TRUSTED_BFF_AUTH_HEADER_NAME" ]; then
+        echo -e "${RED}❌ TRUSTED_BFF_AUTH_HEADER_NAME is required.${NC}"
+        exit 1
+    fi
+
     if ! validate_ingress_setting "$CLOUD_RUN_INGRESS"; then
         echo -e "${RED}❌ Invalid CLOUD_RUN_INGRESS: $CLOUD_RUN_INGRESS${NC}"
         exit 1
     fi
 
+    if ! validate_cloud_run_auth_mode "$CLOUD_RUN_AUTH_MODE"; then
+        echo -e "${RED}❌ Invalid CLOUD_RUN_AUTH_MODE: $CLOUD_RUN_AUTH_MODE (must be public or private)${NC}"
+        exit 1
+    fi
+
+    if ! validate_boolean_string "$TRUST_PROXY_BROWSER_ORIGIN_HEADER"; then
+        echo -e "${RED}❌ Invalid TRUST_PROXY_BROWSER_ORIGIN_HEADER: $TRUST_PROXY_BROWSER_ORIGIN_HEADER (must be true or false)${NC}"
+        exit 1
+    fi
+
+    if [ -z "$BROWSER_ORIGIN_HEADER_NAME" ]; then
+        echo -e "${RED}❌ BROWSER_ORIGIN_HEADER_NAME is required.${NC}"
+        exit 1
+    fi
+
     if ! validate_boolean_string "$POST_DEPLOY_HEALTHCHECK_ENABLED"; then
         echo -e "${RED}❌ Invalid POST_DEPLOY_HEALTHCHECK_ENABLED: $POST_DEPLOY_HEALTHCHECK_ENABLED (must be true or false)${NC}"
+        exit 1
+    fi
+
+    if ! validate_boolean_string "$SKIP_PROJECT_IAM_BINDINGS"; then
+        echo -e "${RED}❌ Invalid SKIP_PROJECT_IAM_BINDINGS: $SKIP_PROJECT_IAM_BINDINGS (must be true or false)${NC}"
         exit 1
     fi
 
@@ -1349,11 +1463,20 @@ validate_smtp_config() {
             exit 1
         fi
     fi
+
+    if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ] && [ -z "$TRUSTED_BFF_SHARED_SECRET_VALUE" ]; then
+        echo -e "${RED}❌ TRUSTED_BFF_SHARED_SECRET_VALUE is required when TRUSTED_BFF_AUTH_ENABLED=true${NC}"
+        exit 1
+    fi
 }
 
 resolve_deploy_mode_settings() {
     CLOUD_RUN_INGRESS="${CLOUD_RUN_INGRESS:-all}"
-    RUN_AUTH_FLAG="--allow-unauthenticated"
+    if [ "$CLOUD_RUN_AUTH_MODE" = "private" ]; then
+        RUN_AUTH_FLAG="--no-allow-unauthenticated"
+    else
+        RUN_AUTH_FLAG="--allow-unauthenticated"
+    fi
     DEFAULT_URL_FLAG="--default-url"
 }
 
@@ -1363,6 +1486,8 @@ print_deploy_summary() {
     echo -e "   App Name                : ${YELLOW}$APP_NAME${NC}"
     echo -e "   Service Name            : ${YELLOW}$SERVICE_NAME${NC}"
     echo -e "   Frontend Service Name   : ${YELLOW}$FRONTEND_SERVICE_NAME${NC}"
+    echo -e "   Frontend Service Account: ${YELLOW}$FRONTEND_SERVICE_ACCOUNT_EMAIL${NC}"
+    echo -e "   Frontend Invoker Override: ${YELLOW}${FRONTEND_INVOKER_SERVICE_ACCOUNT:-<derived from name>}${NC}"
     echo -e "   Bucket                  : ${YELLOW}$BUCKET_NAME${NC}"
     echo -e "   Bucket Location         : ${YELLOW}$BUCKET_LOCATION${NC}"
     echo -e "   Bucket Storage Class    : ${YELLOW}$BUCKET_STORAGE_CLASS${NC}"
@@ -1408,6 +1533,9 @@ print_deploy_summary() {
     echo -e "   OIDC Enabled            : ${YELLOW}$OIDC_ENABLED${NC}"
     echo -e "   OIDC Allowed Domains    : ${YELLOW}$OIDC_ALLOWED_DOMAINS${NC}"
     echo -e "   OIDC Require HD         : ${YELLOW}$OIDC_REQUIRE_HOSTED_DOMAIN${NC}"
+    echo -e "   Trusted BFF Auth        : ${YELLOW}$TRUSTED_BFF_AUTH_ENABLED${NC}"
+    echo -e "   Trusted BFF Header      : ${YELLOW}$TRUSTED_BFF_AUTH_HEADER_NAME${NC}"
+    echo -e "   Trusted BFF Secret      : ${YELLOW}$TRUSTED_BFF_SHARED_SECRET_SECRET${NC}"
     echo -e "   Canonical run.app URL   : ${YELLOW}${CANONICAL_RUN_APP_BASE_URL}${NC}"
     echo -e "   Canonical frontend URL  : ${YELLOW}${CANONICAL_FRONTEND_RUN_APP_BASE_URL}${NC}"
     echo -e "   OIDC Callback URL       : ${YELLOW}${GOOGLE_OIDC_CALLBACK_URL}${NC}"
@@ -1415,10 +1543,14 @@ print_deploy_summary() {
     echo -e "   OIDC Client ID Secret   : ${YELLOW}$OIDC_CLIENT_ID_SECRET${NC}"
     echo -e "   OIDC Client Secret      : ${YELLOW}$OIDC_CLIENT_SECRET_SECRET${NC}"
     echo -e "   Cloud Run Ingress       : ${YELLOW}$CLOUD_RUN_INGRESS${NC}"
+    echo -e "   Cloud Run Auth Mode     : ${YELLOW}$CLOUD_RUN_AUTH_MODE${NC}"
     echo -e "   Run Auth Flag           : ${YELLOW}$RUN_AUTH_FLAG${NC}"
     echo -e "   Default URL Flag        : ${YELLOW}${DEFAULT_URL_FLAG:-<auto>}${NC}"
     echo -e "   App Service Account     : ${YELLOW}${APP_SERVICE_ACCOUNT_EMAIL:-<pending>}${NC}"
+    echo -e "   Trust Proxy Origin Hdr  : ${YELLOW}$TRUST_PROXY_BROWSER_ORIGIN_HEADER${NC}"
+    echo -e "   Browser Origin Header   : ${YELLOW}$BROWSER_ORIGIN_HEADER_NAME${NC}"
     echo -e "   Post Deploy Healthcheck : ${YELLOW}$POST_DEPLOY_HEALTHCHECK_ENABLED${NC}"
+    echo -e "   Skip Project IAM Bindings: ${YELLOW}$SKIP_PROJECT_IAM_BINDINGS${NC}"
 
     if [ "${AUTO_BUCKET_MIGRATION_TRIGGERED:-false}" = "true" ]; then
         echo -e "${RED}⚠️  AUTO BUCKET MIGRATION WILL RUN IN THIS DEPLOY${NC}"
@@ -1446,6 +1578,21 @@ run_preflight_checks() {
 
     if ! printf '%s' "$GOOGLE_OIDC_CALLBACK_URL" | grep -Eq '^https://[^[:space:]]+/api/v1/oidc/google/callback$'; then
         echo -e "${RED}   ❌ GOOGLE_OIDC_CALLBACK_URL must be an HTTPS callback ending with /api/v1/oidc/google/callback${NC}"
+        PRECHECK_FAILED="true"
+    fi
+
+    if [ "$TRUST_PROXY_BROWSER_ORIGIN_HEADER" = "true" ] && [ "$CLOUD_RUN_AUTH_MODE" != "private" ]; then
+        echo -e "${RED}   ❌ TRUST_PROXY_BROWSER_ORIGIN_HEADER=true requires CLOUD_RUN_AUTH_MODE=private${NC}"
+        PRECHECK_FAILED="true"
+    fi
+
+    if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ] && [ "$CLOUD_RUN_AUTH_MODE" != "private" ]; then
+        echo -e "${RED}   ❌ TRUSTED_BFF_AUTH_ENABLED=true requires CLOUD_RUN_AUTH_MODE=private${NC}"
+        PRECHECK_FAILED="true"
+    fi
+
+    if [ "$CLOUD_RUN_AUTH_MODE" = "private" ] && ! validate_email "$FRONTEND_SERVICE_ACCOUNT_EMAIL"; then
+        echo -e "${RED}   ❌ FRONTEND_SERVICE_ACCOUNT_EMAIL is invalid for private backend mode: ${FRONTEND_SERVICE_ACCOUNT_EMAIL}${NC}"
         PRECHECK_FAILED="true"
     fi
 
@@ -1556,10 +1703,15 @@ run_post_deploy_healthcheck() {
         echo -e "   🔎 Healthcheck body: ${YELLOW}${BODY}${NC}"
     fi
 
-    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "401" ]; then
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
         echo -e "   ✅ HTTPS endpoint is responding."
     else
         echo -e "   ⚠️  HTTPS endpoint did not return an expected status yet."
+        return
+    fi
+
+    if [ "$CLOUD_RUN_AUTH_MODE" = "private" ]; then
+        echo -e "   ℹ️  Skipping signed URL smoke check because CLOUD_RUN_AUTH_MODE=private requires an authenticated caller."
         return
     fi
 
@@ -1634,6 +1786,9 @@ upsert_secret_value $SMTP_FROM_EMAIL_SECRET "$SMTP_FROM_EMAIL_VALUE"
 upsert_secret_value $SMTP_FROM_NAME_SECRET "$SMTP_FROM_NAME_VALUE"
 upsert_secret_value $OIDC_CLIENT_ID_SECRET "$GOOGLE_OIDC_CLIENT_ID_VALUE"
 upsert_secret_value $OIDC_CLIENT_SECRET_SECRET "$GOOGLE_OIDC_CLIENT_SECRET_VALUE"
+if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ]; then
+    upsert_secret_value $TRUSTED_BFF_SHARED_SECRET_SECRET "$TRUSTED_BFF_SHARED_SECRET_VALUE"
+fi
 
 
 if ! gcloud secrets describe $PRIV_KEY_SECRET &> /dev/null; then
@@ -1684,6 +1839,12 @@ DEPLOY_SET_SECRET_ARGS=(
   --set-secrets "GOOGLE_OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET_SECRET}:latest"
 )
 
+if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ]; then
+    DEPLOY_SET_SECRET_ARGS+=(
+      --set-secrets "TRUSTED_BFF_SHARED_SECRET=${TRUSTED_BFF_SHARED_SECRET_SECRET}:latest"
+    )
+fi
+
 if gcloud secrets describe "$PREV_PRIV_KEY_SECRET" &> /dev/null && gcloud secrets describe "$PREV_PUB_KEY_SECRET" &> /dev/null; then
     echo -e "   🔄 Attaching previous key pair secrets for rotation fallback."
     DEPLOY_SET_SECRET_ARGS+=(
@@ -1702,10 +1863,11 @@ gcloud run deploy "$SERVICE_NAME" \
   "$RUN_AUTH_FLAG" \
   "$DEFAULT_URL_FLAG" \
   --service-account "$APP_SERVICE_ACCOUNT_EMAIL" \
-  --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCP_PROJECT_NUMBER=${PROJECT_NUMBER}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__APP_REGION=${REGION}__ENV_DELIM__AI_LOCATION=${AI_LOCATION}__ENV_DELIM__AI_DAILY_TOKEN_LIMIT=${AI_DAILY_TOKEN_LIMIT}__ENV_DELIM__AI_USAGE_RETENTION_DAYS=${AI_USAGE_RETENTION_DAYS}__ENV_DELIM__GCP_LOCATION=${AI_LOCATION}__ENV_DELIM__FRONTEND_URL=${FRONTEND_URL}__ENV_DELIM__TECH_SUPPORT_TARGET_EMAIL=${TECH_SUPPORT_TARGET_EMAIL}__ENV_DELIM__SMTP_PORT=${SMTP_PORT}__ENV_DELIM__SMTP_SECURE=${SMTP_SECURE}__ENV_DELIM__OIDC_ENABLED=${OIDC_ENABLED}__ENV_DELIM__OIDC_ALLOWED_DOMAINS=${OIDC_ALLOWED_DOMAINS}__ENV_DELIM__OIDC_REQUIRE_HOSTED_DOMAIN=${OIDC_REQUIRE_HOSTED_DOMAIN}__ENV_DELIM__GOOGLE_OIDC_CALLBACK_URL=${GOOGLE_OIDC_CALLBACK_URL}" \
+  --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCP_PROJECT_NUMBER=${PROJECT_NUMBER}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__APP_REGION=${REGION}__ENV_DELIM__AI_LOCATION=${AI_LOCATION}__ENV_DELIM__AI_DAILY_TOKEN_LIMIT=${AI_DAILY_TOKEN_LIMIT}__ENV_DELIM__AI_USAGE_RETENTION_DAYS=${AI_USAGE_RETENTION_DAYS}__ENV_DELIM__GCP_LOCATION=${AI_LOCATION}__ENV_DELIM__FRONTEND_URL=${FRONTEND_URL}__ENV_DELIM__TECH_SUPPORT_TARGET_EMAIL=${TECH_SUPPORT_TARGET_EMAIL}__ENV_DELIM__SMTP_PORT=${SMTP_PORT}__ENV_DELIM__SMTP_SECURE=${SMTP_SECURE}__ENV_DELIM__OIDC_ENABLED=${OIDC_ENABLED}__ENV_DELIM__OIDC_ALLOWED_DOMAINS=${OIDC_ALLOWED_DOMAINS}__ENV_DELIM__OIDC_REQUIRE_HOSTED_DOMAIN=${OIDC_REQUIRE_HOSTED_DOMAIN}__ENV_DELIM__GOOGLE_OIDC_CALLBACK_URL=${GOOGLE_OIDC_CALLBACK_URL}__ENV_DELIM__TRUST_PROXY_BROWSER_ORIGIN_HEADER=${TRUST_PROXY_BROWSER_ORIGIN_HEADER}__ENV_DELIM__BROWSER_ORIGIN_HEADER_NAME=${BROWSER_ORIGIN_HEADER_NAME}__ENV_DELIM__TRUSTED_BFF_AUTH_ENABLED=${TRUSTED_BFF_AUTH_ENABLED}__ENV_DELIM__TRUSTED_BFF_AUTH_HEADER_NAME=${TRUSTED_BFF_AUTH_HEADER_NAME}" \
   "${DEPLOY_SET_SECRET_ARGS[@]}"
 
 if [ $? -eq 0 ]; then
+  grant_backend_service_invoker_binding_if_needed
   echo -e "${GREEN}--------------------------------------------------${NC}"
   echo -e "${GREEN}✅ Deployment Successful!${NC}"
   echo -e "${GREEN}--------------------------------------------------${NC}"

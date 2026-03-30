@@ -12,6 +12,7 @@ const oidcAuthRoutes = require('./routes/oidcAuthRoutes');
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
 const { getKeyStatus } = require('./utils/cryptoUtils');
 const { cleanupStaleTempFilesOnStartup } = require('./utils/tempFileCleanup');
+const { getAllowedOrigins } = require('./utils/browserOrigin');
 
 // Swagger Imports
 const swaggerUi = require('swagger-ui-express');
@@ -45,8 +46,7 @@ app.use(helmet({
 }));
 
 // CORS Setup
-const rawOrigins = process.env.FRONTEND_URL || "http://localhost:5173|http://127.0.0.1:5500";
-const allowedOrigins = rawOrigins.split(/[,|]/).map(url => url.trim());
+const allowedOrigins = getAllowedOrigins();
 
 const corsOptions = {
     origin: function (origin, callback) {
@@ -121,7 +121,7 @@ app.get(`${BASE_URL}/system/status`, (req, res) => {
     res.status(healthy ? 200 : 503).json(status);
 });
 
-app.get(`${BASE_URL}/system/status/storage-signing`, async (req, res) => {
+app.get(`${BASE_URL}/system/status/storage-signing`, authMiddleware, async (req, res) => {
     try {
         const probe = await probeSignedUrlGeneration();
 

@@ -1,17 +1,18 @@
 # Deploy Runbook
 
-Last updated: `2026-03-27`
+Last updated: `2026-03-30`
 
-runbook นี้อธิบายการ deploy backend ในโหมด Google OIDC แบบไม่ใช้ IAP/LB auth gate โดยให้ `run.app` เป็น entrypoint หลัก
+runbook นี้อธิบายการ deploy backend ในโหมด Google OIDC แบบไม่ใช้ IAP/LB auth gate โดยรองรับทั้ง backend แบบ public ชั่วคราวและ backend แบบ private หลัง frontend BFF
 
 เอกสารประกอบ:
 
 - incident/threat model แบบย่ออยู่ที่ [INCIDENT_RUNBOOK.md](/Users/pst./senior/backend/INCIDENT_RUNBOOK.md)
+- contract ระหว่าง frontend BFF กับ backend private อยู่ที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
 
 หมายเหตุสำคัญ:
 
-- production path ที่แนะนำตอนนี้คือ Cloud Run `run.app` URL แบบ regional โดยตรง
-- `deploy.sh` ตอนนี้ deploy ไปที่ `run.app` เสมอ
+- production target ที่แนะนำตอนนี้คือ frontend public + backend private
+- backend ยัง deploy เป็น Cloud Run `run.app` เสมอ แต่สามารถตั้ง `CLOUD_RUN_AUTH_MODE=private` ได้
 - domain mapping, LB fallback, และ legacy LB cleanup ถูกแยกออกจาก deploy หลักแล้ว
 
 ## Prerequisites
@@ -29,6 +30,7 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 - `APP_NAME=ai-formcheck`
 - `SERVICE_NAME=ai-formcheck-backend`
 - `FRONTEND_SERVICE_NAME=ai-formcheck-frontend`
+- `FRONTEND_SERVICE_ACCOUNT_NAME=ai-formcheck-frontend-sa`
 - `CLEANUP_SERVICE_NAME=ai-formcheck-backend-cleanup`
 - `BUCKET_NAME=ai-formcheck-backend-files`
 - `FIRESTORE_DATABASE_ID=ai-formcheck`
@@ -97,6 +99,29 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 
 - ถ้า Secret Manager มี `GOOGLE_OIDC_CLIENT_ID` และ `GOOGLE_OIDC_CLIENT_SECRET` อยู่แล้ว สคริปต์จะพยายาม reuse ให้อัตโนมัติก่อน prompt
 - ค่า `GOOGLE_OIDC_CLIENT_ID_VALUE` และ `GOOGLE_OIDC_CLIENT_SECRET_VALUE` จึงจำเป็นเฉพาะตอน bootstrap ครั้งแรกหรือเมื่อต้องการอัปเดต secret
+- ถ้าจะเดินหน้าไปสู่ private backend เต็มรูปแบบ ให้ใช้เอกสาร [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md) ควบคู่กัน เพราะ OIDC ownership และ callback flow จะเปลี่ยนตามสถาปัตยกรรม BFF
+
+## BFF / Private Backend Flags
+
+ค่าเหล่านี้ใช้เมื่อ frontend ทำหน้าที่เป็น Backend-for-Frontend (BFF) และ backend ต้องเป็น private service:
+
+```bash
+export CLOUD_RUN_AUTH_MODE="private"
+export FRONTEND_SERVICE_ACCOUNT_NAME="ai-formcheck-frontend-sa"
+export TRUST_PROXY_BROWSER_ORIGIN_HEADER="true"
+export BROWSER_ORIGIN_HEADER_NAME="x-browser-origin"
+export TRUSTED_BFF_AUTH_ENABLED="true"
+export TRUSTED_BFF_AUTH_HEADER_NAME="x-bff-auth"
+export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
+```
+
+หมายเหตุ:
+
+- เมื่อ `CLOUD_RUN_AUTH_MODE=private` สคริปต์จะ deploy backend ด้วย `--no-allow-unauthenticated`
+- หลัง deploy สคริปต์จะพยายาม grant `roles/run.invoker` ให้ frontend service account
+- เมื่อ `TRUSTED_BFF_AUTH_ENABLED=true` สคริปต์จะเก็บ shared secret ลง Secret Manager และ inject เข้า backend runtime
+- origin forwarding ผ่าน `x-browser-origin` จะถูกไว้ใจได้ก็ต่อเมื่อ backend เป็น private และเรียกผ่าน BFF เท่านั้น
+- header contract ที่ frontend ต้องส่งดูได้ที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
 
 ## Recommended Production Config
 
@@ -104,8 +129,12 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 export APP_NAME="ai-formcheck"
 export SERVICE_NAME="ai-formcheck-backend"
 export FRONTEND_SERVICE_NAME="ai-formcheck-frontend"
+export FRONTEND_SERVICE_ACCOUNT_NAME="ai-formcheck-frontend-sa"
 export FRONTEND_URL="https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app"
 export FRONTEND_EXTRA_URLS=""
+export CLOUD_RUN_AUTH_MODE="private"
+export TRUST_PROXY_BROWSER_ORIGIN_HEADER="true"
+export BROWSER_ORIGIN_HEADER_NAME="x-browser-origin"
 export TECH_SUPPORT_TARGET_EMAIL="support@example.com"
 export SMTP_HOST_VALUE="smtp.example.com"
 export SMTP_PORT="465"
@@ -123,6 +152,9 @@ export AI_USAGE_RETENTION_DAYS="30"
 export GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id"
 export GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret"
 export GOOGLE_OIDC_CALLBACK_URL="https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback"
+export TRUSTED_BFF_AUTH_ENABLED="true"
+export TRUSTED_BFF_AUTH_HEADER_NAME="x-bff-auth"
+export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 ```
 
 หมายเหตุ:
@@ -137,6 +169,7 @@ export GOOGLE_OIDC_CALLBACK_URL="https://ai-formcheck-backend-<project-number>.a
 - `AI_USAGE_RETENTION_DAYS` ใช้กำหนดว่าจะเก็บเอกสาร usage รายวันใน Firestore ไว้กี่วันก่อน TTL ลบออก
 - ไม่ควรปล่อย `localhost` หรือ origin ชั่วคราวค้างใน production โดยไม่จำเป็น
 - ควรใส่ `Authorised redirect URI` ใน Google OAuth client ให้ตรงกับ callback URL ข้างต้นแบบ exact match
+- ถ้าจะเปิด `TRUSTED_BFF_AUTH_ENABLED=true` ควรสร้าง shared secret แบบสุ่มยาวและเก็บเฉพาะใน Secret Manager เท่านั้น
 
 ## Optional Deploy Flags
 
@@ -144,6 +177,7 @@ export GOOGLE_OIDC_CALLBACK_URL="https://ai-formcheck-backend-<project-number>.a
 
 ```bash
 export CLOUD_RUN_INGRESS="all"
+export CLOUD_RUN_AUTH_MODE="private"
 export POST_DEPLOY_HEALTHCHECK_ENABLED="false"
 export POST_DEPLOY_HEALTHCHECK_PATH="/healthz"
 ```
@@ -151,8 +185,10 @@ export POST_DEPLOY_HEALTHCHECK_PATH="/healthz"
 หมายเหตุ:
 
 - `CLOUD_RUN_INGRESS` รองรับ `all`, `internal`, และ `internal-and-cloud-load-balancing`
-- `POST_DEPLOY_HEALTHCHECK_ENABLED=true` จะให้สคริปต์ยิง smoke check หลัง deploy ทั้งที่ `POST_DEPLOY_HEALTHCHECK_PATH` และ `GET /api/v1/system/status/storage-signing`
-- production path ปัจจุบันใช้ `run.app` โดยตรงและค่า default ของสคริปต์คือ `CLOUD_RUN_INGRESS=all`
+- `CLOUD_RUN_AUTH_MODE` รองรับ `public` และ `private`
+- `POST_DEPLOY_HEALTHCHECK_ENABLED=true` จะให้สคริปต์ยิง smoke check หลัง deploy
+- ถ้า backend เป็น `private` สคริปต์จะข้าม signed URL smoke check แบบ public ให้อัตโนมัติ
+- production path ปัจจุบันยังใช้ `run.app` โดยตรง แต่ backend ควรอยู่หลัง frontend BFF เมื่อพร้อม
 
 ## Copy/Paste Deploy Snippets
 
@@ -163,8 +199,12 @@ cd /Users/pst./senior/backend && \
 APP_NAME="ai-formcheck" \
 SERVICE_NAME="ai-formcheck-backend" \
 FRONTEND_SERVICE_NAME="ai-formcheck-frontend" \
+FRONTEND_SERVICE_ACCOUNT_NAME="ai-formcheck-frontend-sa" \
 FRONTEND_URL="https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app" \
 FRONTEND_EXTRA_URLS="" \
+CLOUD_RUN_AUTH_MODE="private" \
+TRUST_PROXY_BROWSER_ORIGIN_HEADER="true" \
+BROWSER_ORIGIN_HEADER_NAME="x-browser-origin" \
 TECH_SUPPORT_TARGET_EMAIL="support@example.com" \
 SMTP_HOST_VALUE="smtp.example.com" \
 SMTP_PORT="465" \
@@ -182,6 +222,9 @@ AI_USAGE_RETENTION_DAYS="30" \
 GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id" \
 GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret" \
 GOOGLE_OIDC_CALLBACK_URL="https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback" \
+TRUSTED_BFF_AUTH_ENABLED="true" \
+TRUSTED_BFF_AUTH_HEADER_NAME="x-bff-auth" \
+TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret" \
 ./deploy.sh
 ```
 
@@ -192,8 +235,12 @@ cd /Users/pst./senior/backend && \
 APP_NAME="ai-formcheck" \
 SERVICE_NAME="ai-formcheck-backend" \
 FRONTEND_SERVICE_NAME="ai-formcheck-frontend" \
+FRONTEND_SERVICE_ACCOUNT_NAME="ai-formcheck-frontend-sa" \
 FRONTEND_URL="https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app" \
 FRONTEND_EXTRA_URLS="http://localhost:5173|http://127.0.0.1:5500" \
+CLOUD_RUN_AUTH_MODE="private" \
+TRUST_PROXY_BROWSER_ORIGIN_HEADER="true" \
+BROWSER_ORIGIN_HEADER_NAME="x-browser-origin" \
 TECH_SUPPORT_TARGET_EMAIL="support@example.com" \
 SMTP_HOST_VALUE="smtp.example.com" \
 SMTP_PORT="465" \
@@ -211,6 +258,9 @@ AI_USAGE_RETENTION_DAYS="30" \
 GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id" \
 GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret" \
 GOOGLE_OIDC_CALLBACK_URL="https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback" \
+TRUSTED_BFF_AUTH_ENABLED="true" \
+TRUSTED_BFF_AUTH_HEADER_NAME="x-bff-auth" \
+TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret" \
 ./deploy.sh
 ```
 
