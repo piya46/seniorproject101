@@ -8,7 +8,7 @@ export function redirectToLogin(returnTo = buildReturnToUrl()) {
   window.location.assign(`/auth/login?return_to=${encodeURIComponent(returnTo)}`);
 }
 
-export async function ensureAuthenticatedOrRedirect() {
+export async function getAuthenticatedUser() {
   try {
     const response = await axios.get('/api/v1/oidc/me', {
       withCredentials: true,
@@ -20,6 +20,15 @@ export async function ensureAuthenticatedOrRedirect() {
     }
   } catch (error) {
     console.error('Auth bootstrap failed:', error);
+  }
+
+  return null;
+}
+
+export async function ensureAuthenticatedOrRedirect() {
+  const authenticatedUser = await getAuthenticatedUser();
+  if (authenticatedUser) {
+    return authenticatedUser;
   }
 
   redirectToLogin();

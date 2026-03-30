@@ -3,7 +3,7 @@ import React from 'react';
 export default function Login() {
   const handleGoogleLogin = () => {
     const returnTo = encodeURIComponent(window.location.origin);
-    window.location.href = `/api/v1/oidc/google/login?return_to=${returnTo}`;
+    window.location.href = `/auth/login?return_to=${returnTo}`;
   };
 
   return (

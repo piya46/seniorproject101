@@ -185,7 +185,7 @@ export default function Formdetail() {
 
       const validatePayload = {
         form_code: formData.form_code || id,
-        student_level: degreeLevel,
+        degree_level: degreeLevel,
         sub_type: subType || ""
       };
 
