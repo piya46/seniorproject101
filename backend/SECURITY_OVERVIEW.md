@@ -17,6 +17,7 @@ production topology ใหม่:
 
 เอกสาร contract ระหว่าง frontend BFF กับ backend private อยู่ที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
 และ roadmap สำหรับ secure transport รุ่นถัดไปอยู่ที่ [PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)
+ตอนนี้มี phase 1 scaffold แล้วผ่าน route `GET /api/v2/auth/handshake` เมื่อเปิด `PFS_V2_ENABLED=true`
 
 ## Security Layers ที่ยังคงอยู่
 

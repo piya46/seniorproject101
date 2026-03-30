@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { wipeBuffer, wipeBufferList } = require('./memorySecurity');
+const { getPfsV2Curve, getPfsV2HandshakeTtlMs, isPfsV2Enabled } = require('./pfsV2Config');
 
 const decodeBase64Pem = (base64Value) => Buffer.from(base64Value, 'base64').toString('utf8').trim();
 
@@ -126,6 +127,7 @@ const tryDecryptWithPrivateKey = (slot, encKey) => {
 };
 
 let ACTIVE_CRYPTO_PROVIDER = null;
+let ACTIVE_PFS_V2_HANDSHAKE = null;
 
 try {
     const { currentSlot, allSlots } = loadKeySlots();
@@ -191,13 +193,186 @@ const decryptEnvelopeKey = (encKey) => {
     return ACTIVE_CRYPTO_PROVIDER.decryptEnvelopeKey(encKey);
 };
 
+const getSigningPublicKey = () => ACTIVE_CRYPTO_PROVIDER?.getPublicKey?.() || null;
+
+const buildPfsV2Transcript = ({
+    protocolVersion,
+    curve,
+    keyId,
+    serverEphemeralPublicKey,
+    expiresAt
+}) => JSON.stringify({
+    protocol_version: protocolVersion,
+    curve,
+    key_id: keyId,
+    server_ephemeral_public_key: serverEphemeralPublicKey,
+    expires_at: expiresAt
+});
+
+const signPfsV2Transcript = (transcript) => {
+    if (!ACTIVE_CRYPTO_PROVIDER?.currentSlot?.privateKeyPem) {
+        throw new Error('Active signing key is unavailable.');
+    }
+
+    return crypto.sign(
+        'sha256',
+        Buffer.from(transcript, 'utf8'),
+        {
+            key: ACTIVE_CRYPTO_PROVIDER.currentSlot.privateKeyPem,
+            padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+            saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+        }
+    ).toString('base64');
+};
+
+const createPfsV2Handshake = () => {
+    if (!isPfsV2Enabled()) {
+        throw new Error('PFS v2 is disabled.');
+    }
+
+    if (!ACTIVE_CRYPTO_PROVIDER?.currentSlot?.privateKeyPem) {
+        throw new Error('Crypto provider is not initialized.');
+    }
+
+    const curve = getPfsV2Curve();
+    const ttlMs = getPfsV2HandshakeTtlMs();
+    const { privateKey, publicKey } = crypto.generateKeyPairSync(curve);
+    const expiresAtMs = Date.now() + ttlMs;
+    const expiresAt = new Date(expiresAtMs).toISOString();
+    const publicKeyDer = publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
+    const keyId = `pfs-${ACTIVE_CRYPTO_PROVIDER.currentSlot.label || 'current'}-${expiresAtMs}`;
+    const transcript = buildPfsV2Transcript({
+        protocolVersion: 'v2',
+        curve,
+        keyId,
+        serverEphemeralPublicKey: publicKeyDer,
+        expiresAt
+    });
+    const signature = signPfsV2Transcript(transcript);
+
+    return {
+        protocol_version: 'v2',
+        curve,
+        key_id: keyId,
+        server_ephemeral_public_key: publicKeyDer,
+        server_ephemeral_expires_at: expiresAt,
+        signature,
+        signing_public_key: getSigningPublicKey(),
+        transcript,
+        privateKey
+    };
+};
+
+const getPfsV2Handshake = () => {
+    if (!isPfsV2Enabled()) {
+        return null;
+    }
+
+    const now = Date.now();
+    const expiresAtMs = ACTIVE_PFS_V2_HANDSHAKE?.expiresAtMs || 0;
+    if (ACTIVE_PFS_V2_HANDSHAKE && expiresAtMs > now + 1000) {
+        return ACTIVE_PFS_V2_HANDSHAKE.payload;
+    }
+
+    const nextHandshake = createPfsV2Handshake();
+    ACTIVE_PFS_V2_HANDSHAKE = {
+        expiresAtMs: Date.parse(nextHandshake.server_ephemeral_expires_at),
+        payload: {
+            protocol_version: nextHandshake.protocol_version,
+            curve: nextHandshake.curve,
+            key_id: nextHandshake.key_id,
+            server_ephemeral_public_key: nextHandshake.server_ephemeral_public_key,
+            server_ephemeral_expires_at: nextHandshake.server_ephemeral_expires_at,
+            signature: nextHandshake.signature,
+            signing_public_key: nextHandshake.signing_public_key
+        },
+        privateKey: nextHandshake.privateKey
+    };
+
+    return ACTIVE_PFS_V2_HANDSHAKE.payload;
+};
+
+const decodeSpkiPublicKey = (publicKeyBase64) =>
+    crypto.createPublicKey({
+        key: Buffer.from(publicKeyBase64, 'base64'),
+        format: 'der',
+        type: 'spki'
+    });
+
+const buildPfsV2InfoContext = (info = {}) => JSON.stringify({
+    protocol_version: 'v2',
+    method: String(info.method || '').toUpperCase(),
+    path: String(info.path || ''),
+    nonce: String(info.nonce || ''),
+    timestamp: Number(info.timestamp || 0),
+    session_id: String(info.sessionId || '')
+});
+
+const derivePfsV2SessionKeys = ({
+    clientEphemeralPublicKey,
+    serverKeyId,
+    requestContext = {}
+}) => {
+    if (!isPfsV2Enabled()) {
+        throw new Error('PFS v2 is disabled.');
+    }
+
+    if (!ACTIVE_PFS_V2_HANDSHAKE?.privateKey || !ACTIVE_PFS_V2_HANDSHAKE?.payload) {
+        throw new Error('No active PFS v2 handshake is available.');
+    }
+
+    if (serverKeyId !== ACTIVE_PFS_V2_HANDSHAKE.payload.key_id) {
+        throw new Error('Unknown or expired PFS v2 server key id.');
+    }
+
+    const clientPublicKey = decodeSpkiPublicKey(clientEphemeralPublicKey);
+    const sharedSecret = crypto.diffieHellman({
+        privateKey: ACTIVE_PFS_V2_HANDSHAKE.privateKey,
+        publicKey: clientPublicKey
+    });
+    const transcriptContext = buildPfsV2InfoContext(requestContext);
+    const requestKey = crypto.hkdfSync(
+        'sha256',
+        sharedSecret,
+        Buffer.from(serverKeyId, 'utf8'),
+        Buffer.from(`request:${transcriptContext}`, 'utf8'),
+        32
+    );
+    const responseKey = crypto.hkdfSync(
+        'sha256',
+        sharedSecret,
+        Buffer.from(serverKeyId, 'utf8'),
+        Buffer.from(`response:${transcriptContext}`, 'utf8'),
+        32
+    );
+
+    wipeBuffer(sharedSecret);
+
+    return {
+        requestKey: Buffer.from(requestKey),
+        responseKey: Buffer.from(responseKey)
+    };
+};
+
+const getPfsV2Status = () => ({
+    enabled: isPfsV2Enabled(),
+    curve: getPfsV2Curve(),
+    handshake_ttl_ms: getPfsV2HandshakeTtlMs(),
+    cached_key_id: ACTIVE_PFS_V2_HANDSHAKE?.payload?.key_id || null,
+    cached_key_expires_at: ACTIVE_PFS_V2_HANDSHAKE?.payload?.server_ephemeral_expires_at || null
+});
+
 exports.decryptEnvelopeKey = decryptEnvelopeKey;
 exports.getPublicKey = () => ACTIVE_CRYPTO_PROVIDER?.getPublicKey?.() || null;
+exports.getSigningPublicKey = getSigningPublicKey;
 exports.getKeyStatus = () => ACTIVE_CRYPTO_PROVIDER?.getKeyStatus?.() || {
     activeLabel: null,
     rotationEnabled: false,
     activeCertificateValidTo: null
 };
+exports.getPfsV2Handshake = getPfsV2Handshake;
+exports.getPfsV2Status = getPfsV2Status;
+exports.derivePfsV2SessionKeys = derivePfsV2SessionKeys;
 
 exports.decryptHybridPayload = (encryptedPackage) => {
     let aesKeyBuffer = null;

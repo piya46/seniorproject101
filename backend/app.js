@@ -8,9 +8,10 @@ const requestContextMiddleware = require('./middlewares/requestContextMiddleware
 const securityMiddleware = require('./middlewares/securityMiddleware');
 const authMiddleware = require('./middlewares/authMiddleware');
 const authRoutes = require('./routes/authRoutes');
+const authV2Routes = require('./routes/authV2Routes');
 const oidcAuthRoutes = require('./routes/oidcAuthRoutes');
 const { generalLimiter } = require('./middlewares/rateLimitMiddleware');
-const { getKeyStatus } = require('./utils/cryptoUtils');
+const { getKeyStatus, getPfsV2Status } = require('./utils/cryptoUtils');
 const { cleanupStaleTempFilesOnStartup } = require('./utils/tempFileCleanup');
 const { getAllowedOrigins } = require('./utils/browserOrigin');
 const { parseTrustProxySetting } = require('./utils/runtimeSecurityConfig');
@@ -78,6 +79,7 @@ app.use(requestContextMiddleware);
 app.use(generalLimiter);
 
 const BASE_URL = '/api/v1';
+const BASE_URL_V2 = '/api/v2';
 
 const probeSignedUrlGeneration = async () => {
     const bucketName = process.env.GCS_BUCKET_NAME;
@@ -119,6 +121,9 @@ app.get(`${BASE_URL}/system/status`, (req, res) => {
             },
             crypto: {
                 status: keyStatus.activeLabel ? 'ok' : 'degraded'
+            },
+            pfs_v2: {
+                status: getPfsV2Status().enabled ? 'ok' : 'disabled'
             }
         },
         message: healthy ? 'Service is available' : 'Service is running with degraded configuration',
@@ -168,6 +173,7 @@ app.get(`${BASE_URL}/system/status/details`, authMiddleware, (req, res) => {
         : null;
     const missingCriticalEnv = requiredEnv.filter(key => !process.env[key]);
     const healthy = missingCriticalEnv.length === 0;
+    const pfsV2Status = getPfsV2Status();
 
     res.status(healthy ? 200 : 503).json({
         status: healthy ? 'ok' : 'degraded',
@@ -186,6 +192,9 @@ app.get(`${BASE_URL}/system/status/details`, authMiddleware, (req, res) => {
                 active_key_slot: keyStatus.activeLabel || null,
                 active_certificate_valid_to: keyStatus.activeCertificateValidTo || null,
                 rotation_enabled: keyStatus.rotationEnabled
+            },
+            pfs_v2: {
+                status: pfsV2Status.enabled ? 'ok' : 'disabled'
             }
         },
         runtime: {
@@ -209,7 +218,12 @@ app.get(`${BASE_URL}/system/status/details`, authMiddleware, (req, res) => {
             e2ee_enabled: true,
             active_key_slot: keyStatus.activeLabel || null,
             key_rotation_enabled: keyStatus.rotationEnabled,
-            active_certificate_valid_to: keyStatus.activeCertificateValidTo || null
+            active_certificate_valid_to: keyStatus.activeCertificateValidTo || null,
+            pfs_v2_enabled: pfsV2Status.enabled,
+            pfs_v2_curve: pfsV2Status.curve,
+            pfs_v2_handshake_ttl_ms: pfsV2Status.handshake_ttl_ms,
+            pfs_v2_cached_key_id: pfsV2Status.cached_key_id,
+            pfs_v2_cached_key_expires_at: pfsV2Status.cached_key_expires_at
         },
         integrations: {
             gcp_project_id: process.env.GCP_PROJECT_ID || null,
@@ -235,6 +249,7 @@ if (process.env.NODE_ENV === 'development' && fs.existsSync(swaggerFile)) {
 app.use(securityMiddleware);
 
 app.use(`${BASE_URL}/auth`, authRoutes);
+app.use(`${BASE_URL_V2}/auth`, authV2Routes);
 app.use(`${BASE_URL}/oidc`, oidcAuthRoutes);
 app.use(`${BASE_URL}/profile`, require('./routes/profileRoutes'));
 app.use(`${BASE_URL}/session`, require('./routes/sessionRoutes'));

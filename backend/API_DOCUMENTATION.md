@@ -83,6 +83,7 @@ legacy/direct mode ที่ยังมีอยู่เพื่อ backward 
 | `/api/v1/system/status` | `GET` | ไม่ต้อง | ไม่ต้อง | service liveness + high-level check status |
 | `/api/v1/system/status/storage-signing` | `GET` | ต้อง | ไม่ต้อง | smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้ |
 | `/api/v1/system/status/details` | `GET` | ต้อง | ไม่ต้อง | detailed runtime/config status สำหรับ internal QA/ops |
+| `/api/v2/auth/handshake` | `GET` | ไม่ต้อง | ไม่ต้อง | ขอ PFS `v2` handshake metadata ถ้าเปิด `PFS_V2_ENABLED=true` |
 | `/auth/public-key` | `GET` | ไม่ต้อง | ไม่ต้อง | public key สำหรับ secure JSON |
 | `/auth/csrf-token` | `GET` | ต้อง | ไม่ต้อง | ดึง/refresh anti-CSRF token สำหรับ browser client |
 | `/oidc/google/login` | `GET` | ไม่ต้อง | ไม่ต้อง | เริ่ม Google OIDC login ใน legacy/direct mode |
@@ -104,6 +105,18 @@ legacy/direct mode ที่ยังมีอยู่เพื่อ backward 
 | `/support/technical-email` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | ส่งอีเมลแจ้งปัญหา |
 
 ## OIDC Endpoints
+
+## PFS V2 Handshake
+
+### `GET /api/v2/auth/handshake`
+
+route นี้เป็น phase 1 ของ secure transport รุ่นใหม่
+
+พฤติกรรม:
+
+- ถ้า `PFS_V2_ENABLED=false` จะตอบ `404`
+- ถ้าเปิดอยู่ จะตอบ server ephemeral public key, key id, expiry, signature, และ signing public key
+- route นี้ยังไม่ทำให้ business endpoints ย้ายไปใช้ `v2` อัตโนมัติ แต่ใช้เป็น scaffold สำหรับ rollout ฝั่ง client/BFF
 
 ### `GET /oidc/google/login`
 

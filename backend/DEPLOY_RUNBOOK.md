@@ -179,6 +179,8 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 | Env | Default | ความหมาย |
 | --- | --- | --- |
 | `ALLOW_BEARER_SESSION_TOKEN` | `false` | production ไม่ควรเปิด เพราะจะลดความปลอดภัยของ cookie-backed session model |
+| `PFS_V2_ENABLED` | `false` | เปิด scaffold ของ secure transport `v2` และ route `/api/v2/auth/handshake` |
+| `PFS_V2_HANDSHAKE_TTL_MS` | `300000` | อายุของ server ephemeral handshake metadata สำหรับ `v2` (5 นาที) |
 | `TRUST_PROXY` | `1` | จำนวน trusted proxy hop สำหรับ Cloud Run topology ปัจจุบัน |
 | `COOKIE_SAME_SITE` | `Lax` | ค่า cookie policy ที่แนะนำสำหรับ production BFF mode |
 | `COOKIE_SECURE` | `true` | production ต้องเปิดเสมอ และจำเป็นเมื่อ `COOKIE_SAME_SITE=None` |
