@@ -4,6 +4,7 @@ import axios from 'axios'
 import Navbar from './Navbar'
 import Footer from './Footer'
 import { encryptAndKeepKey, decryptResponse } from './crypto' 
+import { ensureAuthenticatedOrRedirect } from '../lib/auth'
 
 export default function Formdetail() {
   const { id } = useParams(); 
@@ -43,6 +44,11 @@ export default function Formdetail() {
   useEffect(() => {
     const fetchDetailAndKey = async () => {
       try {
+        const currentUser = await ensureAuthenticatedOrRedirect();
+        if (!currentUser) {
+          return;
+        }
+
         let pk = sessionStorage.getItem('public_key');
         
         if (!pk) {

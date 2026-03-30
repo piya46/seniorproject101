@@ -5,6 +5,7 @@ import Navbar from './Navbar'
 import Footer from './Footer'
 import axios from 'axios'
 import { encryptPayload, encryptAndKeepKey, decryptResponse } from './crypto' 
+import { ensureAuthenticatedOrRedirect } from '../lib/auth'
 
 export default function Home() {
   const navigate = useNavigate();
@@ -44,6 +45,11 @@ export default function Home() {
       initRef.current = true;
 
       try {
+        const currentUser = await ensureAuthenticatedOrRedirect();
+        if (!currentUser) {
+          return;
+        }
+
         let pubKey = sessionStorage.getItem('public_key');
         
         if (pubKey === 'null' || pubKey === 'undefined') {
@@ -60,7 +66,7 @@ export default function Home() {
           
           if (pubKey) {
             const encryptedBody = await encryptPayload({}, pubKey);
-            await axios.post('/api/v1/session/init', encryptedBody);
+            await axios.post('/api/v1/session/init', encryptedBody, { withCredentials: true });
             sessionStorage.setItem('public_key', pubKey);
             sessionStorage.setItem('is_initialized', 'true');
           }
@@ -164,7 +170,7 @@ export default function Home() {
       const chatPayload = { message: userMessage };
       const { requestPayload, aesKeyRaw } = await encryptAndKeepKey(chatPayload, publicKey);
       
-      const reqConfig = { headers: { 'Content-Type': 'application/json' }, withCredentials: true };
+        const reqConfig = { headers: { 'Content-Type': 'application/json' }, withCredentials: true };
       const res = await axios.post('/api/v1/chat/recommend', requestPayload, reqConfig);
       
       let responseData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;

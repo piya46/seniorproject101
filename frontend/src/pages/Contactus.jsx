@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import axios from 'axios';
+import { useEffect } from 'react';
+import { ensureAuthenticatedOrRedirect } from '../lib/auth';
 
 function Contactus() {
   const [formData, setFormData] = useState({
@@ -26,6 +28,10 @@ function Contactus() {
   const closePopup = () => {
     setPopup({ isOpen: false, type: 'success', message: '' });
   };
+
+  useEffect(() => {
+    ensureAuthenticatedOrRedirect();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

@@ -12,6 +12,7 @@ const PORT = Number.parseInt(process.env.PORT || '8080', 10);
 const BACKEND_URL = String(process.env.BACKEND_URL || '').trim().replace(/\/+$/, '');
 const TRUSTED_BFF_SHARED_SECRET = String(process.env.TRUSTED_BFF_SHARED_SECRET || '').trim();
 const TRUSTED_BFF_AUTH_HEADER_NAME = String(process.env.TRUSTED_BFF_AUTH_HEADER_NAME || 'x-bff-auth').trim();
+const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -73,6 +74,13 @@ function sendJson(res, statusCode, payload) {
     'Content-Length': Buffer.byteLength(body)
   });
   res.end(body);
+}
+
+function redirect(res, location, statusCode = 302) {
+  res.writeHead(statusCode, {
+    Location: location
+  });
+  res.end();
 }
 
 function buildStaticHeaders(filePath) {
@@ -157,6 +165,26 @@ function copyResponseHeaders(fromHeaders, toResponse) {
   }
 }
 
+function parseCookieHeader(cookieHeader) {
+  const cookies = new Map();
+
+  for (const part of String(cookieHeader || '').split(';')) {
+    const [rawName, ...rawValueParts] = part.split('=');
+    const name = String(rawName || '').trim();
+    if (!name) {
+      continue;
+    }
+
+    cookies.set(name, rawValueParts.join('=').trim());
+  }
+
+  return cookies;
+}
+
+function getCookieValue(req, cookieName) {
+  return parseCookieHeader(req.headers.cookie).get(cookieName) || '';
+}
+
 function buildProxyHeaders(req, idToken) {
   const headers = new Headers();
 
@@ -188,7 +216,188 @@ function buildProxyHeaders(req, idToken) {
     headers.set('x-browser-origin', browserOrigin);
   }
 
+  if (STATE_CHANGING_METHODS.has(String(req.method || '').toUpperCase()) && !headers.has('x-csrf-token')) {
+    const csrfToken = getCookieValue(req, 'sci_csrf_token');
+    if (csrfToken) {
+      headers.set('x-csrf-token', csrfToken);
+    }
+  }
+
   return headers;
+}
+
+function buildBffRequestHeaders(req, idToken) {
+  const headers = new Headers({
+    Authorization: `Bearer ${idToken}`
+  });
+
+  if (TRUSTED_BFF_SHARED_SECRET) {
+    headers.set(TRUSTED_BFF_AUTH_HEADER_NAME, TRUSTED_BFF_SHARED_SECRET);
+  }
+
+  const browserOrigin = deriveBrowserOrigin(req);
+  if (browserOrigin) {
+    headers.set('x-browser-origin', browserOrigin);
+  }
+
+  return headers;
+}
+
+async function callBackendBff(req, backendPath) {
+  const idToken = await getCloudRunIdToken(BACKEND_URL);
+  return fetch(new URL(backendPath, `${BACKEND_URL}/`), {
+    method: 'GET',
+    headers: buildBffRequestHeaders(req, idToken),
+    redirect: 'manual'
+  });
+}
+
+function resolveReturnTo(req) {
+  const requestUrl = new URL(req.url || '/', 'http://localhost');
+  const requestedReturnTo = String(requestUrl.searchParams.get('return_to') || '').trim();
+
+  if (!requestedReturnTo) {
+    const browserOrigin = deriveBrowserOrigin(req);
+    return browserOrigin || '/';
+  }
+
+  if (/^https?:\/\//i.test(requestedReturnTo)) {
+    return requestedReturnTo;
+  }
+
+  const browserOrigin = deriveBrowserOrigin(req);
+  if (!browserOrigin) {
+    return '/';
+  }
+
+  return new URL(requestedReturnTo, `${browserOrigin}/`).toString();
+}
+
+async function handleLogin(req, res) {
+  if (!BACKEND_URL) {
+    sendJson(res, 500, {
+      error: 'BFF misconfiguration',
+      message: 'BACKEND_URL is not configured.'
+    });
+    return;
+  }
+
+  try {
+    const returnTo = resolveReturnTo(req);
+    const backendResponse = await callBackendBff(
+      req,
+      `/api/v1/oidc/bff/google/login-url?return_to=${encodeURIComponent(returnTo)}`
+    );
+
+    if (!backendResponse.ok) {
+      copyResponseHeaders(backendResponse.headers, res);
+      res.writeHead(backendResponse.status);
+      const responseText = await backendResponse.text();
+      res.end(responseText);
+      return;
+    }
+
+    const payload = await backendResponse.json();
+    if (!payload?.login_url) {
+      sendJson(res, 502, {
+        error: 'Bad Gateway',
+        message: 'Backend did not provide a Google login URL.'
+      });
+      return;
+    }
+
+    redirect(res, payload.login_url);
+  } catch (error) {
+    console.error('BFF login redirect error:', error);
+    sendJson(res, 502, {
+      error: 'Bad Gateway',
+      message: 'Failed to initialize Google login.'
+    });
+  }
+}
+
+async function handleCallback(req, res) {
+  if (!BACKEND_URL) {
+    sendJson(res, 500, {
+      error: 'BFF misconfiguration',
+      message: 'BACKEND_URL is not configured.'
+    });
+    return;
+  }
+
+  try {
+    const requestUrl = new URL(req.url || '/', 'http://localhost');
+    const code = String(requestUrl.searchParams.get('code') || '').trim();
+    const state = String(requestUrl.searchParams.get('state') || '').trim();
+
+    if (!code || !state) {
+      sendJson(res, 400, {
+        error: 'Invalid callback request',
+        message: 'Missing authorization code or state.'
+      });
+      return;
+    }
+
+    const backendResponse = await callBackendBff(
+      req,
+      `/api/v1/oidc/bff/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`
+    );
+
+    copyResponseHeaders(backendResponse.headers, res);
+
+    if (!backendResponse.ok) {
+      res.writeHead(backendResponse.status);
+      const responseText = await backendResponse.text();
+      res.end(responseText);
+      return;
+    }
+
+    const payload = await backendResponse.json();
+    const redirectTarget = payload?.return_to || '/';
+    redirect(res, redirectTarget);
+  } catch (error) {
+    console.error('BFF callback error:', error);
+    sendJson(res, 502, {
+      error: 'Bad Gateway',
+      message: 'Failed to complete Google login.'
+    });
+  }
+}
+
+async function handleLogout(req, res) {
+  if (!BACKEND_URL) {
+    sendJson(res, 500, {
+      error: 'BFF misconfiguration',
+      message: 'BACKEND_URL is not configured.'
+    });
+    return;
+  }
+
+  try {
+    const idToken = await getCloudRunIdToken(BACKEND_URL);
+    const backendResponse = await fetch(new URL('/api/v1/oidc/logout', `${BACKEND_URL}/`), {
+      method: 'POST',
+      headers: buildProxyHeaders(req, idToken),
+      redirect: 'manual'
+    });
+
+    copyResponseHeaders(backendResponse.headers, res);
+
+    if (!backendResponse.ok) {
+      res.writeHead(backendResponse.status);
+      const responseText = await backendResponse.text();
+      res.end(responseText);
+      return;
+    }
+
+    redirect(res, '/');
+  } catch (error) {
+    console.error('BFF logout error:', error);
+    sendJson(res, 502, {
+      error: 'Bad Gateway',
+      message: 'Failed to complete logout.'
+    });
+  }
 }
 
 async function proxyApiRequest(req, res) {
@@ -244,6 +453,21 @@ function resolveStaticPath(requestPath) {
 
 const server = createServer(async (req, res) => {
   const method = String(req.method || 'GET').toUpperCase();
+
+  if (method === 'GET' && req.url?.startsWith('/auth/login')) {
+    await handleLogin(req, res);
+    return;
+  }
+
+  if (method === 'GET' && req.url?.startsWith('/auth/callback')) {
+    await handleCallback(req, res);
+    return;
+  }
+
+  if (method === 'POST' && req.url === '/auth/logout') {
+    await handleLogout(req, res);
+    return;
+  }
 
   if (req.url?.startsWith('/api/')) {
     await proxyApiRequest(req, res);
