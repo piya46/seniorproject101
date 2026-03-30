@@ -133,6 +133,12 @@ flow ใหม่สำหรับงานหนัก:
 5. client poll `GET /documents/jobs/:jobId`
 6. เมื่อ `status=succeeded` ให้เรียก `GET /documents/jobs/:jobId/download`
 
+หมายเหตุด้าน operation:
+
+- backend จะ enqueue job อย่างเดียว
+- worker service จะเป็นคน claim งานจาก `DOCUMENT_JOBS`
+- raw intake files ของ upload job จะถูกลบทิ้งทั้งกรณีสำเร็จและล้มเหลว เพื่อลด object leakage
+
 ### `GET /oidc/google/login`
 
 ใช้เริ่ม Google OIDC login ใน legacy/direct mode

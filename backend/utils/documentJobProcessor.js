@@ -136,6 +136,7 @@ const processUploadSanitizeJob = async (job) => {
             source_bytes: sourceBytes
         };
     } finally {
+        await rawFile.delete({ ignoreNotFound: true }).catch(() => {});
         await cleanupTempFile(sourcePath);
         await cleanupTempFile(processedPath);
     }

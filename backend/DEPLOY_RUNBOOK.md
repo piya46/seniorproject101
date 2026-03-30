@@ -48,6 +48,7 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 - apply bucket lifecycle policy ถ้าเปิด flag ที่เกี่ยวข้อง
 - create/check Firestore database ที่ app ใช้งาน
 - enable Firestore TTL policies สำหรับ `used_nonces.expire_at`, `RATE_LIMITS.expireAt`, และ `AI_USAGE_DAILY.expire_at`
+- enable Firestore TTL policy สำหรับ `DOCUMENT_JOBS.expire_at`
 - create/update app service account และ cleanup service account
 - grant IAM bindings ที่ backend และ cleanup service ต้องใช้
 - create/update secrets สำหรับ JWT, DB encryption key, SMTP, OIDC client secret values, และ key pair
@@ -217,6 +218,7 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - `POST /api/v1/documents/merge` จะ enqueue job ประเภท `merge_documents`
 - worker ใช้ Firestore collection `DOCUMENT_JOBS` เป็น queue/status store
 - worker scaffold อยู่ที่ [services/document-job-worker/index.js](/Users/pst./senior/backend/services/document-job-worker/index.js)
+- `deploy.sh` จะ deploy worker service และ scheduler pump ให้อัตโนมัติเมื่อ `ENABLE_DOCUMENT_JOB_WORKER=true`
 
 ถ้าจะรัน worker จาก backend root:
 

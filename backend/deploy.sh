@@ -34,6 +34,17 @@ CLEANUP_SERVICE_NAME="${CLEANUP_SERVICE_NAME:-${SERVICE_NAME}-cleanup}"
 CLEANUP_SERVICE_REGION="${CLEANUP_SERVICE_REGION:-}"
 CLEANUP_SERVICE_SOURCE_DIR="${CLEANUP_SERVICE_SOURCE_DIR:-$SCRIPT_DIR/services/delete-file-cleanup}"
 CLEANUP_SERVICE_ACCOUNT_NAME="${CLEANUP_SERVICE_ACCOUNT_NAME:-${APP_NAME}-cln-sa}"
+ENABLE_DOCUMENT_JOB_WORKER="${ENABLE_DOCUMENT_JOB_WORKER:-true}"
+DOCUMENT_JOB_WORKER_SERVICE_NAME="${DOCUMENT_JOB_WORKER_SERVICE_NAME:-${SERVICE_NAME}-document-worker}"
+DOCUMENT_JOB_WORKER_REGION="${DOCUMENT_JOB_WORKER_REGION:-}"
+DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME="${DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME:-${DOCUMENT_JOB_WORKER_SERVICE_NAME}-pump}"
+DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION="${DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION:-}"
+DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION="${DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION:-asia-southeast1}"
+DOCUMENT_JOB_WORKER_SCHEDULE_CRON="${DOCUMENT_JOB_WORKER_SCHEDULE_CRON:-* * * * *}"
+DOCUMENT_JOB_WORKER_TIME_ZONE="${DOCUMENT_JOB_WORKER_TIME_ZONE:-Asia/Bangkok}"
+DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT="${DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT:-}"
+DOCUMENT_JOB_RETENTION_DAYS="${DOCUMENT_JOB_RETENTION_DAYS:-7}"
+DOCUMENT_JOB_PROCESSING_TIMEOUT_MS="${DOCUMENT_JOB_PROCESSING_TIMEOUT_MS:-600000}"
 APP_SERVICE_ACCOUNT_NAME="${APP_SERVICE_ACCOUNT_NAME:-${SERVICE_NAME}-sa}"
 CLEANUP_SCHEDULER_JOB_NAME="${CLEANUP_SCHEDULER_JOB_NAME:-${CLEANUP_SERVICE_NAME}-daily}"
 CLEANUP_SCHEDULER_LOCATION="${CLEANUP_SCHEDULER_LOCATION:-}"
@@ -185,6 +196,17 @@ CLEANUP_SERVICE_NAME="$(trim_value "$CLEANUP_SERVICE_NAME")"
 CLEANUP_SERVICE_REGION="$(trim_value "$CLEANUP_SERVICE_REGION")"
 CLEANUP_SERVICE_SOURCE_DIR="$(trim_value "$CLEANUP_SERVICE_SOURCE_DIR")"
 CLEANUP_SERVICE_ACCOUNT_NAME="$(trim_value "$CLEANUP_SERVICE_ACCOUNT_NAME")"
+ENABLE_DOCUMENT_JOB_WORKER="$(trim_value "$ENABLE_DOCUMENT_JOB_WORKER")"
+DOCUMENT_JOB_WORKER_SERVICE_NAME="$(trim_value "$DOCUMENT_JOB_WORKER_SERVICE_NAME")"
+DOCUMENT_JOB_WORKER_REGION="$(trim_value "$DOCUMENT_JOB_WORKER_REGION")"
+DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME="$(trim_value "$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME")"
+DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION="$(trim_value "$DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION")"
+DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION="$(trim_value "$DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION")"
+DOCUMENT_JOB_WORKER_SCHEDULE_CRON="$(trim_value "$DOCUMENT_JOB_WORKER_SCHEDULE_CRON")"
+DOCUMENT_JOB_WORKER_TIME_ZONE="$(trim_value "$DOCUMENT_JOB_WORKER_TIME_ZONE")"
+DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT="$(trim_value "$DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT")"
+DOCUMENT_JOB_RETENTION_DAYS="$(trim_value "$DOCUMENT_JOB_RETENTION_DAYS")"
+DOCUMENT_JOB_PROCESSING_TIMEOUT_MS="$(trim_value "$DOCUMENT_JOB_PROCESSING_TIMEOUT_MS")"
 APP_SERVICE_ACCOUNT_NAME="$(trim_value "$APP_SERVICE_ACCOUNT_NAME")"
 CLEANUP_SCHEDULER_JOB_NAME="$(trim_value "$CLEANUP_SCHEDULER_JOB_NAME")"
 CLEANUP_SCHEDULER_LOCATION="$(trim_value "$CLEANUP_SCHEDULER_LOCATION")"
@@ -225,8 +247,20 @@ if [ -z "$CLEANUP_SERVICE_REGION" ]; then
     CLEANUP_SERVICE_REGION="$REGION"
 fi
 
+if [ -z "$DOCUMENT_JOB_WORKER_REGION" ]; then
+    DOCUMENT_JOB_WORKER_REGION="$REGION"
+fi
+
 if [ -z "$CLEANUP_SCHEDULER_LOCATION" ]; then
     CLEANUP_SCHEDULER_LOCATION="$CLEANUP_SERVICE_REGION"
+fi
+
+if [ -z "$DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION" ]; then
+    DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION="$DOCUMENT_JOB_WORKER_REGION"
+fi
+
+if [ -z "$DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT" ]; then
+    DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT="$APP_SERVICE_ACCOUNT_EMAIL"
 fi
 
 require_command() {
@@ -501,6 +535,7 @@ ensure_firestore_ttl_policies() {
     ensure_firestore_ttl_policy "used_nonces" "expire_at"
     ensure_firestore_ttl_policy "RATE_LIMITS" "expireAt"
     ensure_firestore_ttl_policy "AI_USAGE_DAILY" "expire_at"
+    ensure_firestore_ttl_policy "DOCUMENT_JOBS" "expire_at"
 }
 
 ensure_bucket_exists() {
@@ -742,6 +777,13 @@ ensure_cleanup_service_source_exists() {
     fi
 }
 
+ensure_document_job_worker_source_exists() {
+    if [ ! -f "$SCRIPT_DIR/services/document-job-worker/index.js" ] || [ ! -f "$SCRIPT_DIR/services/document-job-worker/package.json" ]; then
+        echo -e "${RED}❌ Document job worker source is incomplete: $SCRIPT_DIR/services/document-job-worker${NC}"
+        exit 1
+    fi
+}
+
 deploy_cleanup_service() {
     local TARGET_REGION=$1
 
@@ -756,12 +798,41 @@ deploy_cleanup_service() {
         --set-env-vars "GCS_BUCKET_NAME=${BUCKET_NAME},FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID},FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME},FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}"
 }
 
+deploy_document_job_worker_service() {
+    local TARGET_REGION=$1
+
+    gcloud run deploy "$DOCUMENT_JOB_WORKER_SERVICE_NAME" \
+        --project "$PROJECT_ID" \
+        --region "$TARGET_REGION" \
+        --source "$SCRIPT_DIR" \
+        --port 8080 \
+        --ingress all \
+        --no-allow-unauthenticated \
+        --service-account "$APP_SERVICE_ACCOUNT_EMAIL" \
+        --command node \
+        --args services/document-job-worker/index.js \
+        --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__DOCUMENT_JOB_RETENTION_DAYS=${DOCUMENT_JOB_RETENTION_DAYS}__ENV_DELIM__DOCUMENT_JOB_PROCESSING_TIMEOUT_MS=${DOCUMENT_JOB_PROCESSING_TIMEOUT_MS}__ENV_DELIM__MERGED_DOWNLOAD_URL_TTL_MS=${MERGED_DOWNLOAD_URL_TTL_MS:-900000}__ENV_DELIM__MERGE_TOTAL_SOURCE_BYTES_LIMIT=${MERGE_TOTAL_SOURCE_BYTES_LIMIT:-26214400}__ENV_DELIM__MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-10485760}__ENV_DELIM__MAX_PDF_SOURCE_BYTES=${MAX_PDF_SOURCE_BYTES:-5242880}" \
+        --set-secrets "DB_ENCRYPTION_KEY=${DB_KEY_SECRET}:latest"
+}
+
 grant_cleanup_service_invoker_binding() {
     local INVOKER_SERVICE_ACCOUNT=$1
 
     echo -e "   🔐 Granting Cloud Run Invoker to ${YELLOW}$INVOKER_SERVICE_ACCOUNT${NC}"
     gcloud run services add-iam-policy-binding "$CLEANUP_SERVICE_NAME" \
         --region="$CLEANUP_SERVICE_REGION" \
+        --project "$PROJECT_ID" \
+        --member="serviceAccount:$INVOKER_SERVICE_ACCOUNT" \
+        --role="roles/run.invoker" \
+        --quiet >/dev/null
+}
+
+grant_document_job_worker_invoker_binding() {
+    local INVOKER_SERVICE_ACCOUNT=$1
+
+    echo -e "   🔐 Granting Cloud Run Invoker on document worker to ${YELLOW}$INVOKER_SERVICE_ACCOUNT${NC}"
+    gcloud run services add-iam-policy-binding "$DOCUMENT_JOB_WORKER_SERVICE_NAME" \
+        --region="$DOCUMENT_JOB_WORKER_REGION" \
         --project "$PROJECT_ID" \
         --member="serviceAccount:$INVOKER_SERVICE_ACCOUNT" \
         --role="roles/run.invoker" \
@@ -1054,6 +1125,118 @@ ensure_daily_cleanup_function_and_scheduler() {
 
     echo -e "   ✅ Daily cleanup service and scheduler are ready."
     cleanup_legacy_cleanup_resources
+}
+
+ensure_document_job_worker_and_scheduler() {
+    if [ "$ENABLE_DOCUMENT_JOB_WORKER" != "true" ]; then
+        echo -e "   ℹ️  Skipping document job worker because ENABLE_DOCUMENT_JOB_WORKER=false"
+        return
+    fi
+
+    ensure_document_job_worker_source_exists
+
+    local INVOKER_SERVICE_ACCOUNT=${DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT:-$APP_SERVICE_ACCOUNT_EMAIL}
+
+    echo -e "${YELLOW}🧵 Ensuring document job worker and scheduler...${NC}"
+    echo -e "   Worker service          : ${YELLOW}$DOCUMENT_JOB_WORKER_SERVICE_NAME${NC}"
+    echo -e "   Worker region           : ${YELLOW}$DOCUMENT_JOB_WORKER_REGION${NC}"
+    echo -e "   Worker service account  : ${YELLOW}$APP_SERVICE_ACCOUNT_EMAIL${NC}"
+    echo -e "   Worker invoker          : ${YELLOW}$INVOKER_SERVICE_ACCOUNT${NC}"
+    echo -e "   Worker scheduler job    : ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME${NC}"
+    echo -e "   Worker scheduler loc    : ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION${NC}"
+    echo -e "   Worker scheduler fallback: ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION${NC}"
+    echo -e "   Worker schedule         : ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULE_CRON${NC}"
+    echo -e "   Worker time zone        : ${YELLOW}$DOCUMENT_JOB_WORKER_TIME_ZONE${NC}"
+
+    deploy_document_job_worker_service "$DOCUMENT_JOB_WORKER_REGION"
+    grant_document_job_worker_invoker_binding "$INVOKER_SERVICE_ACCOUNT"
+
+    local WORKER_SERVICE_URL
+    WORKER_SERVICE_URL=$(gcloud run services describe "$DOCUMENT_JOB_WORKER_SERVICE_NAME" \
+        --region "$DOCUMENT_JOB_WORKER_REGION" \
+        --project "$PROJECT_ID" \
+        --format='value(status.url)')
+
+    if [ -z "$WORKER_SERVICE_URL" ]; then
+        echo -e "${RED}❌ Failed to resolve document job worker URL.${NC}"
+        exit 1
+    fi
+
+    local WORKER_PROCESS_URL="${WORKER_SERVICE_URL}/process-next"
+    local SCHEDULER_LOCATION="$DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION"
+    local SCHEDULER_DEPLOYED="false"
+    local SCHEDULER_STDERR_LOG
+    SCHEDULER_STDERR_LOG=$(mktemp /tmp/sci-request-doc-worker-scheduler.XXXXXX)
+
+    if gcloud scheduler jobs describe "$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME" --location "$SCHEDULER_LOCATION" --project "$PROJECT_ID" >/dev/null 2>&1; then
+        echo -e "   ♻️  Updating document worker scheduler job: $DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME"
+        if gcloud scheduler jobs update http "$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME" \
+            --location "$SCHEDULER_LOCATION" \
+            --project "$PROJECT_ID" \
+            --schedule "$DOCUMENT_JOB_WORKER_SCHEDULE_CRON" \
+            --time-zone "$DOCUMENT_JOB_WORKER_TIME_ZONE" \
+            --uri "$WORKER_PROCESS_URL" \
+            --http-method POST \
+            --oidc-service-account-email "$INVOKER_SERVICE_ACCOUNT" \
+            --oidc-token-audience "$WORKER_PROCESS_URL" \
+            2>"$SCHEDULER_STDERR_LOG"; then
+            SCHEDULER_DEPLOYED="true"
+        fi
+    else
+        echo -e "   🕒 Creating document worker scheduler job: $DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME"
+        if gcloud scheduler jobs create http "$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME" \
+            --location "$SCHEDULER_LOCATION" \
+            --project "$PROJECT_ID" \
+            --schedule "$DOCUMENT_JOB_WORKER_SCHEDULE_CRON" \
+            --time-zone "$DOCUMENT_JOB_WORKER_TIME_ZONE" \
+            --uri "$WORKER_PROCESS_URL" \
+            --http-method POST \
+            --oidc-service-account-email "$INVOKER_SERVICE_ACCOUNT" \
+            --oidc-token-audience "$WORKER_PROCESS_URL" \
+            2>"$SCHEDULER_STDERR_LOG"; then
+            SCHEDULER_DEPLOYED="true"
+        fi
+    fi
+
+    if [ "$SCHEDULER_DEPLOYED" != "true" ]; then
+        if grep -q "is not a valid location" "$SCHEDULER_STDERR_LOG"; then
+            echo -e "${YELLOW}   ⚠️  Worker scheduler location ${SCHEDULER_LOCATION} is unavailable in this project.${NC}"
+            echo -e "${YELLOW}   ℹ️  Retrying scheduler in fallback location ${DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION}.${NC}"
+            SCHEDULER_LOCATION="$DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION"
+            DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION="$SCHEDULER_LOCATION"
+
+            if gcloud scheduler jobs describe "$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME" --location "$SCHEDULER_LOCATION" --project "$PROJECT_ID" >/dev/null 2>&1; then
+                echo -e "   ♻️  Updating document worker scheduler job in fallback location: $DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME"
+                gcloud scheduler jobs update http "$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME" \
+                    --location "$SCHEDULER_LOCATION" \
+                    --project "$PROJECT_ID" \
+                    --schedule "$DOCUMENT_JOB_WORKER_SCHEDULE_CRON" \
+                    --time-zone "$DOCUMENT_JOB_WORKER_TIME_ZONE" \
+                    --uri "$WORKER_PROCESS_URL" \
+                    --http-method POST \
+                    --oidc-service-account-email "$INVOKER_SERVICE_ACCOUNT" \
+                    --oidc-token-audience "$WORKER_PROCESS_URL"
+            else
+                echo -e "   🕒 Creating document worker scheduler job in fallback location: $DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME"
+                gcloud scheduler jobs create http "$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME" \
+                    --location "$SCHEDULER_LOCATION" \
+                    --project "$PROJECT_ID" \
+                    --schedule "$DOCUMENT_JOB_WORKER_SCHEDULE_CRON" \
+                    --time-zone "$DOCUMENT_JOB_WORKER_TIME_ZONE" \
+                    --uri "$WORKER_PROCESS_URL" \
+                    --http-method POST \
+                    --oidc-service-account-email "$INVOKER_SERVICE_ACCOUNT" \
+                    --oidc-token-audience "$WORKER_PROCESS_URL"
+            fi
+        else
+            cat "$SCHEDULER_STDERR_LOG" >&2
+            rm -f "$SCHEDULER_STDERR_LOG"
+            exit 1
+        fi
+    fi
+
+    rm -f "$SCHEDULER_STDERR_LOG"
+    echo -e "   ✅ Document job worker and scheduler are ready."
 }
 
 migrate_bucket_if_requested() {
@@ -1442,9 +1625,31 @@ validate_smtp_config() {
         exit 1
     fi
 
+    if ! validate_boolean_string "$ENABLE_DOCUMENT_JOB_WORKER"; then
+        echo -e "${RED}❌ Invalid ENABLE_DOCUMENT_JOB_WORKER: $ENABLE_DOCUMENT_JOB_WORKER (must be true or false)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_JOB_RETENTION_DAYS"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_JOB_RETENTION_DAYS: $DOCUMENT_JOB_RETENTION_DAYS (must be a positive integer)${NC}"
+        exit 1
+    fi
+
+    if ! validate_positive_integer "$DOCUMENT_JOB_PROCESSING_TIMEOUT_MS"; then
+        echo -e "${RED}❌ Invalid DOCUMENT_JOB_PROCESSING_TIMEOUT_MS: $DOCUMENT_JOB_PROCESSING_TIMEOUT_MS (must be a positive integer)${NC}"
+        exit 1
+    fi
+
     if [ "$ENABLE_DAILY_FILE_CLEANUP_FUNCTION" = "true" ]; then
         if [ -z "$CLEANUP_SERVICE_NAME" ] || [ -z "$CLEANUP_SERVICE_REGION" ] || [ -z "$CLEANUP_SCHEDULER_JOB_NAME" ] || [ -z "$CLEANUP_SCHEDULER_LOCATION" ] || [ -z "$CLEANUP_SCHEDULE_CRON" ] || [ -z "$CLEANUP_TIME_ZONE" ]; then
             echo -e "${RED}❌ Cleanup service config is incomplete.${NC}"
+            exit 1
+        fi
+    fi
+
+    if [ "$ENABLE_DOCUMENT_JOB_WORKER" = "true" ]; then
+        if [ -z "$DOCUMENT_JOB_WORKER_SERVICE_NAME" ] || [ -z "$DOCUMENT_JOB_WORKER_REGION" ] || [ -z "$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME" ] || [ -z "$DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION" ] || [ -z "$DOCUMENT_JOB_WORKER_SCHEDULE_CRON" ] || [ -z "$DOCUMENT_JOB_WORKER_TIME_ZONE" ]; then
+            echo -e "${RED}❌ Document job worker config is incomplete.${NC}"
             exit 1
         fi
     fi
@@ -1638,6 +1843,17 @@ print_deploy_summary() {
     echo -e "   Cleanup Scheduler Fallback: ${YELLOW}$CLEANUP_SCHEDULER_FALLBACK_LOCATION${NC}"
     echo -e "   Cleanup Schedule        : ${YELLOW}$CLEANUP_SCHEDULE_CRON${NC}"
     echo -e "   Cleanup Time Zone       : ${YELLOW}$CLEANUP_TIME_ZONE${NC}"
+    echo -e "   Document Worker Enabled : ${YELLOW}$ENABLE_DOCUMENT_JOB_WORKER${NC}"
+    echo -e "   Document Worker Service : ${YELLOW}$DOCUMENT_JOB_WORKER_SERVICE_NAME${NC}"
+    echo -e "   Document Worker Region  : ${YELLOW}$DOCUMENT_JOB_WORKER_REGION${NC}"
+    echo -e "   Document Worker Invoker : ${YELLOW}$DOCUMENT_JOB_WORKER_INVOKER_SERVICE_ACCOUNT${NC}"
+    echo -e "   Document Worker Job     : ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULER_JOB_NAME${NC}"
+    echo -e "   Document Worker Loc     : ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULER_LOCATION${NC}"
+    echo -e "   Document Worker Fallback: ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULER_FALLBACK_LOCATION${NC}"
+    echo -e "   Document Worker Schedule: ${YELLOW}$DOCUMENT_JOB_WORKER_SCHEDULE_CRON${NC}"
+    echo -e "   Document Worker TZ      : ${YELLOW}$DOCUMENT_JOB_WORKER_TIME_ZONE${NC}"
+    echo -e "   Document Job Retention  : ${YELLOW}$DOCUMENT_JOB_RETENTION_DAYS${NC}"
+    echo -e "   Document Job Timeout ms : ${YELLOW}$DOCUMENT_JOB_PROCESSING_TIMEOUT_MS${NC}"
     echo -e "   Bucket Migration        : ${YELLOW}$ENABLE_BUCKET_MIGRATION${NC}"
     echo -e "   Bucket Source           : ${YELLOW}${BUCKET_MIGRATION_SOURCE_NAME:-<not set>}${NC}"
     echo -e "   Delete Source Bucket    : ${YELLOW}$DELETE_SOURCE_BUCKET_AFTER_MIGRATION${NC}"
@@ -1969,6 +2185,7 @@ ensure_app_service_account_and_permissions
 echo -e "   ✅ Permissions granted."
 
 ensure_daily_cleanup_function_and_scheduler
+ensure_document_job_worker_and_scheduler
 
 # 7. Deploy to Cloud Run
 echo -e "${GREEN}🚀 Deploying to Cloud Run...${NC}"
