@@ -241,17 +241,21 @@ app.use(`${BASE_URL}/support`, require('./routes/supportRoutes'));
 
 // Error Handler
 app.use((err, req, res, next) => {
+    const statusCode = Number.isInteger(err.statusCode) && err.statusCode >= 400 && err.statusCode < 600
+        ? err.statusCode
+        : 500;
+
     if (req.log) {
         req.log.error('unhandled_error', {
-            status_code: err.statusCode || 500,
+            status_code: statusCode,
             message: err.message
         });
     } else {
         console.error('🔥 Unhandled Error:', err);
     }
 
-    res.status(500).json({
-        error: 'Internal Server Error',
+    res.status(statusCode).json({
+        error: statusCode === 500 ? 'Internal Server Error' : (err.error || err.name || 'Request Error'),
         message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
     });
 });

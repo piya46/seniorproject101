@@ -40,3 +40,4 @@ coverage/
 
 # Local temp files
 temp_files/
+tests/
