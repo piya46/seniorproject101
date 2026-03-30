@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.0.0",
+    "@google-cloud/kms": "^4.5.0",
     "@google-cloud/secret-manager": "^5.0.1",
     "@google-cloud/storage": "^6.9.5",
     "@google-cloud/vertexai": "^1.10.0",

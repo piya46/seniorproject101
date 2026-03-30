@@ -1,55 +1,91 @@
 const crypto = require('crypto');
 const fsp = require('fs/promises');
+const { wipeBufferList } = require('./memorySecurity');
 
-const DOCUMENT_INTAKE_KEY_ENV = 'DOCUMENT_INTAKE_ENCRYPTION_KEY';
+const KMS_KEY_NAME_ENV = 'DOCUMENT_INTAKE_KMS_KEY_NAME';
 
-const getDocumentIntakeEncryptionKey = () => {
-    const hex = String(process.env[DOCUMENT_INTAKE_KEY_ENV] || '').trim();
-    if (!hex) {
-        throw new Error(`${DOCUMENT_INTAKE_KEY_ENV} is missing.`);
+let kmsClientOverride = null;
+
+const loadKmsClient = () => {
+    if (kmsClientOverride) {
+        return kmsClientOverride;
     }
 
-    if (!/^[0-9a-f]{64}$/i.test(hex)) {
-        throw new Error(`${DOCUMENT_INTAKE_KEY_ENV} must be a 64-character hex string.`);
+    const { KeyManagementServiceClient } = require('@google-cloud/kms');
+    return new KeyManagementServiceClient();
+};
+
+const setKmsClientForTests = (client) => {
+    kmsClientOverride = client || null;
+};
+
+const getDocumentIntakeKmsKeyName = () => {
+    const name = String(process.env[KMS_KEY_NAME_ENV] || '').trim();
+    if (!name) {
+        throw new Error(`${KMS_KEY_NAME_ENV} is missing.`);
     }
 
-    return Buffer.from(hex, 'hex');
+    return name;
+};
+
+const generateDocumentIntakeDek = () => crypto.randomBytes(32);
+
+const wrapDekWithKms = async (dekBuffer) => {
+    const client = loadKmsClient();
+    const [response] = await client.encrypt({
+        name: getDocumentIntakeKmsKeyName(),
+        plaintext: dekBuffer
+    });
+
+    return Buffer.from(response.ciphertext);
+};
+
+const unwrapDekWithKms = async (wrappedDekBuffer) => {
+    const client = loadKmsClient();
+    const [response] = await client.decrypt({
+        name: getDocumentIntakeKmsKeyName(),
+        ciphertext: wrappedDekBuffer
+    });
+
+    return Buffer.from(response.plaintext);
 };
 
 const encryptDocumentIntakeToFile = async (sourcePath, encryptedPath) => {
-    const key = getDocumentIntakeEncryptionKey();
+    const dek = generateDocumentIntakeDek();
     const iv = crypto.randomBytes(12);
     const inputBuffer = await fsp.readFile(sourcePath);
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', dek, iv);
     const encryptedBuffer = Buffer.concat([cipher.update(inputBuffer), cipher.final()]);
     const authTag = cipher.getAuthTag();
+    const wrappedDek = await wrapDekWithKms(dek);
     await fsp.writeFile(encryptedPath, encryptedBuffer);
 
-    key.fill(0);
+    wipeBufferList([dek]);
 
     return {
         iv_base64: iv.toString('base64'),
-        tag_base64: authTag.toString('base64')
+        tag_base64: authTag.toString('base64'),
+        wrapped_dek_base64: wrappedDek.toString('base64')
     };
 };
 
 const decryptDocumentIntakeToFile = async (encryptedPath, outputPath, metadata) => {
-    const key = getDocumentIntakeEncryptionKey();
     const iv = Buffer.from(String(metadata?.iv_base64 || ''), 'base64');
     const authTag = Buffer.from(String(metadata?.tag_base64 || ''), 'base64');
+    const wrappedDek = Buffer.from(String(metadata?.wrapped_dek_base64 || ''), 'base64');
+    const dek = await unwrapDekWithKms(wrappedDek);
     const encryptedBuffer = await fsp.readFile(encryptedPath);
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', dek, iv);
     decipher.setAuthTag(authTag);
     const decryptedBuffer = Buffer.concat([decipher.update(encryptedBuffer), decipher.final()]);
     await fsp.writeFile(outputPath, decryptedBuffer);
 
-    key.fill(0);
-    iv.fill(0);
-    authTag.fill(0);
+    wipeBufferList([dek, iv, authTag, wrappedDek]);
 };
 
 module.exports = {
-    DOCUMENT_INTAKE_KEY_ENV,
+    KMS_KEY_NAME_ENV,
     encryptDocumentIntakeToFile,
-    decryptDocumentIntakeToFile
+    decryptDocumentIntakeToFile,
+    setKmsClientForTests
 };
