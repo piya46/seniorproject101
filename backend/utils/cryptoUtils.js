@@ -308,6 +308,25 @@ const buildPfsV2InfoContext = (info = {}) => JSON.stringify({
     session_id: String(info.sessionId || '')
 });
 
+const decryptSymmetricPayload = ({ payload, iv, tag }, aesKeyBuffer) => {
+    let ivBuffer = null;
+    let authTagBuffer = null;
+
+    try {
+        ivBuffer = Buffer.from(iv, 'base64');
+        authTagBuffer = Buffer.from(tag, 'base64');
+        const decipher = crypto.createDecipheriv('aes-256-gcm', aesKeyBuffer, ivBuffer);
+        decipher.setAuthTag(authTagBuffer);
+
+        let decrypted = decipher.update(payload, 'base64', 'utf8');
+        decrypted += decipher.final('utf8');
+
+        return JSON.parse(decrypted);
+    } finally {
+        wipeBufferList([ivBuffer, authTagBuffer]);
+    }
+};
+
 const derivePfsV2SessionKeys = ({
     clientEphemeralPublicKey,
     serverKeyId,
@@ -362,6 +381,53 @@ const getPfsV2Status = () => ({
     cached_key_expires_at: ACTIVE_PFS_V2_HANDSHAKE?.payload?.server_ephemeral_expires_at || null
 });
 
+const decryptPfsV2Payload = (encryptedPackage, requestContext = {}) => {
+    let requestKey = null;
+    let responseKey = null;
+
+    try {
+        const {
+            protocol_version: protocolVersion,
+            server_key_id: serverKeyId,
+            client_ephemeral_public_key: clientEphemeralPublicKey,
+            iv,
+            tag,
+            payload
+        } = encryptedPackage || {};
+
+        if (protocolVersion !== 'v2' || !serverKeyId || !clientEphemeralPublicKey || !iv || !tag || !payload) {
+            return null;
+        }
+
+        const derivedKeys = derivePfsV2SessionKeys({
+            clientEphemeralPublicKey,
+            serverKeyId,
+            requestContext
+        });
+
+        requestKey = derivedKeys.requestKey;
+        responseKey = derivedKeys.responseKey;
+
+        return {
+            data: decryptSymmetricPayload({ payload, iv, tag }, requestKey),
+            responseKey,
+            serverKeyId
+        };
+    } catch (error) {
+        console.error('PFS v2 decryption failed:', error.message);
+        wipeBuffer(responseKey);
+        return null;
+    } finally {
+        wipeBuffer(requestKey);
+    }
+};
+
+const encryptPfsV2Response = (data, responseKeyBuffer, serverKeyId) => ({
+    protocol_version: 'v2',
+    server_key_id: serverKeyId,
+    ...exports.encryptSymmetric(data, responseKeyBuffer)
+});
+
 exports.decryptEnvelopeKey = decryptEnvelopeKey;
 exports.getPublicKey = () => ACTIVE_CRYPTO_PROVIDER?.getPublicKey?.() || null;
 exports.getSigningPublicKey = getSigningPublicKey;
@@ -373,29 +439,20 @@ exports.getKeyStatus = () => ACTIVE_CRYPTO_PROVIDER?.getKeyStatus?.() || {
 exports.getPfsV2Handshake = getPfsV2Handshake;
 exports.getPfsV2Status = getPfsV2Status;
 exports.derivePfsV2SessionKeys = derivePfsV2SessionKeys;
+exports.decryptPfsV2Payload = decryptPfsV2Payload;
+exports.encryptPfsV2Response = encryptPfsV2Response;
 
 exports.decryptHybridPayload = (encryptedPackage) => {
     let aesKeyBuffer = null;
-    let ivBuffer = null;
-    let authTagBuffer = null;
     try {
         const { encKey, iv, tag, payload } = encryptedPackage;
         if (!encKey || !iv || !tag || !payload) return null; // Validate structure
 
         // ขั้นที่ 1: ใช้ Private Key แกะ AES Key ออกมา
         aesKeyBuffer = decryptEnvelopeKey(encKey);
-        ivBuffer = Buffer.from(iv, 'base64');
-        authTagBuffer = Buffer.from(tag, 'base64');
-
-        // ขั้นที่ 2: ใช้ AES Key แกะข้อมูลจริง
-        const decipher = crypto.createDecipheriv('aes-256-gcm', aesKeyBuffer, ivBuffer);
-        decipher.setAuthTag(authTagBuffer);
-        
-        let decrypted = decipher.update(payload, 'base64', 'utf8');
-        decrypted += decipher.final('utf8');
 
         return {
-            data: JSON.parse(decrypted),
+            data: decryptSymmetricPayload({ payload, iv, tag }, aesKeyBuffer),
             aesKey: aesKeyBuffer 
         };
 
@@ -404,8 +461,6 @@ exports.decryptHybridPayload = (encryptedPackage) => {
         console.error('Decryption Failed:', error.message);
         wipeBuffer(aesKeyBuffer);
         return null;
-    } finally {
-        wipeBufferList([ivBuffer, authTagBuffer]);
     }
 };
 

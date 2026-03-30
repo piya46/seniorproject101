@@ -182,6 +182,10 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 | `ALLOW_BEARER_SESSION_TOKEN` | `false` | production ไม่ควรเปิด เพราะจะลดความปลอดภัยของ cookie-backed session model |
 | `PFS_V2_ENABLED` | `false` | เปิด scaffold ของ secure transport `v2` และ route `/api/v2/auth/handshake` |
 | `PFS_V2_HANDSHAKE_TTL_MS` | `300000` | อายุของ server ephemeral handshake metadata สำหรับ `v2` (5 นาที) |
+| `TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN` | `false` | เมื่อเป็น `true` backend จะ require Google-signed identity token เพิ่มจาก shared secret สำหรับ trusted BFF requests |
+| `TRUSTED_BFF_IDENTITY_TOKEN_HEADER` | `x-bff-identity-token` | header ที่ backend จะอ่าน BFF identity token |
+| `TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL` | derived from deploy | service account email ของ frontend/BFF ที่ backend ยอมรับสำหรับ service attestation |
+| `TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE` | derived from deploy | expected audience ของ BFF identity token; default เป็น canonical backend run.app URL |
 | `TRUST_PROXY` | `1` | จำนวน trusted proxy hop สำหรับ Cloud Run topology ปัจจุบัน |
 | `COOKIE_SAME_SITE` | `Lax` | ค่า cookie policy ที่แนะนำสำหรับ production BFF mode |
 | `COOKIE_SECURE` | `true` | production ต้องเปิดเสมอ และจำเป็นเมื่อ `COOKIE_SAME_SITE=None` |
@@ -192,6 +196,7 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 | `DOCUMENT_JOB_RETENTION_DAYS` | `7` | ระยะเวลาที่เก็บ job records/result metadata ใน Firestore |
 | `DOCUMENT_JOB_PROCESSING_TIMEOUT_MS` | `600000` | timeout เชิงตรรกะสำหรับ job ที่ถูก claim ไปประมวลผล |
 | `DOCUMENT_INTAKE_KMS_KEY_NAME` | derived from deploy | Cloud KMS crypto key ที่ใช้ห่อ/แกะ DEK สำหรับ raw intake object |
+| `DOCUMENT_INTAKE_KMS_ACCESS_MODE` | deploy-set (`encrypt` app / `decrypt` worker) | จำกัด capability ของ service นั้น ๆ ให้ทำได้เฉพาะ encrypt หรือ decrypt ตาม role |
 | `DB_ENCRYPTION_KEY_VERSION` | `v1` | version ของ DB encryption key ที่ใช้เข้ารหัสข้อมูลใหม่ |
 | `DB_ENCRYPTION_KEY_V2` เป็นต้นไป | unset | key เพิ่มเติมสำหรับ decrypt ข้อมูลที่ถูกเข้ารหัสด้วย version ใหม่ในอนาคต |
 
@@ -200,7 +205,9 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - `FRONTEND_URL` ควรเป็น production origin หลักเพียงค่าเดียว
 - ถ้า frontend ก็ deploy เป็น Cloud Run ในโปรเจกต์เดียวกัน สามารถไม่ export `FRONTEND_URL` ได้ และปล่อยให้ `deploy.sh` derive จาก `FRONTEND_SERVICE_NAME` แทน
 - `FRONTEND_EXTRA_URLS` เป็น temporary dev/QA override เท่านั้น
-- ถ้าต้องการ deploy แบบ non-interactive หรือรันใน CI ควร export ชุด `SMTP_*` และ `TECH_SUPPORT_TARGET_EMAIL` ให้ครบ ไม่เช่นนั้น `deploy.sh` จะ prompt ถามค่าระหว่างรัน
+- ถ้าต้องการ deploy แบบ one-shot/non-interactive หรือรันใน CI ให้ตั้ง `DEPLOY_NON_INTERACTIVE=true`
+- เมื่อใช้ `DEPLOY_NON_INTERACTIVE=true` ต้องเตรียมค่าจำเป็นให้ครบผ่าน env หรือ Secret Manager โดยเฉพาะ `SMTP_HOST_VALUE`, `SMTP_USER_VALUE`, `SMTP_FROM_EMAIL_VALUE`, `GOOGLE_OIDC_CLIENT_ID_VALUE`, `GOOGLE_OIDC_CLIENT_SECRET_VALUE`, `TECH_SUPPORT_TARGET_EMAIL`
+- ใน non-interactive mode สคริปต์จะไม่ fallback ไปใช้ค่า placeholder อย่าง `smtp.example.com` หรือ `support@example.com`; ถ้าค่าจำเป็นยังไม่มีจะ fail ทันที
 - ถ้า Secret Manager มี `SMTP_PASS` อยู่แล้วและไม่ต้องการเปลี่ยนค่า สามารถไม่ export `SMTP_PASS_VALUE` ได้ โดยสคริปต์จะ reuse ค่าเดิมให้
 - `AI_LOCATION=us-central1` เป็นค่าที่แนะนำในระบบปัจจุบันเพื่อให้สอดคล้องกับ AI routes ที่ใช้งานจริง
 - `AI_DAILY_TOKEN_LIMIT` ใช้กำหนดเพดาน token ต่อ user ต่อวัน

@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const { firestore, COLLECTION_NAME } = require('../utils/dbUtils'); // ✅ Import Firestore
 const { extractDomain, getAllowedDomains, isHostedDomainRequired, isTruthy } = require('../utils/oidcUtils');
+const { resolveTrustedBffIdentity } = require('../utils/trustedBffAuth');
 
 function isOidcEnabled() {
   return isTruthy(process.env.OIDC_ENABLED !== undefined ? process.env.OIDC_ENABLED : 'true');
@@ -9,65 +9,6 @@ function isOidcEnabled() {
 
 function isTrustedBffAuthEnabled() {
   return isTruthy(process.env.TRUSTED_BFF_AUTH_ENABLED || 'false');
-}
-
-function getTrustedBffHeader(name) {
-  return String(name || '').trim().toLowerCase();
-}
-
-function getTrustedBffSharedSecret(req) {
-  const headerName = getTrustedBffHeader(process.env.TRUSTED_BFF_AUTH_HEADER_NAME || 'x-bff-auth');
-  const headerValue = req.headers?.[headerName];
-
-  if (typeof headerValue !== 'string') {
-    return '';
-  }
-
-  return headerValue.trim();
-}
-
-function isValidSessionId(value) {
-  return /^sess_[a-f0-9]{32}$/i.test(String(value || '').trim());
-}
-
-function getTrustedBffIdentity(req) {
-  if (!isTrustedBffAuthEnabled()) {
-    return null;
-  }
-
-  const sharedSecret = String(process.env.TRUSTED_BFF_SHARED_SECRET || '').trim();
-  const providedSecret = getTrustedBffSharedSecret(req);
-  if (!sharedSecret || !providedSecret) {
-    return null;
-  }
-
-  const sharedSecretBuffer = Buffer.from(sharedSecret);
-  const providedSecretBuffer = Buffer.from(providedSecret);
-
-  if (
-    sharedSecretBuffer.length !== providedSecretBuffer.length ||
-    !crypto.timingSafeEqual(sharedSecretBuffer, providedSecretBuffer)
-  ) {
-    return null;
-  }
-
-  const sessionId = String(req.headers['x-bff-user-session-id'] || '').trim();
-  const email = String(req.headers['x-bff-user-email'] || '').trim().toLowerCase();
-  const hostedDomain = String(req.headers['x-bff-user-hosted-domain'] || '').trim().toLowerCase();
-
-  if (!isValidSessionId(sessionId) || !email) {
-    return null;
-  }
-
-  return {
-    session_id: sessionId,
-    email,
-    hosted_domain: hostedDomain || null,
-    auth_provider: 'trusted_bff',
-    google_sub: String(req.headers['x-bff-user-google-sub'] || '').trim() || null,
-    name: String(req.headers['x-bff-user-name'] || '').trim() || null,
-    picture: String(req.headers['x-bff-user-picture'] || '').trim() || null
-  };
 }
 
 module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป็น async
@@ -86,7 +27,10 @@ module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป�
   }
 
   if (!token) {
-    trustedBffIdentity = getTrustedBffIdentity(req);
+    const trustedBffResolution = isTrustedBffAuthEnabled()
+      ? await resolveTrustedBffIdentity(req)
+      : { ok: false };
+    trustedBffIdentity = trustedBffResolution.ok ? trustedBffResolution.identity : null;
     if (!trustedBffIdentity) {
       return res.status(401).json({ error: 'Unauthorized: No session token found' });
     }

@@ -38,10 +38,12 @@ Last updated: `2026-03-31`
 - endpoint ธุรกิจหลักยังต้องผ่าน session-based auth
 - upload sanitize และ document merge ทำงานแบบ async job แล้ว โดย API หลักจะ enqueue งานและให้ client poll status
 - secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด
+- เมื่อเปิด `PFS_V2_ENABLED=true` protected JSON endpoints สามารถรับ envelope แบบ `v2` ได้ด้วย โดย `securityMiddleware` จะ derive request/response keys แยกกัน
 - raw intake object ของ upload async flow ถูกเข้ารหัสระดับแอปด้วย KMS envelope encryption ก่อนเก็บลง GCS และ worker จะถอดรหัสเฉพาะตอนประมวลผล
+- runtime ของ app และ worker ถูกแยก `DOCUMENT_INTAKE_KMS_ACCESS_MODE` เป็น `encrypt` และ `decrypt` ตามลำดับเพื่อลด capability ของแต่ละ service
 - DB field encryption สำหรับข้อมูลใหม่ใช้ format แบบ versioned (`vN:iv:ciphertext:authTag`) และ backend ยังอ่าน legacy format เดิมได้
 - operator สามารถใช้ [migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js) เพื่อ dry-run / migrate legacy DB records ก่อน flip `DB_ENCRYPTION_KEY_VERSION`
-- secure transport รุ่นถัดไปที่มี PFS ถูกแยกเป็น design doc แล้วใน [PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)
+- secure transport รุ่นถัดไปที่มี PFS ถูกแยกเป็น design doc และ backend รองรับ handshake + protected route transport แล้วใน [PFS_PROTOCOL_V2.md](/Users/pst./senior/backend/PFS_PROTOCOL_V2.md)
 
 ## Authentication Flow
 

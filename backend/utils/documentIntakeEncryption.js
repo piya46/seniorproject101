@@ -3,6 +3,7 @@ const fsp = require('fs/promises');
 const { wipeBufferList } = require('./memorySecurity');
 
 const KMS_KEY_NAME_ENV = 'DOCUMENT_INTAKE_KMS_KEY_NAME';
+const KMS_ACCESS_MODE_ENV = 'DOCUMENT_INTAKE_KMS_ACCESS_MODE';
 
 let kmsClientOverride = null;
 
@@ -28,9 +29,23 @@ const getDocumentIntakeKmsKeyName = () => {
     return name;
 };
 
+const getDocumentIntakeKmsAccessMode = () => String(process.env[KMS_ACCESS_MODE_ENV] || 'both').trim().toLowerCase();
+
+const ensureDocumentIntakeKmsAccess = (requiredMode) => {
+    const configuredMode = getDocumentIntakeKmsAccessMode();
+    const allowedModes = requiredMode === 'encrypt'
+        ? new Set(['encrypt', 'both'])
+        : new Set(['decrypt', 'both']);
+
+    if (!allowedModes.has(configuredMode)) {
+        throw new Error(`DOCUMENT_INTAKE_KMS_ACCESS_MODE=${configuredMode || '<empty>'} does not allow ${requiredMode}.`);
+    }
+};
+
 const generateDocumentIntakeDek = () => crypto.randomBytes(32);
 
 const wrapDekWithKms = async (dekBuffer) => {
+    ensureDocumentIntakeKmsAccess('encrypt');
     const client = loadKmsClient();
     const [response] = await client.encrypt({
         name: getDocumentIntakeKmsKeyName(),
@@ -41,6 +56,7 @@ const wrapDekWithKms = async (dekBuffer) => {
 };
 
 const unwrapDekWithKms = async (wrappedDekBuffer) => {
+    ensureDocumentIntakeKmsAccess('decrypt');
     const client = loadKmsClient();
     const [response] = await client.decrypt({
         name: getDocumentIntakeKmsKeyName(),
@@ -84,8 +100,10 @@ const decryptDocumentIntakeToFile = async (encryptedPath, outputPath, metadata) 
 };
 
 module.exports = {
+    KMS_ACCESS_MODE_ENV,
     KMS_KEY_NAME_ENV,
     encryptDocumentIntakeToFile,
     decryptDocumentIntakeToFile,
+    getDocumentIntakeKmsAccessMode,
     setKmsClientForTests
 };

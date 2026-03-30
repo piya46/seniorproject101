@@ -212,6 +212,7 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
             intake_encrypted: 'true',
             intake_iv_base64: intakeEncryption.iv_base64,
             intake_tag_base64: intakeEncryption.tag_base64,
+            intake_wrapped_dek_base64: intakeEncryption.wrapped_dek_base64,
             intake_original_mime: detectedType.mime,
             intake_original_ext: detectedType.ext
         }

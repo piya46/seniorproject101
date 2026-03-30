@@ -77,7 +77,8 @@ const processUploadSanitizeJob = async (job) => {
         await rawFile.download({ destination: encryptedIntakePath });
         await decryptDocumentIntakeToFile(encryptedIntakePath, sourcePath, {
             iv_base64: metadata?.metadata?.intake_iv_base64,
-            tag_base64: metadata?.metadata?.intake_tag_base64
+            tag_base64: metadata?.metadata?.intake_tag_base64,
+            wrapped_dek_base64: metadata?.metadata?.intake_wrapped_dek_base64
         });
 
         const sourceStat = await fsp.stat(sourcePath);
