@@ -337,6 +337,11 @@ upsert_secret_value() {
     echo -n "$VALUE" | gcloud secrets versions add "$NAME" --data-file=-
 }
 
+# Backward-compatible alias for older deploy snippets/typos that may still call the legacy name.
+psert_secret_value() {
+    upsert_secret_value "$@"
+}
+
 validate_email() {
     local VALUE=$1
     [[ "$VALUE" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
