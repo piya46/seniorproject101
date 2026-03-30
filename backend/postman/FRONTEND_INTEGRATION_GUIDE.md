@@ -50,6 +50,7 @@ frontend ต้องใช้ต่อทั้งใน BFF mode และ leg
 cookie/security headers ที่เกี่ยวข้อง:
 
 - backend จะ set cookie `sci_csrf_token`
+- production BFF mode ควรใช้ `COOKIE_SAME_SITE=Lax` และ `COOKIE_SECURE=true`
 - frontend ต้องแนบ header `x-csrf-token` ในทุก `POST`, `PUT`, `PATCH`, `DELETE` ที่ใช้ session cookie
 - แนะนำให้เก็บ token นี้ไว้ใน API client กลาง แล้ว refresh ผ่าน `GET /auth/csrf-token` หลัง login หรือเมื่อสร้าง session ใหม่
 - ใน production BFF mode frontend server ควร forward cookie และ `x-csrf-token` ให้ backend แทน browser

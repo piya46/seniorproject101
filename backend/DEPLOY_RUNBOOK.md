@@ -109,6 +109,9 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 
 ```bash
 export CLOUD_RUN_AUTH_MODE="private"
+export TRUST_PROXY="1"
+export COOKIE_SAME_SITE="Lax"
+export COOKIE_SECURE="true"
 export FRONTEND_SERVICE_ACCOUNT_NAME="ai-formcheck-frontend-sa"
 export TRUST_PROXY_BROWSER_ORIGIN_HEADER="true"
 export BROWSER_ORIGIN_HEADER_NAME="x-browser-origin"
@@ -123,6 +126,8 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - หลัง deploy สคริปต์จะพยายาม grant `roles/run.invoker` ให้ frontend service account
 - เมื่อ `TRUSTED_BFF_AUTH_ENABLED=true` สคริปต์จะเก็บ shared secret ลง Secret Manager และ inject เข้า backend runtime
 - origin forwarding ผ่าน `x-browser-origin` จะถูกไว้ใจได้ก็ต่อเมื่อ backend เป็น private และเรียกผ่าน BFF เท่านั้น
+- production BFF mode ควรใช้ `COOKIE_SAME_SITE=Lax` และ `COOKIE_SECURE=true` เป็นค่าเริ่มต้น
+- `TRUST_PROXY=1` เป็นค่าที่แนะนำสำหรับ Cloud Run ทั่วไปที่มี trusted proxy hop เดียว
 - header contract ที่ frontend ต้องส่งดูได้ที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
 - frontend BFF production flow ที่โค้ดรองรับตอนนี้คือ:
   1. browser เรียก `/auth/login` บน frontend
@@ -140,6 +145,9 @@ export FRONTEND_SERVICE_ACCOUNT_NAME="ai-formcheck-frontend-sa"
 export FRONTEND_URL="https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app"
 export FRONTEND_EXTRA_URLS=""
 export CLOUD_RUN_AUTH_MODE="private"
+export TRUST_PROXY="1"
+export COOKIE_SAME_SITE="Lax"
+export COOKIE_SECURE="true"
 export TRUST_PROXY_BROWSER_ORIGIN_HEADER="true"
 export BROWSER_ORIGIN_HEADER_NAME="x-browser-origin"
 export TECH_SUPPORT_TARGET_EMAIL="support@example.com"
@@ -212,6 +220,9 @@ FRONTEND_SERVICE_ACCOUNT_NAME="ai-formcheck-frontend-sa" \
 FRONTEND_URL="https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app" \
 FRONTEND_EXTRA_URLS="" \
 CLOUD_RUN_AUTH_MODE="private" \
+TRUST_PROXY="1" \
+COOKIE_SAME_SITE="Lax" \
+COOKIE_SECURE="true" \
 TRUST_PROXY_BROWSER_ORIGIN_HEADER="true" \
 BROWSER_ORIGIN_HEADER_NAME="x-browser-origin" \
 TECH_SUPPORT_TARGET_EMAIL="support@example.com" \
@@ -248,6 +259,9 @@ FRONTEND_SERVICE_ACCOUNT_NAME="ai-formcheck-frontend-sa" \
 FRONTEND_URL="https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app" \
 FRONTEND_EXTRA_URLS="http://localhost:5173|http://127.0.0.1:5500" \
 CLOUD_RUN_AUTH_MODE="private" \
+TRUST_PROXY="1" \
+COOKIE_SAME_SITE="Lax" \
+COOKIE_SECURE="true" \
 TRUST_PROXY_BROWSER_ORIGIN_HEADER="true" \
 BROWSER_ORIGIN_HEADER_NAME="x-browser-origin" \
 TECH_SUPPORT_TARGET_EMAIL="support@example.com" \

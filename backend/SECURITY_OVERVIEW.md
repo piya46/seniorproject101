@@ -62,7 +62,7 @@ properties สำคัญ:
 
 - `HttpOnly`
 - `Secure` ใน production
-- `SameSite=None` ใน production
+- `SameSite=Lax` เป็น default ที่แนะนำใน production BFF mode
 - signed ด้วย `JWT_SECRET`
 
 session cookie ไม่ถูก expose ให้ frontend อ่านเอง
@@ -258,6 +258,9 @@ FRONTEND_EXTRA_URLS=
 - `FRONTEND_URL=https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app`
 - `FRONTEND_EXTRA_URLS=` (เว้นว่างใน production ปกติ)
 - `CLOUD_RUN_AUTH_MODE=private`
+- `TRUST_PROXY=1`
+- `COOKIE_SAME_SITE=Lax`
+- `COOKIE_SECURE=true`
 - `TRUST_PROXY_BROWSER_ORIGIN_HEADER=true`
 - `TRUSTED_BFF_AUTH_ENABLED=true`
 - Google OIDC credentials เก็บใน Secret Manager

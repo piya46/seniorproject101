@@ -352,6 +352,12 @@ validate_boolean_string() {
     [[ "$VALUE" = "true" || "$VALUE" = "false" ]]
 }
 
+validate_cookie_same_site() {
+    local VALUE
+    VALUE="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    [[ "$VALUE" = "strict" || "$VALUE" = "lax" || "$VALUE" = "none" ]]
+}
+
 add_project_iam_policy_binding_if_enabled() {
     local MEMBER=$1
     local ROLE=$2
@@ -1502,6 +1508,21 @@ validate_smtp_config() {
         exit 1
     fi
 
+    if ! validate_cookie_same_site "$COOKIE_SAME_SITE"; then
+        echo -e "${RED}❌ Invalid COOKIE_SAME_SITE: $COOKIE_SAME_SITE (must be Strict, Lax, or None)${NC}"
+        exit 1
+    fi
+
+    if ! validate_boolean_string "$COOKIE_SECURE"; then
+        echo -e "${RED}❌ Invalid COOKIE_SECURE: $COOKIE_SECURE (must be true or false)${NC}"
+        exit 1
+    fi
+
+    if [ -z "$TRUST_PROXY" ]; then
+        echo -e "${RED}❌ TRUST_PROXY is required.${NC}"
+        exit 1
+    fi
+
     if [ -z "$BROWSER_ORIGIN_HEADER_NAME" ]; then
         echo -e "${RED}❌ BROWSER_ORIGIN_HEADER_NAME is required.${NC}"
         exit 1
@@ -1662,6 +1683,15 @@ run_preflight_checks() {
     if [ "$TRUST_PROXY_BROWSER_ORIGIN_HEADER" = "true" ] && [ "$CLOUD_RUN_AUTH_MODE" != "private" ]; then
         echo -e "${RED}   ❌ TRUST_PROXY_BROWSER_ORIGIN_HEADER=true requires CLOUD_RUN_AUTH_MODE=private${NC}"
         PRECHECK_FAILED="true"
+    fi
+
+    if [ "$(printf '%s' "$COOKIE_SAME_SITE" | tr '[:upper:]' '[:lower:]')" = "none" ] && [ "$COOKIE_SECURE" != "true" ]; then
+        echo -e "${RED}   ❌ COOKIE_SAME_SITE=None requires COOKIE_SECURE=true${NC}"
+        PRECHECK_FAILED="true"
+    fi
+
+    if [ "$CLOUD_RUN_AUTH_MODE" = "private" ] && [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ] && [ "$(printf '%s' "$COOKIE_SAME_SITE" | tr '[:upper:]' '[:lower:]')" = "none" ]; then
+        echo -e "${YELLOW}   ⚠️  COOKIE_SAME_SITE=None is unusual for private BFF mode. Prefer Lax unless browser must send backend cookies cross-site.${NC}"
     fi
 
     if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ] && [ "$CLOUD_RUN_AUTH_MODE" != "private" ]; then

@@ -30,6 +30,9 @@ backend ควร deploy ด้วยค่าอย่างน้อย:
 
 ```bash
 CLOUD_RUN_AUTH_MODE="private"
+TRUST_PROXY="1"
+COOKIE_SAME_SITE="Lax"
+COOKIE_SECURE="true"
 TRUSTED_BFF_AUTH_ENABLED="true"
 TRUSTED_BFF_AUTH_HEADER_NAME="x-bff-auth"
 TRUST_PROXY_BROWSER_ORIGIN_HEADER="true"

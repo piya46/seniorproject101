@@ -30,6 +30,7 @@ Last updated: `2026-03-31`
 - ใช้ Google OIDC เป็น identity provider
 - backend verify Google `id_token`, `state`, `nonce`, `email_verified`, และ allowed domains
 - backend ออก session cookie แบบ `HttpOnly` และ `Secure` ใน production
+- production BFF mode ควรใช้ `COOKIE_SAME_SITE=Lax`, `COOKIE_SECURE=true`, และ `TRUST_PROXY=1`
 - backend ออก anti-CSRF token ผ่าน `sci_csrf_token` + `x-csrf-token` สำหรับ state-changing requests ที่ใช้ session cookie
 - backend regenerate `session_id` ใหม่หลัง OIDC login callback
 - `POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist
