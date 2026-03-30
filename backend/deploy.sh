@@ -68,6 +68,7 @@ GOOGLE_OIDC_CALLBACK_URL="${GOOGLE_OIDC_CALLBACK_URL:-}"
 CLOUD_RUN_INGRESS="${CLOUD_RUN_INGRESS:-all}"
 POST_DEPLOY_HEALTHCHECK_ENABLED="${POST_DEPLOY_HEALTHCHECK_ENABLED:-false}"
 POST_DEPLOY_HEALTHCHECK_PATH="${POST_DEPLOY_HEALTHCHECK_PATH:-/healthz}"
+SKIP_ENABLE_APIS="${SKIP_ENABLE_APIS:-false}"
 
 # ชื่อ Secret ของ Key ต่างๆ
 PRIV_KEY_SECRET="${PRIV_KEY_SECRET:-Gb_PRIVATE_KEY_BASE64}"
@@ -249,22 +250,26 @@ if [ -z "$GOOGLE_OIDC_CALLBACK_URL" ]; then
 fi
 
 # 2. เปิด APIs ที่จำเป็น (Enable APIs)
-echo -e "${YELLOW}🛠️  Enabling required APIs... (This may take a minute)${NC}"
-gcloud services enable \
-    compute.googleapis.com \
-    cloudscheduler.googleapis.com \
-    cloudfunctions.googleapis.com \
-    artifactregistry.googleapis.com \
-    iam.googleapis.com \
-    iamcredentials.googleapis.com \
-    cloudresourcemanager.googleapis.com \
-    iap.googleapis.com \
-    run.googleapis.com \
-    cloudbuild.googleapis.com \
-    secretmanager.googleapis.com \
-    firestore.googleapis.com \
-    aiplatform.googleapis.com \
-    storage.googleapis.com
+if [ "$SKIP_ENABLE_APIS" = "true" ]; then
+    echo -e "   ℹ️  Skipping API enable step because SKIP_ENABLE_APIS=true"
+else
+    echo -e "${YELLOW}🛠️  Enabling required APIs... (This may take a minute)${NC}"
+    gcloud services enable \
+        compute.googleapis.com \
+        cloudscheduler.googleapis.com \
+        cloudfunctions.googleapis.com \
+        artifactregistry.googleapis.com \
+        iam.googleapis.com \
+        iamcredentials.googleapis.com \
+        cloudresourcemanager.googleapis.com \
+        iap.googleapis.com \
+        run.googleapis.com \
+        cloudbuild.googleapis.com \
+        secretmanager.googleapis.com \
+        firestore.googleapis.com \
+        aiplatform.googleapis.com \
+        storage.googleapis.com
+fi
 
 # 3. ฟังก์ชันสำหรับสร้าง Secret แบบ Auto
 create_secret_if_missing() {
