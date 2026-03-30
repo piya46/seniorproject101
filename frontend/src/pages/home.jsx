@@ -5,6 +5,7 @@ import Navbar from './Navbar'
 import Footer from './Footer'
 import axios from 'axios'
 import { encryptPayload, encryptAndKeepKey, decryptResponse } from './crypto' 
+import { ensureAuthenticatedOrRedirect } from '../lib/auth'
 
 export default function Home() {
   const navigate = useNavigate();
@@ -44,6 +45,11 @@ export default function Home() {
       initRef.current = true;
 
       try {
+        const currentUser = await ensureAuthenticatedOrRedirect();
+        if (!currentUser) {
+          return;
+        }
+
         let pubKey = sessionStorage.getItem('public_key');
         
         if (pubKey === 'null' || pubKey === 'undefined') {
@@ -59,20 +65,8 @@ export default function Home() {
           pubKey = keyRes.data?.publicKey || keyRes.data?.data?.publicKey || (typeof keyRes.data === 'string' ? keyRes.data : null);
           
           if (pubKey) {
-            // 💡 สร้าง Payload พร้อม _ts และ nonce ตามที่ Backend ต้องการก่อนนำไปเข้ารหัส
-            const initPayload = {
-              _ts: Date.now(),
-              nonce: `req-init-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-            };
-
-            const encryptedBody = await encryptPayload(initPayload, pubKey);
-            
-            // 💡 ใส่ withCredentials: true เพื่อให้บราวเซอร์เซฟ Cookie session_token ที่แบ็คเอนด์ส่งมา
-            await axios.post('/api/v1/session/init', encryptedBody, {
-              headers: { 'Content-Type': 'application/json' },
-              withCredentials: true 
-            });
-            
+            const encryptedBody = await encryptPayload({}, pubKey);
+            await axios.post('/api/v1/session/init', encryptedBody, { withCredentials: true });
             sessionStorage.setItem('public_key', pubKey);
             sessionStorage.setItem('is_initialized', 'true');
           }
@@ -180,7 +174,7 @@ export default function Home() {
       const chatPayload = { message: userMessage };
       const { requestPayload, aesKeyRaw } = await encryptAndKeepKey(chatPayload, publicKey);
       
-      const reqConfig = { headers: { 'Content-Type': 'application/json' }, withCredentials: true };
+        const reqConfig = { headers: { 'Content-Type': 'application/json' }, withCredentials: true };
       const res = await axios.post('/api/v1/chat/recommend', requestPayload, reqConfig);
       
       let responseData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;

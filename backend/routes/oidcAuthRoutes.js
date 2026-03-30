@@ -1,5 +1,6 @@
 const express = require('express');
 const authMiddleware = require('../middlewares/authMiddleware');
+const trustedBffMiddleware = require('../middlewares/trustedBffMiddleware');
 const { ensureAppSession, buildSessionCookieOptions } = require('../utils/sessionUtils');
 const { revokeSessionRecord } = require('../utils/dbUtils');
 const { clearCsrfCookie, ensureCsrfCookie } = require('../utils/csrfUtils');
@@ -32,6 +33,11 @@ function rejectLegacyDirectOidcFlow(req, res) {
   });
 }
 
+function buildBffCallbackUrl(returnTo) {
+  const returnUrl = new URL(returnTo);
+  return `${returnUrl.origin}/auth/callback`;
+}
+
 router.get('/google/login', (req, res) => {
   if (!isOidcEnabled()) {
     return res.status(503).json({
@@ -50,6 +56,33 @@ router.get('/google/login', (req, res) => {
     return res.redirect(302, loginUrl);
   } catch (error) {
     req.log?.warn('oidc_login_redirect_rejected', { message: error.message });
+    return res.status(400).json({
+      error: 'Invalid login request',
+      message: error.message
+    });
+  }
+});
+
+router.get('/bff/google/login-url', trustedBffMiddleware, (req, res) => {
+  if (!isOidcEnabled()) {
+    return res.status(503).json({
+      error: 'OIDC Disabled',
+      message: 'Google OIDC login is disabled on this server.'
+    });
+  }
+
+  try {
+    const returnTo = String(req.query.return_to || '').trim();
+    const loginUrl = buildGoogleLoginUrl(req, returnTo, {
+      callbackUrl: buildBffCallbackUrl(returnTo)
+    });
+
+    req.log?.audit('bff_oidc_login_url_issued');
+    return res.json({
+      login_url: loginUrl
+    });
+  } catch (error) {
+    req.log?.warn('bff_oidc_login_url_rejected', { message: error.message });
     return res.status(400).json({
       error: 'Invalid login request',
       message: error.message
@@ -105,6 +138,63 @@ router.get('/google/callback', async (req, res) => {
     return res.redirect(302, redirectUrl.toString());
   } catch (error) {
     req.log?.error('oidc_callback_error', { message: error.message });
+    return res.status(401).json({
+      error: 'OIDC authentication failed',
+      message: error.message
+    });
+  }
+});
+
+router.get('/bff/google/callback', trustedBffMiddleware, async (req, res) => {
+  if (!isOidcEnabled()) {
+    return res.status(503).json({
+      error: 'OIDC Disabled',
+      message: 'Google OIDC login is disabled on this server.'
+    });
+  }
+
+  const code = String(req.query.code || '').trim();
+  const state = String(req.query.state || '').trim();
+
+  if (!code || !state) {
+    return res.status(400).json({
+      error: 'Invalid callback request',
+      message: 'Missing authorization code or state.'
+    });
+  }
+
+  try {
+    const decodedState = verifyStateToken(state);
+    const callbackUrl = buildBffCallbackUrl(decodedState.return_to);
+    const tokenResponse = await exchangeCodeForTokens(req, code, { callbackUrl });
+    const idToken = String(tokenResponse.id_token || '').trim();
+
+    if (!idToken) {
+      throw new Error('Missing id_token in Google token response.');
+    }
+
+    const payload = await verifyGoogleIdToken(req, idToken, decodedState.nonce);
+    const identity = normalizeGoogleIdentity(payload);
+
+    await ensureAppSession(req, res, identity);
+    ensureCsrfCookie(req, res);
+    req.log?.audit('bff_oidc_login_completed', {
+      user_email: identity.email || null,
+      hosted_domain: identity.hosted_domain || null
+    });
+
+    return res.json({
+      status: 'success',
+      return_to: decodedState.return_to,
+      authenticated: true,
+      email: identity.email || null,
+      hosted_domain: identity.hosted_domain || null,
+      name: identity.name || null,
+      picture: identity.picture || null,
+      auth_provider: identity.auth_provider || null
+    });
+  } catch (error) {
+    req.log?.error('bff_oidc_callback_error', { message: error.message });
     return res.status(401).json({
       error: 'OIDC authentication failed',
       message: error.message

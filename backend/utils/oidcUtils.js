@@ -183,7 +183,11 @@ async function getGoogleCerts(forceRefresh = false) {
   }
 }
 
-function buildCallbackUrl(req) {
+function buildCallbackUrl(req, callbackUrlOverride = '') {
+  if (callbackUrlOverride) {
+    return callbackUrlOverride.trim();
+  }
+
   if (process.env.GOOGLE_OIDC_CALLBACK_URL) {
     return process.env.GOOGLE_OIDC_CALLBACK_URL.trim();
   }
@@ -193,7 +197,7 @@ function buildCallbackUrl(req) {
   return `${protocol}://${host}/api/v1/oidc/google/callback`;
 }
 
-function getOidcConfig(req) {
+function getOidcConfig(req, options = {}) {
   const clientId = String(process.env.GOOGLE_OIDC_CLIENT_ID || '').trim();
   const clientSecret = String(process.env.GOOGLE_OIDC_CLIENT_SECRET || '').trim();
 
@@ -204,7 +208,7 @@ function getOidcConfig(req) {
   return {
     clientId,
     clientSecret,
-    callbackUrl: buildCallbackUrl(req)
+    callbackUrl: buildCallbackUrl(req, options.callbackUrl || '')
   };
 }
 
@@ -220,13 +224,13 @@ function verifyStateToken(token) {
   });
 }
 
-function buildGoogleLoginUrl(req, returnTo) {
+function buildGoogleLoginUrl(req, returnTo, options = {}) {
   const safeReturnUrl = getSafeReturnUrl(returnTo);
   if (!safeReturnUrl) {
     throw new Error('return_to must match an allowed frontend origin.');
   }
 
-  const { clientId, callbackUrl } = getOidcConfig(req);
+  const { clientId, callbackUrl } = getOidcConfig(req, options);
   const nonce = jwt.sign(
     {
       type: 'oidc_nonce',
@@ -254,8 +258,8 @@ function buildGoogleLoginUrl(req, returnTo) {
   return `https://accounts.google.com/o/oauth2/v2/auth?${query.toString()}`;
 }
 
-async function exchangeCodeForTokens(req, code) {
-  const { clientId, clientSecret, callbackUrl } = getOidcConfig(req);
+async function exchangeCodeForTokens(req, code, options = {}) {
+  const { clientId, clientSecret, callbackUrl } = getOidcConfig(req, options);
 
   return postForm(GOOGLE_TOKEN_ENDPOINT, {
     code,
