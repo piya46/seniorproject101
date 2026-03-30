@@ -128,7 +128,7 @@
       <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
     </section>
     <h1>API Documentation</h1>
-<p>Version: `v1.9.4` Last updated: `2026-03-30`</p>
+<p>Version: `v1.9.5` Last updated: `2026-03-30`</p>
 <p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
 <p>เอกสารที่เกี่ยวข้อง:</p>
 <ul>
@@ -142,7 +142,7 @@
 <h2>Overview</h2>
 <ul>
 <li>Base URL: `/api/v1`</li>
-<li>Authentication: session-backed auth with Google OIDC identity rules; direct backend OIDC browser flow is legacy/direct mode</li>
+<li>Authentication: session-backed auth with Google OIDC identity rules; production target ใหม่คือ frontend BFF + private backend</li>
 <li>Allowed account domains: กำหนดผ่าน `OIDC_ALLOWED_DOMAINS`</li>
 <li>Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`</li>
 <li>Secure JSON endpoints ใช้ application-level encryption transport</li>
@@ -163,7 +163,7 @@
 </ul>
 <h2>Authentication Flow</h2>
 <p>flow ที่แนะนำสำหรับ production:</p>
-<p>1. browser เรียก frontend BFF 2. frontend BFF เป็น owner ของ browser-facing login/session flow 3. frontend BFF เรียก backend แบบ private server-to-server ตาม [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md) 4. backend ใช้ session-backed auth และ policy checks เดิมต่อ</p>
+<p>1. browser เรียก frontend BFF 2. frontend BFF เป็น owner ของ browser-facing login/session flow 3. frontend BFF เริ่ม browser-facing login ผ่าน `/auth/login` 4. Google redirect กลับ `GET /auth/callback` บน frontend 5. frontend BFF เรียก backend BFF bridge routes เพื่อให้ backend verify Google identity และออก `sci_session_token` 6. frontend BFF proxy request อื่นไป backend พร้อม cookie, CSRF, และ trusted BFF headers ตามที่จำเป็น</p>
 <p>legacy/direct mode ที่ยังมีอยู่เพื่อ backward compatibility:</p>
 <p>1. frontend หรือ browser เปิด `GET /oidc/google/login?return_to=&lt;frontend-url&gt;` 2. Google login เสร็จแล้ว redirect กลับ `GET /oidc/google/callback` 3. backend verify Google identity และสร้าง `sci_session_token` 4. backend redirect กลับ frontend พร้อม `auth=ok` และ `oidc=done` 5. frontend เรียก `GET /oidc/me` ด้วย `credentials: &#39;include&#39;` 6. frontend เรียก `GET /auth/csrf-token` 7. จากนั้นค่อยเรียก `POST /session/init` และ endpoint อื่น</p>
 <p>ข้อสำคัญ:</p>
@@ -173,7 +173,11 @@
 </ul>
 <p>  production ควรใช้ `FRONTEND_URL` เป็นหลัก   และใช้ `FRONTEND_EXTRA_URLS` เป็น temporary dev/QA override เท่านั้น</p>
 <ul>
-<li>Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:</li>
+<li>ถ้าใช้ production BFF flow Google OAuth redirect URI ควรชี้มาที่ frontend callback:</li>
+</ul>
+<p>  `https://ai-formcheck-frontend-&lt;project-number&gt;.asia-southeast3.run.app/auth/callback`</p>
+<ul>
+<li>backend callback ด้านล่างยังใช้กับ legacy/direct mode เท่านั้น:</li>
 </ul>
 <p>  `https://ai-formcheck-backend-&lt;project-number&gt;.asia-southeast3.run.app/api/v1/oidc/google/callback`</p>
 <ul>
@@ -240,6 +244,20 @@
 <td>backend callback หลัง Google login ใน legacy/direct mode</td>
 </tr>
 <tr>
+<td>`/oidc/bff/google/login-url`</td>
+<td>`GET`</td>
+<td>ไม่ใช้ session แต่ต้อง trusted BFF header</td>
+<td>ไม่ต้อง</td>
+<td>ออก Google login URL สำหรับ frontend BFF flow</td>
+</tr>
+<tr>
+<td>`/oidc/bff/google/callback`</td>
+<td>`GET`</td>
+<td>ไม่ใช้ session แต่ต้อง trusted BFF header</td>
+<td>ไม่ต้อง</td>
+<td>backend BFF callback bridge ที่ verify Google identity และออก session cookie</td>
+</tr>
+<tr>
 <td>`/oidc/me`</td>
 <td>`GET`</td>
 <td>ต้อง</td>
@@ -249,7 +267,7 @@
 <tr>
 <td>`/oidc/logout`</td>
 <td>`POST`</td>
-<td>ไม่ต้อง</td>
+<td>ต้อง</td>
 <td>ไม่ต้อง</td>
 <td>ลบ app session cookie และ revoke session record</td>
 </tr>
@@ -345,6 +363,38 @@
 <li>redirect กลับ `return_to` พร้อม `auth=ok` และ `oidc=done`</li>
 <li>ถ้า backend อยู่ใน private BFF mode route นี้จะตอบ `409`</li>
 </ul>
+<h3>`GET /oidc/bff/google/login-url`</h3>
+<p>ใช้โดย frontend BFF เท่านั้นเพื่อขอ Google login URL สำหรับ browser-facing BFF flow</p>
+<p>query:</p>
+<ul>
+<li>`return_to` required ในทางปฏิบัติ และควรเป็น frontend public URL ที่ user ใช้งานจริง</li>
+</ul>
+<p>เงื่อนไข:</p>
+<ul>
+<li>request ต้องผ่าน trusted BFF secret header</li>
+<li>route นี้ไม่ต้องมี session cookie ล่วงหน้า</li>
+<li>backend จะสร้าง signed state และ nonce เหมือน legacy flow แต่จะ override callback URL ไปที่ frontend `/auth/callback`</li>
+</ul>
+<p>response ตัวอย่าง:</p>
+<pre><code>
+{
+
+  &quot;login_url&quot;: &quot;https://accounts.google.com/o/oauth2/v2/auth?...&quot;
+
+}
+
+</code></pre>
+<h3>`GET /oidc/bff/google/callback`</h3>
+<p>ใช้โดย frontend BFF เท่านั้นหลัง Google redirect กลับมาที่ `/auth/callback` ของ frontend แล้ว frontend จะ forward `code` และ `state` มาที่ route นี้</p>
+<p>backend จะ:</p>
+<ul>
+<li>verify trusted BFF secret</li>
+<li>exchange authorization code ด้วย callback URL ของ frontend</li>
+<li>verify Google identity</li>
+<li>ออก `sci_session_token`</li>
+<li>refresh/rotate `sci_csrf_token`</li>
+<li>คืน `return_to` ให้ frontend ใช้ redirect browser ต่อ</li>
+</ul>
 <h3>`GET /oidc/me`</h3>
 <p>response ตัวอย่าง:</p>
 <pre><code>
@@ -399,7 +449,7 @@
 </code></pre>
 <p>หมายเหตุ:</p>
 <ul>
-<li>frontend ควรเรียก endpoint นี้หลัง `GET /oidc/me` ใน legacy/direct mode</li>
+<li>frontend หรือ BFF client ควรเรียก endpoint นี้หลัง `GET /oidc/me`</li>
 <li>token นี้ต้องถูกส่งกลับมาใน header `x-csrf-token`</li>
 <li>ใช้กับทุก `POST`, `PUT`, `PATCH`, `DELETE` ที่อาศัย `sci_session_token`</li>
 </ul>
@@ -415,7 +465,7 @@
 </ul>
 <p>หมายเหตุ:</p>
 <ul>
-<li>ใน private BFF mode endpoint นี้ควรถูกเรียกจาก frontend BFF เท่านั้น ไม่ควรเปิดให้ browser เรียก backend ตรง</li>
+<li>ใน private BFF mode endpoint นี้ควรถูกเรียกผ่าน frontend BFF เท่านั้น ไม่ควรเปิดให้ browser เรียก backend ตรง</li>
 </ul>
 <p>response ตัวอย่าง:</p>
 <pre><code>
@@ -498,7 +548,7 @@
 <h2>Notes</h2>
 <ul>
 <li>การเอา IAP ออกทำให้ชั้น outer access gate หายไป แต่ app-layer auth, domain enforcement, session policy, validation, encryption, และ rate limiting ยังอยู่</li>
-<li>production ตอนนี้ใช้ `run.app` โดยตรงเป็นหลัก จึงมี public origin ของ backend เพิ่มขึ้น แต่ไม่ได้เปลี่ยน app-layer auth contract</li>
+<li>production target ใหม่ไม่ควรใช้ browser direct-to-backend flow; browser ควรเข้า frontend BFF แล้วให้ BFF proxy ไป backend private</li>
 <li>ถ้าต้องการ OIDC หลาย provider ในอนาคต ควรแยก abstraction ออกจาก Google-specific logic ใน `utils/oidcUtils.js`</li>
 </ul>
   </main>

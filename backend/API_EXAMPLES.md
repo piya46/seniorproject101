@@ -1,15 +1,18 @@
 # API Examples
 
-Version: `v1.9.4`
+Version: `v1.9.5`
 Last updated: `2026-03-30`
 
-ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only โดย direct backend browser flow ให้ถือเป็น legacy/direct mode และ production target ใหม่คือ frontend BFF + private backend
+ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only โดย production target ใหม่คือ frontend BFF + private backend ส่วน direct backend browser flow ให้ถือเป็น legacy/direct mode
 
-1. เปิด Google OIDC login
-2. ตรวจ session ด้วย `GET /oidc/me`
-3. ดึง CSRF token ด้วย `GET /auth/csrf-token`
-4. ดึง public key
-5. เริ่ม session ด้วย `POST /session/init`
+1. browser เปิด `GET /auth/login` ที่ frontend BFF
+2. frontend BFF เรียก backend `GET /oidc/bff/google/login-url`
+3. Google redirect กลับ `GET /auth/callback` ของ frontend
+4. frontend BFF เรียก backend `GET /oidc/bff/google/callback`
+5. ตรวจ session ด้วย `GET /oidc/me`
+6. ดึง CSRF token ด้วย `GET /auth/csrf-token`
+7. ดึง public key
+8. เริ่ม session ด้วย `POST /session/init`
 
 ## Base URL
 
@@ -69,13 +72,40 @@ https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/sys
 - endpoint นี้ต้อง auth แล้ว
 - ใช้สำหรับ internal QA/ops หรือ BFF/internal caller ที่ผ่าน auth มาแล้ว
 
-Canonical Google OAuth callback:
+Legacy backend Google OAuth callback:
 
 ```text
 https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback
 ```
 
-## 1. Open Google OIDC Login (Legacy/Direct Mode)
+Frontend BFF Google OAuth callback:
+
+```text
+https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app/auth/callback
+```
+
+## 1. Open Google OIDC Login (BFF Production Flow)
+
+### Browser URL
+
+```text
+https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app/auth/login?return_to=https%3A%2F%2Fai-formcheck-frontend-<project-number>.asia-southeast3.run.app
+```
+
+### JavaScript
+
+```js
+window.location.href =
+  "https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app/auth/login?return_to=" +
+  encodeURIComponent("https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app");
+```
+
+หมายเหตุ:
+
+- browser ไม่ควรเรียก `GET /api/v1/oidc/bff/google/login-url` ตรง เพราะ route นี้รับเฉพาะ trusted BFF caller
+- browser ไม่ควรเรียก `GET /oidc/google/login` ตรงใน production private mode
+
+## 2. Open Google OIDC Login (Legacy/Direct Mode)
 
 ตัวอย่าง URL:
 
@@ -117,7 +147,7 @@ url = "https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api
 print(url)
 ```
 
-## 2. Read OIDC Session Status
+## 3. Read OIDC Session Status
 
 หลัง browser ถูก redirect กลับจาก OIDC callback ให้เรียก `GET /oidc/me` พร้อม cookie เดิม
 
@@ -173,7 +203,7 @@ print(response.status_code)
 print(response.text)
 ```
 
-## 3. Fetch Public Key
+## 4. Fetch Public Key
 
 ### cURL
 
@@ -193,7 +223,7 @@ const data = await response.json();
 console.log(data.publicKey);
 ```
 
-## 4. Fetch CSRF Token
+## 5. Fetch CSRF Token
 
 ### JavaScript
 
@@ -209,10 +239,10 @@ console.log(csrfData.csrf_token);
 
 หมายเหตุ:
 
-- browser client ควรเรียก endpoint นี้หลัง `GET /oidc/me`
+- browser/BFF client ควรเรียก endpoint นี้หลัง `GET /oidc/me`
 - นำ token ที่ได้ไปใส่ใน header `x-csrf-token` ของทุก `POST`, `PUT`, `PATCH`, `DELETE`
 
-## 5. Initialize Session
+## 6. Initialize Session
 
 `POST /session/init` เป็น secure JSON endpoint:
 
@@ -278,10 +308,12 @@ const response = await fetch("https://ai-formcheck-backend-<project-number>.asia
 
 ## Recommended Production Flow
 
-1. browser เรียก frontend BFF
-2. frontend BFF เป็น owner ของ browser-facing login/session flow
-3. frontend BFF เรียก backend แบบ private server-to-server
-4. header contract ระหว่าง frontend BFF กับ backend ดูที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+1. browser เรียก frontend BFF `/auth/login`
+2. frontend BFF ขอ Google login URL จาก backend ผ่าน `GET /oidc/bff/google/login-url`
+3. Google redirect กลับ `GET /auth/callback` ของ frontend
+4. frontend BFF เรียก backend `GET /oidc/bff/google/callback`
+5. frontend BFF ตรวจ `GET /oidc/me`, ดึง `GET /auth/csrf-token`, แล้วค่อยเรียก `POST /session/init`
+6. request business อื่นวิ่งผ่าน frontend BFF ไป backend private
 
 ## AI Usage Retention
 

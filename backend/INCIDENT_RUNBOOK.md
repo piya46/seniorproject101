@@ -1,6 +1,6 @@
 # Incident Runbook
 
-Last updated: `2026-03-27`
+Last updated: `2026-03-30`
 
 runbook นี้สรุป threat model แบบสั้นและแนวทางตอบสนอง incident สำหรับ 3 พื้นที่ที่สำคัญที่สุดในระบบตอนนี้: upload path, Google OIDC, และ AI usage abuse
 
@@ -53,11 +53,12 @@ Threat model:
 
 การตอบสนอง:
 
-1. ตรวจ `GOOGLE_OIDC_CALLBACK_URL` และ authorized redirect URI ใน Google provider ให้ตรงกันแบบ exact match
-2. เปิดดู log ของ `/api/v1/oidc/*`, `/api/v1/auth/csrf-token`, `/api/v1/session/init`
-3. ถ้าพบ login fail เป็นวงกว้างหลัง deploy ให้เทียบ deploy config ล่าสุดกับ canonical `run.app`
-4. ถ้าสงสัย session/csrf issue ให้ยืนยันว่า browser ได้ทั้ง `sci_session_token` และ `sci_csrf_token` และ frontend ส่ง `x-csrf-token`
-5. ถ้ามีความเสี่ยง account abuse ให้บังคับ logout โดย rotate JWT secret ตามขั้นตอนปฏิบัติการที่ทีมยอมรับได้
+1. ตรวจว่าถ้าใช้ production BFF flow Google OAuth redirect URI ตรงกับ frontend callback (`/auth/callback`) แบบ exact match
+2. ถ้ายังใช้ legacy/direct mode ค่อยตรวจ `GOOGLE_OIDC_CALLBACK_URL` และ backend callback ให้ตรงกัน
+3. เปิดดู log ของ `/api/v1/oidc/*`, `/api/v1/auth/csrf-token`, `/api/v1/session/init`
+4. ถ้าพบ login fail เป็นวงกว้างหลัง deploy ให้เทียบ deploy config ล่าสุดกับ callback URL ที่ใช้งานจริง
+5. ถ้าสงสัย session/csrf issue ให้ยืนยันว่า browser ได้ทั้ง `sci_session_token` และ `sci_csrf_token` และ frontend/BFF ส่ง `x-csrf-token`
+6. ถ้ามีความเสี่ยง account abuse ให้บังคับ logout โดย rotate JWT secret ตามขั้นตอนปฏิบัติการที่ทีมยอมรับได้
 
 การป้องกันที่มีอยู่แล้ว:
 

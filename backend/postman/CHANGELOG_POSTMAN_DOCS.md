@@ -1,7 +1,26 @@
 # Changelog Postman Docs
 
-Current version: `v1.9.4`
-Last updated: `2026-03-27`
+Current version: `v1.9.5`
+Last updated: `2026-03-30`
+
+## v1.9.5
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- ปรับเอกสารหลักให้ production auth flow ยึด frontend BFF เป็นค่าหลักแทน legacy/direct mode
+- เพิ่มคำอธิบาย BFF bridge routes คือ `GET /api/v1/oidc/bff/google/login-url` และ `GET /api/v1/oidc/bff/google/callback`
+- อัปเดต runbook/security/integration docs ให้ชี้ว่า Google redirect URI ของ production BFF flow ควรจบที่ frontend `/auth/callback`
+- ปรับ BFF contract ให้สะท้อน implementation ปัจจุบันที่ใช้ cookie-backed backend session เป็นหลัก และ trusted forwarded user headers เป็น fallback/advanced mode
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็นการ sync เอกสารให้ตรงกับ backend implementation ปัจจุบัน
+
+ผลกระทบฝั่งทีม:
+
+- ทีมที่ใช้ production private backend ควรอ้างอิง frontend callback และ BFF bridge flow จาก docs ชุดนี้
+- ถ้ายังใช้ legacy/direct mode ให้ถือว่าเป็น backward compatibility path ไม่ใช่ production target หลัก
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.5`
 
 ## v1.9.4
 

@@ -1,6 +1,6 @@
 # Postman Guide
 
-Version: `v1.9.4`
+Version: `v1.9.5`
 Last updated: `2026-03-30`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
@@ -29,7 +29,9 @@ production target ใหม่:
 
 1. browser เรียก frontend BFF
 2. frontend BFF เป็น owner ของ browser-facing login/session flow
-3. frontend BFF เรียก backend private แบบ server-to-server ตาม [../BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+3. browser เปิด `/auth/login` ที่ frontend
+4. frontend BFF เรียก backend `GET /oidc/bff/google/login-url` และ `GET /oidc/bff/google/callback`
+5. frontend BFF เรียก backend private แบบ server-to-server ตาม [../BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
 
 legacy/direct mode ที่ยังคงอยู่เพื่อ backward compatibility:
 
@@ -48,6 +50,7 @@ legacy/direct mode ที่ยังคงอยู่เพื่อ backward 
 - `GET` endpoints และ multipart upload ไม่ใช้ secure JSON wrapper
 - status endpoints ตอนนี้แยกเป็น `GET /system/status`, `GET /system/status/storage-signing`, และ `GET /system/status/details`
 - `GET /system/status/storage-signing` ตอนนี้เป็น authenticated probe แล้ว ไม่ใช่ public smoke probe
+- BFF production flow ใช้ frontend callback `/auth/callback`; backend callback `/oidc/google/callback` เป็น legacy/direct mode เป็นหลัก
 
 ## AI Usage Notes
 

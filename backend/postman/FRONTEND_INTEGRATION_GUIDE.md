@@ -1,6 +1,6 @@
 # Frontend Integration Guide
 
-Version: `v1.9.4`
+Version: `v1.9.5`
 Last updated: `2026-03-30`
 
 คู่มือนี้อธิบายสิ่งที่ frontend ต้องทำเพื่อเชื่อมต่อ backend ในโหมด Google OIDC + session cookie + secure JSON transport โดย direct backend browser flow ให้ถือเป็น legacy/direct mode และ production target ใหม่คือ frontend BFF + private backend
@@ -11,7 +11,18 @@ Last updated: `2026-03-30`
 - ดังนั้น flow นี้ไม่ได้แก้ CORS/preflight ด้วยตัวมันเอง
 - ถ้า deploy แบบ private backend ให้ใช้ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md) เป็นหลักสำหรับ server-to-server forwarding
 
-## Main Flow (Legacy/Direct Mode)
+## Main Flow (Production BFF Mode)
+
+1. browser เปิด `/auth/login` ที่ frontend
+2. frontend BFF ขอ Google login URL จาก backend `GET /oidc/bff/google/login-url`
+3. Google redirect กลับ `/auth/callback` ที่ frontend
+4. frontend BFF เรียก backend `GET /oidc/bff/google/callback`
+5. frontend/BFF เรียก `GET /oidc/me`
+6. frontend/BFF เรียก `GET /auth/csrf-token`
+7. จากนั้นค่อยเรียก `POST /session/init`
+8. endpoint ที่เปลี่ยน state ทุกตัวต้องส่ง header `x-csrf-token` ให้ตรงกับ token ปัจจุบัน
+
+## Legacy/Direct Mode
 
 1. เรียก `GET /oidc/google/login?return_to=<frontend-url>`
 2. หลัง redirect กลับมา เรียก `GET /oidc/me` ด้วย `credentials: 'include'`
@@ -29,7 +40,7 @@ Last updated: `2026-03-30`
 
 ## Cookie
 
-frontend ต้องใช้ต่อเมื่อยังอยู่ใน legacy/direct mode:
+frontend ต้องใช้ต่อทั้งใน BFF mode และ legacy/direct mode เพราะ backend auth หลักยังเป็น cookie-backed session:
 
 - `credentials: 'include'` กับ `fetch`
 - `withCredentials: true` กับ `axios`
@@ -39,6 +50,7 @@ cookie/security headers ที่เกี่ยวข้อง:
 - backend จะ set cookie `sci_csrf_token`
 - frontend ต้องแนบ header `x-csrf-token` ในทุก `POST`, `PUT`, `PATCH`, `DELETE` ที่ใช้ session cookie
 - แนะนำให้เก็บ token นี้ไว้ใน API client กลาง แล้ว refresh ผ่าน `GET /auth/csrf-token` หลัง login หรือเมื่อสร้าง session ใหม่
+- ใน production BFF mode frontend server ควร forward cookie และ `x-csrf-token` ให้ backend แทน browser
 
 ## Secure JSON
 

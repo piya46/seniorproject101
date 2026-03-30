@@ -69,7 +69,7 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 
 - สร้าง Google OAuth client ที่จะใช้กับ frontend/web application
 - สร้าง Google OAuth client สำหรับ backend ตัวนี้ ถ้ายังไม่มี
-- ใส่ Authorized redirect URI ให้ตรงกับ backend callback URL แบบ exact match
+- ใส่ Authorized redirect URI ให้ตรงกับ callback URL ที่ใช้จริงแบบ exact match
 - ถ้ามีการเปลี่ยน domain, region, หรือ callback URL ต้องอัปเดตรายการ redirect URI ใน OAuth client เอง
 
 `deploy.sh` ทำได้แค่:
@@ -93,13 +93,15 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 - `OIDC_REQUIRE_HOSTED_DOMAIN=true`
 - `GOOGLE_OIDC_CLIENT_ID_VALUE=<google client id>`
 - `GOOGLE_OIDC_CLIENT_SECRET_VALUE=<google client secret>`
-- `GOOGLE_OIDC_CALLBACK_URL=https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback` (optional; ถ้าไม่ตั้ง `deploy.sh` จะ default เป็น canonical Cloud Run URL นี้ให้อัตโนมัติ)
+- `GOOGLE_OIDC_CALLBACK_URL=https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback` (optional; ใช้กับ legacy/direct mode และเป็น default callback ของ backend ถ้าไม่ได้ override)
 
 หมายเหตุ:
 
 - ถ้า Secret Manager มี `GOOGLE_OIDC_CLIENT_ID` และ `GOOGLE_OIDC_CLIENT_SECRET` อยู่แล้ว สคริปต์จะพยายาม reuse ให้อัตโนมัติก่อน prompt
 - ค่า `GOOGLE_OIDC_CLIENT_ID_VALUE` และ `GOOGLE_OIDC_CLIENT_SECRET_VALUE` จึงจำเป็นเฉพาะตอน bootstrap ครั้งแรกหรือเมื่อต้องการอัปเดต secret
 - ถ้าจะเดินหน้าไปสู่ private backend เต็มรูปแบบ ให้ใช้เอกสาร [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md) ควบคู่กัน เพราะ OIDC ownership และ callback flow จะเปลี่ยนตามสถาปัตยกรรม BFF
+- ใน production BFF flow Google OAuth redirect URI ควรเป็น frontend callback เช่น `https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app/auth/callback`
+- route backend `GET /api/v1/oidc/bff/google/callback` ใช้เป็น bridge ระหว่าง frontend callback กับ backend session issuance ไม่ใช่ Google redirect URI ตรง
 
 ## BFF / Private Backend Flags
 
@@ -122,6 +124,11 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - เมื่อ `TRUSTED_BFF_AUTH_ENABLED=true` สคริปต์จะเก็บ shared secret ลง Secret Manager และ inject เข้า backend runtime
 - origin forwarding ผ่าน `x-browser-origin` จะถูกไว้ใจได้ก็ต่อเมื่อ backend เป็น private และเรียกผ่าน BFF เท่านั้น
 - header contract ที่ frontend ต้องส่งดูได้ที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+- frontend BFF production flow ที่โค้ดรองรับตอนนี้คือ:
+  1. browser เรียก `/auth/login` บน frontend
+  2. frontend เรียก backend `GET /api/v1/oidc/bff/google/login-url`
+  3. Google redirect กลับ `/auth/callback` บน frontend
+  4. frontend เรียก backend `GET /api/v1/oidc/bff/google/callback`
 
 ## Recommended Production Config
 
@@ -168,7 +175,9 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - `AI_DAILY_TOKEN_LIMIT` ใช้กำหนดเพดาน token ต่อ user ต่อวัน
 - `AI_USAGE_RETENTION_DAYS` ใช้กำหนดว่าจะเก็บเอกสาร usage รายวันใน Firestore ไว้กี่วันก่อน TTL ลบออก
 - ไม่ควรปล่อย `localhost` หรือ origin ชั่วคราวค้างใน production โดยไม่จำเป็น
-- ควรใส่ `Authorised redirect URI` ใน Google OAuth client ให้ตรงกับ callback URL ข้างต้นแบบ exact match
+- ควรใส่ `Authorised redirect URI` ใน Google OAuth client ให้ตรงกับ callback URL ที่ใช้งานจริงแบบ exact match
+- ถ้าใช้ BFF production flow ต้องเพิ่ม frontend callback เช่น `https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app/auth/callback`
+- ถ้ายังต้องการรองรับ legacy/direct mode ค่อยเพิ่ม backend callback `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback` แยกอีกตัว
 - ถ้าจะเปิด `TRUSTED_BFF_AUTH_ENABLED=true` ควรสร้าง shared secret แบบสุ่มยาวและเก็บเฉพาะใน Secret Manager เท่านั้น
 
 ## Optional Deploy Flags
