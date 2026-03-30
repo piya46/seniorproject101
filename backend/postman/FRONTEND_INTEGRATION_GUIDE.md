@@ -1,16 +1,17 @@
 # Frontend Integration Guide
 
 Version: `v1.9.4`
-Last updated: `2026-03-27`
+Last updated: `2026-03-30`
 
-คู่มือนี้อธิบายสิ่งที่ frontend ต้องทำเพื่อเชื่อมต่อ backend ในโหมด Google OIDC + session cookie + secure JSON transport
+คู่มือนี้อธิบายสิ่งที่ frontend ต้องทำเพื่อเชื่อมต่อ backend ในโหมด Google OIDC + session cookie + secure JSON transport โดย direct backend browser flow ให้ถือเป็น legacy/direct mode และ production target ใหม่คือ frontend BFF + private backend
 
 หมายเหตุ:
 
 - ถ้า backend ใช้ `run.app` โดยตรงและ frontend อยู่คนละ origin เช่น `https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app` ระบบจะยังเป็น `cross-origin`
 - ดังนั้น flow นี้ไม่ได้แก้ CORS/preflight ด้วยตัวมันเอง
+- ถ้า deploy แบบ private backend ให้ใช้ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md) เป็นหลักสำหรับ server-to-server forwarding
 
-## Main Flow
+## Main Flow (Legacy/Direct Mode)
 
 1. เรียก `GET /oidc/google/login?return_to=<frontend-url>`
 2. หลัง redirect กลับมา เรียก `GET /oidc/me` ด้วย `credentials: 'include'`
@@ -19,9 +20,16 @@ Last updated: `2026-03-27`
 5. endpoint ที่เปลี่ยน state ทุกตัวต้องส่ง header `x-csrf-token` ให้ตรงกับ token ปัจจุบัน
 6. จากนั้นเรียก endpoint ที่ต้อง auth อื่น
 
+## Production Flow
+
+1. browser เรียก frontend BFF
+2. frontend BFF เป็น owner ของ browser-facing auth/session flow
+3. frontend BFF เรียก backend แบบ private server-to-server
+4. frontend BFF ส่ง trusted headers ตาม [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+
 ## Cookie
 
-frontend ต้องใช้:
+frontend ต้องใช้ต่อเมื่อยังอยู่ใน legacy/direct mode:
 
 - `credentials: 'include'` กับ `fetch`
 - `withCredentials: true` กับ `axios`

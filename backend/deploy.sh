@@ -90,6 +90,7 @@ SMTP_USER_SECRET="${SMTP_USER_SECRET:-SMTP_USER}"
 SMTP_PASS_SECRET="${SMTP_PASS_SECRET:-SMTP_PASS}"
 SMTP_FROM_EMAIL_SECRET="${SMTP_FROM_EMAIL_SECRET:-SMTP_FROM_EMAIL}"
 SMTP_FROM_NAME_SECRET="${SMTP_FROM_NAME_SECRET:-SMTP_FROM_NAME}"
+TECH_SUPPORT_TARGET_EMAIL_SECRET="${TECH_SUPPORT_TARGET_EMAIL_SECRET:-TECH_SUPPORT_TARGET_EMAIL}"
 OIDC_CLIENT_ID_SECRET="${OIDC_CLIENT_ID_SECRET:-GOOGLE_OIDC_CLIENT_ID}"
 OIDC_CLIENT_SECRET_SECRET="${OIDC_CLIENT_SECRET_SECRET:-GOOGLE_OIDC_CLIENT_SECRET}"
 TRUSTED_BFF_SHARED_SECRET_SECRET="${TRUSTED_BFF_SHARED_SECRET_SECRET:-TRUSTED_BFF_SHARED_SECRET}"
@@ -1157,16 +1158,24 @@ prompt_value_if_empty() {
     local SECRET_INPUT=${4:-false}
     local CURRENT_VALUE=${!VAR_NAME:-}
     local USER_INPUT=""
+    local PROMPT_TEXT="$LABEL"
+
+    if [ -n "$DEFAULT_VALUE" ]; then
+        PROMPT_TEXT="$PROMPT_TEXT [$DEFAULT_VALUE]"
+    fi
+    PROMPT_TEXT="$PROMPT_TEXT: "
 
     if [ -n "$CURRENT_VALUE" ]; then
         return
     fi
 
     if [ "$SECRET_INPUT" = "true" ]; then
-        read -r -s "?$LABEL${DEFAULT_VALUE:+ [$DEFAULT_VALUE]}: " USER_INPUT
+        printf '%s' "$PROMPT_TEXT"
+        read -r -s USER_INPUT
         echo
     else
-        read -r "?$LABEL${DEFAULT_VALUE:+ [$DEFAULT_VALUE]}: " USER_INPUT
+        printf '%s' "$PROMPT_TEXT"
+        read -r USER_INPUT
     fi
 
     USER_INPUT="$(trim_value "$USER_INPUT")"
@@ -1195,6 +1204,48 @@ reuse_oidc_credentials_from_secret_manager() {
     fi
 }
 
+reuse_smtp_and_support_metadata_from_secret_manager() {
+    if [ -z "$TECH_SUPPORT_TARGET_EMAIL" ] && gcloud secrets describe "$TECH_SUPPORT_TARGET_EMAIL_SECRET" &> /dev/null; then
+        TECH_SUPPORT_TARGET_EMAIL=$(gcloud secrets versions access latest --secret="$TECH_SUPPORT_TARGET_EMAIL_SECRET" 2>/dev/null || true)
+        TECH_SUPPORT_TARGET_EMAIL="$(trim_value "$TECH_SUPPORT_TARGET_EMAIL")"
+        if [ -n "$TECH_SUPPORT_TARGET_EMAIL" ]; then
+            echo -e "   ✅ Reusing existing support target email from Secret Manager."
+        fi
+    fi
+
+    if [ -z "$SMTP_HOST_VALUE" ] && gcloud secrets describe "$SMTP_HOST_SECRET" &> /dev/null; then
+        SMTP_HOST_VALUE=$(gcloud secrets versions access latest --secret="$SMTP_HOST_SECRET" 2>/dev/null || true)
+        SMTP_HOST_VALUE="$(trim_value "$SMTP_HOST_VALUE")"
+        if [ -n "$SMTP_HOST_VALUE" ]; then
+            echo -e "   ✅ Reusing existing SMTP host from Secret Manager."
+        fi
+    fi
+
+    if [ -z "$SMTP_USER_VALUE" ] && gcloud secrets describe "$SMTP_USER_SECRET" &> /dev/null; then
+        SMTP_USER_VALUE=$(gcloud secrets versions access latest --secret="$SMTP_USER_SECRET" 2>/dev/null || true)
+        SMTP_USER_VALUE="$(trim_value "$SMTP_USER_VALUE")"
+        if [ -n "$SMTP_USER_VALUE" ]; then
+            echo -e "   ✅ Reusing existing SMTP user from Secret Manager."
+        fi
+    fi
+
+    if [ -z "$SMTP_FROM_EMAIL_VALUE" ] && gcloud secrets describe "$SMTP_FROM_EMAIL_SECRET" &> /dev/null; then
+        SMTP_FROM_EMAIL_VALUE=$(gcloud secrets versions access latest --secret="$SMTP_FROM_EMAIL_SECRET" 2>/dev/null || true)
+        SMTP_FROM_EMAIL_VALUE="$(trim_value "$SMTP_FROM_EMAIL_VALUE")"
+        if [ -n "$SMTP_FROM_EMAIL_VALUE" ]; then
+            echo -e "   ✅ Reusing existing SMTP from email from Secret Manager."
+        fi
+    fi
+
+    if [ -z "$SMTP_FROM_NAME_VALUE" ] && gcloud secrets describe "$SMTP_FROM_NAME_SECRET" &> /dev/null; then
+        SMTP_FROM_NAME_VALUE=$(gcloud secrets versions access latest --secret="$SMTP_FROM_NAME_SECRET" 2>/dev/null || true)
+        SMTP_FROM_NAME_VALUE="$(trim_value "$SMTP_FROM_NAME_VALUE")"
+        if [ -n "$SMTP_FROM_NAME_VALUE" ]; then
+            echo -e "   ✅ Reusing existing SMTP from name from Secret Manager."
+        fi
+    fi
+}
+
 reuse_trusted_bff_secret_from_secret_manager() {
     if [ "$TRUSTED_BFF_AUTH_ENABLED" != "true" ]; then
         return
@@ -1209,8 +1260,34 @@ reuse_trusted_bff_secret_from_secret_manager() {
     fi
 }
 
+generate_trusted_bff_secret_if_needed() {
+    if [ "$TRUSTED_BFF_AUTH_ENABLED" != "true" ]; then
+        return
+    fi
+
+    if [ -n "$TRUSTED_BFF_SHARED_SECRET_VALUE" ]; then
+        return
+    fi
+
+    if command -v openssl >/dev/null 2>&1; then
+        TRUSTED_BFF_SHARED_SECRET_VALUE="$(openssl rand -base64 48 | tr -d '\n')"
+    else
+        TRUSTED_BFF_SHARED_SECRET_VALUE="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
+    fi
+
+    TRUSTED_BFF_SHARED_SECRET_VALUE="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_VALUE")"
+
+    if [ -z "$TRUSTED_BFF_SHARED_SECRET_VALUE" ]; then
+        echo -e "${RED}❌ Failed to generate TRUSTED_BFF_SHARED_SECRET_VALUE automatically.${NC}"
+        exit 1
+    fi
+
+    echo -e "   ✅ Generated a new trusted BFF shared secret automatically."
+}
+
 prompt_for_missing_config() {
     echo -e "${YELLOW}📝 Review SMTP/support config. Leave blank to use the shown default.${NC}"
+    reuse_smtp_and_support_metadata_from_secret_manager
     prompt_value_if_empty TECH_SUPPORT_TARGET_EMAIL "Support target email" "support@example.com"
     prompt_value_if_empty SMTP_HOST_VALUE "SMTP host" "smtp.example.com"
     prompt_value_if_empty SMTP_PORT "SMTP port" "465"
@@ -1225,7 +1302,7 @@ prompt_for_missing_config() {
     reuse_trusted_bff_secret_from_secret_manager
     if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ]; then
         echo -e "${YELLOW}🛡️  Trusted BFF auth is enabled. Backend will accept shared-secret-authenticated proxy requests from the frontend service.${NC}"
-        prompt_value_if_empty TRUSTED_BFF_SHARED_SECRET_VALUE "Trusted BFF shared secret" "" true
+        generate_trusted_bff_secret_if_needed
     fi
 
     SMTP_HOST_VALUE="$(trim_value "$SMTP_HOST_VALUE")"
@@ -1255,7 +1332,8 @@ ensure_smtp_password() {
     fi
 
     echo -e "${YELLOW}🔐 SMTP password not found in env or Secret Manager. Please enter it now.${NC}"
-    read -s "SMTP_PASS_VALUE?SMTP Password: "
+    printf 'SMTP Password: '
+    read -r -s SMTP_PASS_VALUE
     echo
 
     if [ -z "$SMTP_PASS_VALUE" ]; then
@@ -1784,6 +1862,7 @@ upsert_secret_value $SMTP_USER_SECRET "$SMTP_USER_VALUE"
 upsert_secret_value $SMTP_PASS_SECRET "$SMTP_PASS_VALUE"
 upsert_secret_value $SMTP_FROM_EMAIL_SECRET "$SMTP_FROM_EMAIL_VALUE"
 upsert_secret_value $SMTP_FROM_NAME_SECRET "$SMTP_FROM_NAME_VALUE"
+upsert_secret_value $TECH_SUPPORT_TARGET_EMAIL_SECRET "$TECH_SUPPORT_TARGET_EMAIL"
 upsert_secret_value $OIDC_CLIENT_ID_SECRET "$GOOGLE_OIDC_CLIENT_ID_VALUE"
 upsert_secret_value $OIDC_CLIENT_SECRET_SECRET "$GOOGLE_OIDC_CLIENT_SECRET_VALUE"
 if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ]; then

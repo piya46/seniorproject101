@@ -1,9 +1,9 @@
 # API Examples
 
 Version: `v1.9.4`
-Last updated: `2026-03-27`
+Last updated: `2026-03-30`
 
-ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only
+ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only โดย direct backend browser flow ให้ถือเป็น legacy/direct mode และ production target ใหม่คือ frontend BFF + private backend
 
 1. เปิด Google OIDC login
 2. ตรวจ session ด้วย `GET /oidc/me`
@@ -58,7 +58,7 @@ https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/sys
 - endpoint นี้ต้องมี authenticated session ก่อน
 - ใช้สำหรับ internal QA/ops เมื่อต้องดู runtime/config ลึกขึ้น
 
-Public storage-signing smoke probe:
+Authenticated storage-signing smoke probe:
 
 ```text
 https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/system/status/storage-signing
@@ -66,8 +66,8 @@ https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/sys
 
 หมายเหตุ:
 
-- endpoint นี้เป็น public smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้
-- มีประโยชน์หลัง deploy หรือเวลาสงสัยปัญหา merge/download flow
+- endpoint นี้ต้อง auth แล้ว
+- ใช้สำหรับ internal QA/ops หรือ BFF/internal caller ที่ผ่าน auth มาแล้ว
 
 Canonical Google OAuth callback:
 
@@ -75,7 +75,7 @@ Canonical Google OAuth callback:
 https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback
 ```
 
-## 1. Open Google OIDC Login
+## 1. Open Google OIDC Login (Legacy/Direct Mode)
 
 ตัวอย่าง URL:
 
@@ -268,13 +268,20 @@ const response = await fetch("https://ai-formcheck-backend-<project-number>.asia
 });
 ```
 
-## Recommended Browser Flow
+## Recommended Browser Flow (Legacy/Direct Mode)
 
 1. เปิด `GET /oidc/google/login?return_to=<frontend-url>`
 2. frontend เรียก `GET /oidc/me` ด้วย `credentials: 'include'`
 3. frontend เรียก `GET /auth/csrf-token`
 4. ถ้าต้องใช้ secure JSON flow ให้เรียก `POST /session/init`
 5. ค่อยเรียก endpoint ที่ต้อง auth อื่น
+
+## Recommended Production Flow
+
+1. browser เรียก frontend BFF
+2. frontend BFF เป็น owner ของ browser-facing login/session flow
+3. frontend BFF เรียก backend แบบ private server-to-server
+4. header contract ระหว่าง frontend BFF กับ backend ดูที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
 
 ## AI Usage Retention
 

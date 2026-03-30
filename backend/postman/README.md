@@ -1,7 +1,7 @@
 # Postman Guide
 
 Version: `v1.9.4`
-Last updated: `2026-03-27`
+Last updated: `2026-03-30`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
 
@@ -25,6 +25,14 @@ Last updated: `2026-03-27`
 
 ## Production Auth Flow
 
+production target ใหม่:
+
+1. browser เรียก frontend BFF
+2. frontend BFF เป็น owner ของ browser-facing login/session flow
+3. frontend BFF เรียก backend private แบบ server-to-server ตาม [../BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+
+legacy/direct mode ที่ยังคงอยู่เพื่อ backward compatibility:
+
 1. เปิด `GET /oidc/google/login?return_to=https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app`
 2. login ผ่าน Google
 3. backend callback ตั้ง session cookie
@@ -38,7 +46,8 @@ Last updated: `2026-03-27`
 - state-changing requests ที่ใช้ session cookie ต้องมี `x-csrf-token`
 - business body ยังต้องถูกเข้ารหัสสำหรับ secure JSON endpoints
 - `GET` endpoints และ multipart upload ไม่ใช้ secure JSON wrapper
-- public status endpoints ตอนนี้แยกเป็น `GET /system/status`, `GET /system/status/storage-signing`, และ `GET /system/status/details`
+- status endpoints ตอนนี้แยกเป็น `GET /system/status`, `GET /system/status/storage-signing`, และ `GET /system/status/details`
+- `GET /system/status/storage-signing` ตอนนี้เป็น authenticated probe แล้ว ไม่ใช่ public smoke probe
 
 ## AI Usage Notes
 
