@@ -9,6 +9,7 @@ const COLLECTION_NAME = process.env.FIRESTORE_COLLECTION_NAME || 'SESSION';
 const SUB_COLLECTION_NAME = process.env.FIRESTORE_FILES_SUBCOLLECTION || 'files';
 const AI_USAGE_COLLECTION_NAME = 'AI_USAGE_DAILY';
 const DEFAULT_AI_USAGE_RETENTION_DAYS = 30;
+const DEFAULT_DB_KEY_VERSION = 'v1';
 
 const getAiUsageRetentionDays = () => {
     const parsed = Number.parseInt(String(process.env.AI_USAGE_RETENTION_DAYS || DEFAULT_AI_USAGE_RETENTION_DAYS), 10);
@@ -39,24 +40,76 @@ const appendUniqueString = (values = [], input) => {
     return [...existing, normalized];
 };
 
-const getDbKey = (keyBuffer) => {
-    if (keyBuffer) return keyBuffer;
-    const hex = process.env.DB_ENCRYPTION_KEY;
-    if (!hex) throw new Error('DB_ENCRYPTION_KEY is missing.');
+const normalizeDbKeyVersion = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    return /^v[1-9]\d*$/.test(normalized) ? normalized : DEFAULT_DB_KEY_VERSION;
+};
+
+const getCurrentDbKeyVersion = () =>
+    normalizeDbKeyVersion(process.env.DB_ENCRYPTION_KEY_VERSION || DEFAULT_DB_KEY_VERSION);
+
+const getDbKeyEnvNameForVersion = (version) =>
+    version === DEFAULT_DB_KEY_VERSION ? 'DB_ENCRYPTION_KEY' : `DB_ENCRYPTION_KEY_${version.toUpperCase()}`;
+
+const getDbKeyByVersion = (version, keyBuffer = null) => {
+    if (keyBuffer) {
+        return keyBuffer;
+    }
+
+    const normalizedVersion = normalizeDbKeyVersion(version);
+    const envName = getDbKeyEnvNameForVersion(normalizedVersion);
+    const hex = process.env[envName] || (normalizedVersion === DEFAULT_DB_KEY_VERSION ? process.env.DB_ENCRYPTION_KEY : '');
+    if (!hex) throw new Error(`${envName} is missing.`);
     return Buffer.from(hex, 'hex');
 };
 
-const encryptData = (text, keyBuffer = null) => {
+const getDbKey = (keyBuffer) => getDbKeyByVersion(getCurrentDbKeyVersion(), keyBuffer);
+
+const serializeEncryptedValue = (keyVersion, ivHex, encryptedHex, tagHex) =>
+    `${normalizeDbKeyVersion(keyVersion)}:${ivHex}:${encryptedHex}:${tagHex}`;
+
+const parseEncryptedValue = (text) => {
+    if (!text || typeof text !== 'string' || !text.includes(':')) return null;
+
+    const parts = text.split(':');
+
+    if (parts.length === 3) {
+        const [ivHex, encryptedHex, tagHex] = parts;
+        return {
+            keyVersion: null,
+            ivHex,
+            encryptedHex,
+            tagHex,
+            isLegacyFormat: true
+        };
+    }
+
+    if (parts.length === 4 && /^v[1-9]\d*$/i.test(parts[0])) {
+        const [keyVersion, ivHex, encryptedHex, tagHex] = parts;
+        return {
+            keyVersion: normalizeDbKeyVersion(keyVersion),
+            ivHex,
+            encryptedHex,
+            tagHex,
+            isLegacyFormat: false
+        };
+    }
+
+    return null;
+};
+
+const encryptData = (text, keyBuffer = null, options = {}) => {
     if (!text) return text;
     try {
-        const key = getDbKey(keyBuffer);
+        const keyVersion = normalizeDbKeyVersion(options.keyVersion || getCurrentDbKeyVersion());
+        const key = getDbKeyByVersion(keyVersion, keyBuffer);
         const plainText = typeof text === 'object' ? JSON.stringify(text) : String(text);
         const iv = crypto.randomBytes(12);
         const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
         let encrypted = cipher.update(plainText, 'utf8', 'hex');
         encrypted += cipher.final('hex');
         const tag = cipher.getAuthTag().toString('hex');
-        return `${iv.toString('hex')}:${encrypted}:${tag}`;
+        return serializeEncryptedValue(keyVersion, iv.toString('hex'), encrypted, tag);
     } catch (error) {
         console.error('Encryption Error:', error);
         throw error; 
@@ -64,15 +117,16 @@ const encryptData = (text, keyBuffer = null) => {
 };
 
 const decryptData = (text, keyBuffer = null) => {
-    if (!text || typeof text !== 'string' || !text.includes(':')) return null; 
+    const parsed = parseEncryptedValue(text);
+    if (!parsed) return null;
+
     try {
-        const key = getDbKey(keyBuffer);
-        const parts = text.split(':');
-        if (parts.length !== 3) return null; 
-        const [ivHex, encryptedHex, tagHex] = parts;
-        const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
-        decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-        let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+        const key = parsed.isLegacyFormat
+            ? getDbKey(keyBuffer)
+            : getDbKeyByVersion(parsed.keyVersion, keyBuffer);
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(parsed.ivHex, 'hex'));
+        decipher.setAuthTag(Buffer.from(parsed.tagHex, 'hex'));
+        let decrypted = decipher.update(parsed.encryptedHex, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
         try { return JSON.parse(decrypted); } catch { return decrypted; }
     } catch (err) {
@@ -351,5 +405,7 @@ exports.COLLECTION_NAME = COLLECTION_NAME;
 exports.SUB_COLLECTION_NAME = SUB_COLLECTION_NAME;
 exports.AI_USAGE_COLLECTION_NAME = AI_USAGE_COLLECTION_NAME;
 exports.getAiUsageRetentionDays = getAiUsageRetentionDays;
+exports.getCurrentDbKeyVersion = getCurrentDbKeyVersion;
+exports.getDbKeyByVersion = getDbKeyByVersion;
 exports.encryptData = encryptData;
 exports.decryptData = decryptData;

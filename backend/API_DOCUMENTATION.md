@@ -36,6 +36,7 @@ Last updated: `2026-03-31`
 - `POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist
 - endpoint ธุรกิจหลักยังต้องผ่าน session-based auth
 - secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด
+- DB field encryption สำหรับข้อมูลใหม่ใช้ format แบบ versioned (`vN:iv:ciphertext:authTag`) และ backend ยังอ่าน legacy format เดิมได้
 
 ## Authentication Flow
 

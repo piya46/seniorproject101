@@ -172,6 +172,23 @@ export TRUSTED_BFF_AUTH_HEADER_NAME="x-bff-auth"
 export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 ```
 
+## Security And Resource Env Vars
+
+ค่าที่ควรรู้สำหรับ runtime ปัจจุบัน:
+
+| Env | Default | ความหมาย |
+| --- | --- | --- |
+| `ALLOW_BEARER_SESSION_TOKEN` | `false` | production ไม่ควรเปิด เพราะจะลดความปลอดภัยของ cookie-backed session model |
+| `TRUST_PROXY` | `1` | จำนวน trusted proxy hop สำหรับ Cloud Run topology ปัจจุบัน |
+| `COOKIE_SAME_SITE` | `Lax` | ค่า cookie policy ที่แนะนำสำหรับ production BFF mode |
+| `COOKIE_SECURE` | `true` | production ต้องเปิดเสมอ และจำเป็นเมื่อ `COOKIE_SAME_SITE=None` |
+| `MERGED_DOWNLOAD_URL_TTL_MS` | `900000` | อายุ signed URL ของไฟล์ merged output (15 นาที) |
+| `MERGE_TOTAL_SOURCE_BYTES_LIMIT` | `26214400` | เพดานขนาดรวม source files สำหรับ merge route (25MB) |
+| `MAX_UPLOAD_BYTES` | `10485760` | เพดานอัปโหลดทั่วไปต่อไฟล์ (10MB) |
+| `MAX_PDF_SOURCE_BYTES` | `5242880` | เพดาน PDF ที่ backend ยอม sanitize อย่างปลอดภัย (5MB) |
+| `DB_ENCRYPTION_KEY_VERSION` | `v1` | version ของ DB encryption key ที่ใช้เข้ารหัสข้อมูลใหม่ |
+| `DB_ENCRYPTION_KEY_V2` เป็นต้นไป | unset | key เพิ่มเติมสำหรับ decrypt ข้อมูลที่ถูกเข้ารหัสด้วย version ใหม่ในอนาคต |
+
 หมายเหตุ:
 
 - `FRONTEND_URL` ควรเป็น production origin หลักเพียงค่าเดียว

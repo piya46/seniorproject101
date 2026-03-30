@@ -16,6 +16,12 @@ Last updated: `2026-03-31`
 9. เริ่ม session ด้วย `POST /session/init`
 10. ถ้าต้องอ่านข้อมูลส่วนตัวระดับเข้ม ให้เรียก `POST /profile/details` แบบ secure JSON
 
+หมายเหตุด้าน policy ล่าสุด:
+
+- production ไม่ควรเปิด `ALLOW_BEARER_SESSION_TOKEN`
+- `POST /documents/merge` อาจตอบ `413` ถ้าขนาดรวมของ source files เกินเพดาน
+- `POST /upload` อาจตอบ `413` โดยเฉพาะกรณี PDF ที่เกินเพดาน sanitize ของ backend
+
 ## Base URL
 
 Production:

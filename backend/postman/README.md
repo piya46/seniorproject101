@@ -48,11 +48,14 @@ legacy/direct mode ที่ยังคงอยู่เพื่อ backward 
 
 - collection-level scripts ยังช่วยเรื่อง secure JSON transport ให้เหมือนเดิม
 - state-changing requests ที่ใช้ session cookie ต้องมี `x-csrf-token`
+- `ALLOW_BEARER_SESSION_TOKEN` ควรคงเป็น `false` ใน production
 - business body ยังต้องถูกเข้ารหัสสำหรับ secure JSON endpoints
 - `GET` endpoints และ multipart upload ไม่ใช้ secure JSON wrapper
 - status endpoints ตอนนี้แยกเป็น `GET /system/status`, `GET /system/status/storage-signing`, และ `GET /system/status/details`
 - `GET /system/status/storage-signing` ตอนนี้เป็น authenticated probe แล้ว ไม่ใช่ public smoke probe
 - BFF production flow ใช้ frontend callback `/auth/callback`; backend callback `/oidc/google/callback` เป็น legacy/direct mode เป็นหลัก
+- `POST /documents/merge` คืน signed URL อายุสั้นตาม policy ของ backend และอาจตอบ `413` เมื่อ source files รวมกันใหญ่เกินเพดาน
+- `POST /upload` มี PDF cap ที่เข้มกว่ารูปภาพ และอาจตอบ `413` เมื่อไฟล์เกิน policy หลัง verify/decrypt
 
 ## AI Usage Notes
 

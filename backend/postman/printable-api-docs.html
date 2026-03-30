@@ -155,6 +155,7 @@
 <li>ใช้ Google OIDC เป็น identity provider</li>
 <li>backend verify Google `id_token`, `state`, `nonce`, `email_verified`, และ allowed domains</li>
 <li>backend ออก session cookie แบบ `HttpOnly` และ `Secure` ใน production</li>
+<li>production BFF mode ควรใช้ `COOKIE_SAME_SITE=Lax`, `COOKIE_SECURE=true`, และ `TRUST_PROXY=1`</li>
 <li>backend ออก anti-CSRF token ผ่าน `sci_csrf_token` + `x-csrf-token` สำหรับ state-changing requests ที่ใช้ session cookie</li>
 <li>backend regenerate `session_id` ใหม่หลัง OIDC login callback</li>
 <li>`POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist</li>
@@ -651,6 +652,22 @@
 }
 
 </code></pre>
+<h2>Document Merge</h2>
+<h3>`POST /documents/merge`</h3>
+<p>ข้อจำกัดและพฤติกรรมเพิ่มเติม:</p>
+<ul>
+<li>signed URL สำหรับดาวน์โหลดไฟล์ที่ merge แล้วมีอายุสั้น โดย default คือ 15 นาที</li>
+<li>backend อาจตอบ `413` ถ้าขนาดรวมของไฟล์ต้นฉบับเกินเพดานที่กำหนดไว้สำหรับการ merge</li>
+</ul>
+<h2>Upload Endpoint</h2>
+<h3>`POST /upload`</h3>
+<p>ข้อจำกัดและพฤติกรรมเพิ่มเติม:</p>
+<ul>
+<li>จำกัดอัปโหลดครั้งละ 1 ไฟล์</li>
+<li>ขนาดไฟล์อัปโหลดทั่วไปยังถูกคุมด้วย policy ของ backend</li>
+<li>PDF มีเพดานขนาดที่เข้มกว่ารูปภาพสำหรับการ sanitize อย่างปลอดภัย</li>
+<li>backend อาจตอบ `413` ถ้าไฟล์เกินเพดานที่ยอมรับได้หลัง verification/decryption</li>
+</ul>
 <h2>Support Endpoint</h2>
 <h3>`POST /support/technical-email`</h3>
 <p>ข้อจำกัด:</p>
