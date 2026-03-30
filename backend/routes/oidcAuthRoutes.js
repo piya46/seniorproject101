@@ -1,5 +1,4 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { ensureAppSession, buildSessionCookieOptions } = require('../utils/sessionUtils');
 const { revokeSessionRecord } = require('../utils/dbUtils');
@@ -19,12 +18,30 @@ function isOidcEnabled() {
   return String(process.env.OIDC_ENABLED || 'true').toLowerCase() === 'true';
 }
 
+function isPrivateBackendMode() {
+  return String(process.env.CLOUD_RUN_AUTH_MODE || 'public').toLowerCase() === 'private';
+}
+
+function rejectLegacyDirectOidcFlow(req, res) {
+  req.log?.warn('legacy_direct_oidc_flow_blocked', {
+    cloud_run_auth_mode: process.env.CLOUD_RUN_AUTH_MODE || 'public'
+  });
+  return res.status(409).json({
+    error: 'Legacy browser OIDC flow disabled',
+    message: 'This backend is running in private BFF mode. Start login from the frontend BFF instead.'
+  });
+}
+
 router.get('/google/login', (req, res) => {
   if (!isOidcEnabled()) {
     return res.status(503).json({
       error: 'OIDC Disabled',
       message: 'Google OIDC login is disabled on this server.'
     });
+  }
+
+  if (isPrivateBackendMode()) {
+    return rejectLegacyDirectOidcFlow(req, res);
   }
 
   try {
@@ -46,6 +63,10 @@ router.get('/google/callback', async (req, res) => {
       error: 'OIDC Disabled',
       message: 'Google OIDC login is disabled on this server.'
     });
+  }
+
+  if (isPrivateBackendMode()) {
+    return rejectLegacyDirectOidcFlow(req, res);
   }
 
   const code = String(req.query.code || '').trim();
@@ -103,7 +124,7 @@ router.get('/me', authMiddleware, (req, res) => {
   });
 });
 
-router.post('/logout', async (req, res) => {
+router.post('/logout', authMiddleware, async (req, res) => {
   try {
     if (!isAllowedBrowserOrigin(req, { requireHeader: true })) {
       return res.status(403).json({
@@ -112,13 +133,11 @@ router.post('/logout', async (req, res) => {
       });
     }
 
-    if (req.cookies?.sci_session_token) {
+    const sessionId = String(req.user?.session_id || '').trim();
+    if (sessionId) {
       try {
-        const decoded = jwt.verify(req.cookies.sci_session_token, process.env.JWT_SECRET, {
-          algorithms: ['HS256']
-        });
-        await revokeSessionRecord(decoded.session_id);
-        req.log?.audit('oidc_logout_completed', { session_id: decoded.session_id });
+        await revokeSessionRecord(sessionId);
+        req.log?.audit('oidc_logout_completed', { session_id: sessionId });
       } catch (error) {
         req.log?.warn('oidc_logout_revoke_skipped', { message: error.message });
       }

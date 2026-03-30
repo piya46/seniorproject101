@@ -305,7 +305,7 @@
       <div class="hero-grid">
         <div>
           <label for="backendUrl">Backend URL</label>
-          <input id="backendUrl" type="text" value="https://sci-request-system-466086429766.asia-southeast3.run.app" placeholder="https://sci-request-system-466086429766.asia-southeast3.run.app">
+          <input id="backendUrl" type="text" value="https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app" placeholder="https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app">
           <p class="note">Serve this page with any simple static server on localhost. If the origin is `http://localhost:5173`, ensure that origin is included in backend `FRONTEND_EXTRA_URLS` before testing browser OIDC and auth-required requests.</p>
         </div>
         <div class="action-grid">
@@ -499,7 +499,7 @@
 
   <script>
     (function () {
-      var DEFAULT_BACKEND = "https://sci-request-system-466086429766.asia-southeast3.run.app";
+      var DEFAULT_BACKEND = "https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app";
       var backendInput = document.getElementById("backendUrl");
       var responseBox = document.getElementById("responseBox");
       var statusBox = document.getElementById("statusBox");

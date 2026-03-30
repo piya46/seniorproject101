@@ -1,7 +1,7 @@
 # API Documentation
 
 Version: `v1.9.4`
-Last updated: `2026-03-27`
+Last updated: `2026-03-30`
 
 เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client
 
@@ -10,18 +10,19 @@ Last updated: `2026-03-27`
 - [API_EXAMPLES.md](/Users/pst./senior/backend/API_EXAMPLES.md)
 - [SECURITY_OVERVIEW.md](/Users/pst./senior/backend/SECURITY_OVERVIEW.md)
 - [DEPLOY_RUNBOOK.md](/Users/pst./senior/backend/DEPLOY_RUNBOOK.md)
+- [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
 - [backend/postman/README.md](/Users/pst./senior/backend/postman/README.md)
 - [backend/postman/FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)
 
 ## Overview
 
 - Base URL: `/api/v1`
-- Authentication: Google OIDC login + app session cookie (`sci_session_token`)
+- Authentication: session-backed auth with Google OIDC identity rules; direct backend OIDC browser flow is legacy/direct mode
 - Allowed account domains: กำหนดผ่าน `OIDC_ALLOWED_DOMAINS`
 - Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`
 - Secure JSON endpoints ใช้ application-level encryption transport
 - `GET /api/v1/system/status` ใช้เป็น public liveness endpoint หลัก
-- `GET /api/v1/system/status/storage-signing` ใช้เป็น public smoke probe สำหรับ signed URL capability
+- `GET /api/v1/system/status/storage-signing` ใช้เป็น authenticated smoke probe สำหรับ signed URL capability
 - `GET /api/v1/system/status/details` ใช้เป็น authenticated detailed status endpoint สำหรับ internal QA/ops
 
 ## Security Posture Summary
@@ -37,7 +38,14 @@ Last updated: `2026-03-27`
 
 ## Authentication Flow
 
-flow ที่แนะนำ:
+flow ที่แนะนำสำหรับ production:
+
+1. browser เรียก frontend BFF
+2. frontend BFF เป็น owner ของ browser-facing login/session flow
+3. frontend BFF เรียก backend แบบ private server-to-server ตาม [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+4. backend ใช้ session-backed auth และ policy checks เดิมต่อ
+
+legacy/direct mode ที่ยังมีอยู่เพื่อ backward compatibility:
 
 1. frontend หรือ browser เปิด `GET /oidc/google/login?return_to=<frontend-url>`
 2. Google login เสร็จแล้ว redirect กลับ `GET /oidc/google/callback`
@@ -54,21 +62,22 @@ flow ที่แนะนำ:
   production ควรใช้ `FRONTEND_URL` เป็นหลัก
   และใช้ `FRONTEND_EXTRA_URLS` เป็น temporary dev/QA override เท่านั้น
 - Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:
-  `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`
+  `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback`
 - `POST /session/init` ตอนนี้ต้องมี OIDC-backed session ก่อนแล้ว
 - state-changing requests ที่ใช้ session cookie ต้องแนบ `x-csrf-token` ให้ตรงกับ token ปัจจุบัน
+- ถ้า deploy ด้วย `CLOUD_RUN_AUTH_MODE=private` route `GET /oidc/google/login` และ `GET /oidc/google/callback` จะถูก block เพื่อไม่ให้ direct browser flow ชนกับ private backend architecture
 
 ## Endpoint Matrix
 
 | Endpoint | Method | ต้อง Auth | ต้อง Encryption | คำอธิบาย |
 | --- | --- | --- | --- | --- |
 | `/api/v1/system/status` | `GET` | ไม่ต้อง | ไม่ต้อง | service liveness + high-level check status |
-| `/api/v1/system/status/storage-signing` | `GET` | ไม่ต้อง | ไม่ต้อง | smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้ |
+| `/api/v1/system/status/storage-signing` | `GET` | ต้อง | ไม่ต้อง | smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้ |
 | `/api/v1/system/status/details` | `GET` | ต้อง | ไม่ต้อง | detailed runtime/config status สำหรับ internal QA/ops |
 | `/auth/public-key` | `GET` | ไม่ต้อง | ไม่ต้อง | public key สำหรับ secure JSON |
 | `/auth/csrf-token` | `GET` | ต้อง | ไม่ต้อง | ดึง/refresh anti-CSRF token สำหรับ browser client |
-| `/oidc/google/login` | `GET` | ไม่ต้อง | ไม่ต้อง | เริ่ม Google OIDC login |
-| `/oidc/google/callback` | `GET` | ไม่ต้อง | ไม่ต้อง | backend callback หลัง Google login |
+| `/oidc/google/login` | `GET` | ไม่ต้อง | ไม่ต้อง | เริ่ม Google OIDC login ใน legacy/direct mode |
+| `/oidc/google/callback` | `GET` | ไม่ต้อง | ไม่ต้อง | backend callback หลัง Google login ใน legacy/direct mode |
 | `/oidc/me` | `GET` | ต้อง | ไม่ต้อง | อ่านสถานะ session และ identity ปัจจุบัน |
 | `/oidc/logout` | `POST` | ไม่ต้อง | ไม่ต้อง | ลบ app session cookie และ revoke session record |
 | `/session/init` | `POST` | ต้อง | ต้อง | bootstrap secure JSON flow/reuse session |
@@ -85,7 +94,7 @@ flow ที่แนะนำ:
 
 ### `GET /oidc/google/login`
 
-ใช้เริ่ม Google OIDC login
+ใช้เริ่ม Google OIDC login ใน legacy/direct mode
 
 query:
 
@@ -97,10 +106,11 @@ query:
   โดย `FRONTEND_URL` ควรเป็น production origin หลัก
   และ `FRONTEND_EXTRA_URLS` ควรใช้เป็น temporary dev/QA override เท่านั้น
 - backend จะสร้าง signed state และ nonce ก่อน redirect ไป Google
+- ถ้า backend อยู่ใน private BFF mode route นี้จะตอบ `409`
 
 ### `GET /oidc/google/callback`
 
-route callback ที่ Google redirect กลับมา
+route callback ที่ Google redirect กลับมาใน legacy/direct mode
 
 backend จะ:
 
@@ -110,6 +120,7 @@ backend จะ:
 - ตรวจ email domain และ hosted domain
 - สร้าง `sci_session_token` ใหม่สำหรับ authenticated app session
 - redirect กลับ `return_to` พร้อม `auth=ok` และ `oidc=done`
+- ถ้า backend อยู่ใน private BFF mode route นี้จะตอบ `409`
 
 ### `GET /oidc/me`
 
@@ -134,6 +145,7 @@ response ตัวอย่าง:
 
 - request ต้องมาจาก browser origin ที่อยู่ใน frontend allowlist
 - ต้องแนบ `x-csrf-token` ถ้าเรียกผ่าน session cookie จาก browser
+- route นี้รองรับทั้ง cookie auth เดิมและ trusted BFF auth ผ่าน `authMiddleware`
 - ใช้สำหรับทดสอบ negative-path ได้โดยเรียก `GET /oidc/me` ซ้ำหลัง logout
 
 response ตัวอย่าง:
@@ -161,7 +173,7 @@ response ตัวอย่าง:
 
 หมายเหตุ:
 
-- frontend ควรเรียก endpoint นี้หลัง `GET /oidc/me`
+- frontend ควรเรียก endpoint นี้หลัง `GET /oidc/me` ใน legacy/direct mode
 - token นี้ต้องถูกส่งกลับมาใน header `x-csrf-token`
 - ใช้กับทุก `POST`, `PUT`, `PATCH`, `DELETE` ที่อาศัย `sci_session_token`
 
@@ -177,6 +189,10 @@ response ตัวอย่าง:
 - ต้องมี anti-CSRF token ก่อน
 - ใช้ secure JSON transport
 - จะคืน `session_id` ที่ผูกกับระบบภายใน
+
+หมายเหตุ:
+
+- ใน private BFF mode endpoint นี้ควรถูกเรียกจาก frontend BFF เท่านั้น ไม่ควรเปิดให้ browser เรียก backend ตรง
 
 response ตัวอย่าง:
 

@@ -128,25 +128,26 @@
       <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
     </section>
     <h1>API Documentation</h1>
-<p>Version: `v1.9.4` Last updated: `2026-03-27`</p>
+<p>Version: `v1.9.4` Last updated: `2026-03-30`</p>
 <p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
 <p>เอกสารที่เกี่ยวข้อง:</p>
 <ul>
 <li>[API_EXAMPLES.md](/Users/pst./senior/backend/API_EXAMPLES.md)</li>
 <li>[SECURITY_OVERVIEW.md](/Users/pst./senior/backend/SECURITY_OVERVIEW.md)</li>
 <li>[DEPLOY_RUNBOOK.md](/Users/pst./senior/backend/DEPLOY_RUNBOOK.md)</li>
+<li>[BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)</li>
 <li>[backend/postman/README.md](/Users/pst./senior/backend/postman/README.md)</li>
 <li>[backend/postman/FRONTEND_INTEGRATION_GUIDE.md](/Users/pst./senior/backend/postman/FRONTEND_INTEGRATION_GUIDE.md)</li>
 </ul>
 <h2>Overview</h2>
 <ul>
 <li>Base URL: `/api/v1`</li>
-<li>Authentication: Google OIDC login + app session cookie (`sci_session_token`)</li>
+<li>Authentication: session-backed auth with Google OIDC identity rules; direct backend OIDC browser flow is legacy/direct mode</li>
 <li>Allowed account domains: กำหนดผ่าน `OIDC_ALLOWED_DOMAINS`</li>
 <li>Hosted domain enforcement: กำหนดผ่าน `OIDC_REQUIRE_HOSTED_DOMAIN`</li>
 <li>Secure JSON endpoints ใช้ application-level encryption transport</li>
 <li>`GET /api/v1/system/status` ใช้เป็น public liveness endpoint หลัก</li>
-<li>`GET /api/v1/system/status/storage-signing` ใช้เป็น public smoke probe สำหรับ signed URL capability</li>
+<li>`GET /api/v1/system/status/storage-signing` ใช้เป็น authenticated smoke probe สำหรับ signed URL capability</li>
 <li>`GET /api/v1/system/status/details` ใช้เป็น authenticated detailed status endpoint สำหรับ internal QA/ops</li>
 </ul>
 <h2>Security Posture Summary</h2>
@@ -161,7 +162,9 @@
 <li>secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด</li>
 </ul>
 <h2>Authentication Flow</h2>
-<p>flow ที่แนะนำ:</p>
+<p>flow ที่แนะนำสำหรับ production:</p>
+<p>1. browser เรียก frontend BFF 2. frontend BFF เป็น owner ของ browser-facing login/session flow 3. frontend BFF เรียก backend แบบ private server-to-server ตาม [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md) 4. backend ใช้ session-backed auth และ policy checks เดิมต่อ</p>
+<p>legacy/direct mode ที่ยังมีอยู่เพื่อ backward compatibility:</p>
 <p>1. frontend หรือ browser เปิด `GET /oidc/google/login?return_to=&lt;frontend-url&gt;` 2. Google login เสร็จแล้ว redirect กลับ `GET /oidc/google/callback` 3. backend verify Google identity และสร้าง `sci_session_token` 4. backend redirect กลับ frontend พร้อม `auth=ok` และ `oidc=done` 5. frontend เรียก `GET /oidc/me` ด้วย `credentials: &#39;include&#39;` 6. frontend เรียก `GET /auth/csrf-token` 7. จากนั้นค่อยเรียก `POST /session/init` และ endpoint อื่น</p>
 <p>ข้อสำคัญ:</p>
 <ul>
@@ -172,10 +175,11 @@
 <ul>
 <li>Google OAuth callback ควรยึด exact URI นี้เป็นหลัก:</li>
 </ul>
-<p>  `https://sci-request-system-466086429766.asia-southeast3.run.app/api/v1/oidc/google/callback`</p>
+<p>  `https://ai-formcheck-backend-&lt;project-number&gt;.asia-southeast3.run.app/api/v1/oidc/google/callback`</p>
 <ul>
 <li>`POST /session/init` ตอนนี้ต้องมี OIDC-backed session ก่อนแล้ว</li>
 <li>state-changing requests ที่ใช้ session cookie ต้องแนบ `x-csrf-token` ให้ตรงกับ token ปัจจุบัน</li>
+<li>ถ้า deploy ด้วย `CLOUD_RUN_AUTH_MODE=private` route `GET /oidc/google/login` และ `GET /oidc/google/callback` จะถูก block เพื่อไม่ให้ direct browser flow ชนกับ private backend architecture</li>
 </ul>
 <h2>Endpoint Matrix</h2>
 <table>
@@ -196,7 +200,7 @@
 <tr>
 <td>`/api/v1/system/status/storage-signing`</td>
 <td>`GET`</td>
-<td>ไม่ต้อง</td>
+<td>ต้อง</td>
 <td>ไม่ต้อง</td>
 <td>smoke probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้</td>
 </tr>
@@ -226,14 +230,14 @@
 <td>`GET`</td>
 <td>ไม่ต้อง</td>
 <td>ไม่ต้อง</td>
-<td>เริ่ม Google OIDC login</td>
+<td>เริ่ม Google OIDC login ใน legacy/direct mode</td>
 </tr>
 <tr>
 <td>`/oidc/google/callback`</td>
 <td>`GET`</td>
 <td>ไม่ต้อง</td>
 <td>ไม่ต้อง</td>
-<td>backend callback หลัง Google login</td>
+<td>backend callback หลัง Google login ใน legacy/direct mode</td>
 </tr>
 <tr>
 <td>`/oidc/me`</td>
@@ -315,7 +319,7 @@
 </tbody></table>
 <h2>OIDC Endpoints</h2>
 <h3>`GET /oidc/google/login`</h3>
-<p>ใช้เริ่ม Google OIDC login</p>
+<p>ใช้เริ่ม Google OIDC login ใน legacy/direct mode</p>
 <p>query:</p>
 <ul>
 <li>`return_to` optional แต่แนะนำให้ส่ง</li>
@@ -327,9 +331,10 @@
 <p>  โดย `FRONTEND_URL` ควรเป็น production origin หลัก   และ `FRONTEND_EXTRA_URLS` ควรใช้เป็น temporary dev/QA override เท่านั้น</p>
 <ul>
 <li>backend จะสร้าง signed state และ nonce ก่อน redirect ไป Google</li>
+<li>ถ้า backend อยู่ใน private BFF mode route นี้จะตอบ `409`</li>
 </ul>
 <h3>`GET /oidc/google/callback`</h3>
-<p>route callback ที่ Google redirect กลับมา</p>
+<p>route callback ที่ Google redirect กลับมาใน legacy/direct mode</p>
 <p>backend จะ:</p>
 <ul>
 <li>exchange authorization code</li>
@@ -338,6 +343,7 @@
 <li>ตรวจ email domain และ hosted domain</li>
 <li>สร้าง `sci_session_token` ใหม่สำหรับ authenticated app session</li>
 <li>redirect กลับ `return_to` พร้อม `auth=ok` และ `oidc=done`</li>
+<li>ถ้า backend อยู่ใน private BFF mode route นี้จะตอบ `409`</li>
 </ul>
 <h3>`GET /oidc/me`</h3>
 <p>response ตัวอย่าง:</p>
@@ -365,6 +371,7 @@
 <ul>
 <li>request ต้องมาจาก browser origin ที่อยู่ใน frontend allowlist</li>
 <li>ต้องแนบ `x-csrf-token` ถ้าเรียกผ่าน session cookie จาก browser</li>
+<li>route นี้รองรับทั้ง cookie auth เดิมและ trusted BFF auth ผ่าน `authMiddleware`</li>
 <li>ใช้สำหรับทดสอบ negative-path ได้โดยเรียก `GET /oidc/me` ซ้ำหลัง logout</li>
 </ul>
 <p>response ตัวอย่าง:</p>
@@ -392,7 +399,7 @@
 </code></pre>
 <p>หมายเหตุ:</p>
 <ul>
-<li>frontend ควรเรียก endpoint นี้หลัง `GET /oidc/me`</li>
+<li>frontend ควรเรียก endpoint นี้หลัง `GET /oidc/me` ใน legacy/direct mode</li>
 <li>token นี้ต้องถูกส่งกลับมาใน header `x-csrf-token`</li>
 <li>ใช้กับทุก `POST`, `PUT`, `PATCH`, `DELETE` ที่อาศัย `sci_session_token`</li>
 </ul>
@@ -405,6 +412,10 @@
 <li>ต้องมี anti-CSRF token ก่อน</li>
 <li>ใช้ secure JSON transport</li>
 <li>จะคืน `session_id` ที่ผูกกับระบบภายใน</li>
+</ul>
+<p>หมายเหตุ:</p>
+<ul>
+<li>ใน private BFF mode endpoint นี้ควรถูกเรียกจาก frontend BFF เท่านั้น ไม่ควรเปิดให้ browser เรียก backend ตรง</li>
 </ul>
 <p>response ตัวอย่าง:</p>
 <pre><code>

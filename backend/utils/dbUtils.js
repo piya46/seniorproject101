@@ -1,7 +1,7 @@
 const { Firestore } = require('@google-cloud/firestore');
 const crypto = require('crypto');
 
-const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || 'sessiondd';
+const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || 'ai-formcheck';
 const firestore = new Firestore({
     databaseId: FIRESTORE_DATABASE_ID
 });
