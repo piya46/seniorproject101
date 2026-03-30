@@ -358,6 +358,17 @@ response ตัวอย่าง:
 - signed URL สำหรับดาวน์โหลดไฟล์ที่ merge แล้วมีอายุสั้น โดย default คือ 15 นาที
 - backend อาจตอบ `413` ถ้าขนาดรวมของไฟล์ต้นฉบับเกินเพดานที่กำหนดไว้สำหรับการ merge
 
+## Upload Endpoint
+
+### `POST /upload`
+
+ข้อจำกัดและพฤติกรรมเพิ่มเติม:
+
+- จำกัดอัปโหลดครั้งละ 1 ไฟล์
+- ขนาดไฟล์อัปโหลดทั่วไปยังถูกคุมด้วย policy ของ backend
+- PDF มีเพดานขนาดที่เข้มกว่ารูปภาพสำหรับการ sanitize อย่างปลอดภัย
+- backend อาจตอบ `413` ถ้าไฟล์เกินเพดานที่ยอมรับได้หลัง verification/decryption
+
 ## Support Endpoint
 
 ### `POST /support/technical-email`

@@ -74,6 +74,11 @@ secure JSON endpoints:
 - `POST /upload`
 - `POST /support/technical-email`
 
+หมายเหตุสำหรับ `POST /upload`:
+
+- PDF มีเพดานขนาดที่เข้มกว่ารูปภาพเพื่อจำกัดความเสี่ยงด้าน memory/resource exhaustion
+- backend อาจตอบ `413` ถ้าไฟล์เกิน policy หลัง verification หรือหลัง decrypt แล้ว
+
 frontend ควรมี API client กลางที่รับผิดชอบ:
 
 - ดึง public key

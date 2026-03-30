@@ -18,10 +18,13 @@ const { addFileToSession, deleteFileRecord, getDecryptedSessionFiles } = require
 const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc } = require('../utils/fileSelection');
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 const { decryptEnvelopeKey } = require('../utils/cryptoUtils');
+const { getMaxPdfSourceBytes, getMaxUploadBytes } = require('../utils/uploadSecurity');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 const TEMP_UPLOAD_DIR = os.tmpdir();
+const maxUploadBytes = getMaxUploadBytes();
+const maxPdfSourceBytes = getMaxPdfSourceBytes();
 
 // Rate Limiter
 const uploadLimiter = createScopedLimiter('upload', {
@@ -37,7 +40,7 @@ const upload = multer({
           cb(null, `upload-${uuidv4()}${path.extname(file.originalname || '') || '.bin'}`)
   }),
   limits: { 
-      fileSize: 10 * 1024 * 1024, // 10MB
+      fileSize: maxUploadBytes,
       files: 1 
   }
 });
@@ -145,12 +148,45 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
     }
 
     const detectedType = await detector(verifiedInputPath);
+    const verifiedInputStat = await fsp.stat(verifiedInputPath);
+    const verifiedInputBytes = Number(verifiedInputStat.size || 0);
     
     const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     const ALLOWED_EXTS = ['jpg', 'png', 'webp', 'pdf'];
 
     if (!detectedType || !ALLOWED_EXTS.includes(detectedType.ext) || !ALLOWED_MIMES.includes(detectedType.mime)) {
         return res.status(400).json({ error: 'Invalid file signature or type.' });
+    }
+
+    if (verifiedInputBytes > maxUploadBytes) {
+        req.log?.warn('upload_source_limit_exceeded', {
+            mime_type: detectedType.mime,
+            source_bytes: verifiedInputBytes,
+            source_bytes_limit: maxUploadBytes
+        });
+        return res.status(413).json({
+            error: 'File too large',
+            message: 'Uploaded file exceeds the maximum allowed size after verification.',
+            data: {
+                source_bytes: verifiedInputBytes,
+                source_bytes_limit: maxUploadBytes
+            }
+        });
+    }
+
+    if (detectedType.mime === 'application/pdf' && verifiedInputBytes > maxPdfSourceBytes) {
+        req.log?.warn('upload_pdf_source_limit_exceeded', {
+            source_bytes: verifiedInputBytes,
+            source_bytes_limit: maxPdfSourceBytes
+        });
+        return res.status(413).json({
+            error: 'PDF too large',
+            message: 'PDF file exceeds the maximum allowed size for safe processing.',
+            data: {
+                source_bytes: verifiedInputBytes,
+                source_bytes_limit: maxPdfSourceBytes
+            }
+        });
     }
 
     // ... Process Upload ...
@@ -170,6 +206,16 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
             finalMimeType = 'image/jpeg';
             fileExtension = '.jpg';
         } else if (finalMimeType === 'application/pdf') {
+            if (verifiedInputBytes > maxPdfSourceBytes) {
+                return res.status(413).json({
+                    error: 'PDF too large',
+                    message: 'PDF file exceeds the maximum allowed size for safe processing.',
+                    data: {
+                        source_bytes: verifiedInputBytes,
+                        source_bytes_limit: maxPdfSourceBytes
+                    }
+                });
+            }
             const finalBuffer = await fsp.readFile(verifiedInputPath);
             const pdfDoc = await PDFDocument.load(finalBuffer, { ignoreEncryption: true });
             processedPath = path.join(TEMP_UPLOAD_DIR, `processed-${uuidv4()}.pdf`);
@@ -211,7 +257,8 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
         file_key,
         form_code: safeFormCode,
         mime_type: finalMimeType,
-        gcs_path: gcsPath
+        gcs_path: gcsPath,
+        source_bytes: verifiedInputBytes
     });
     res.json({ status: 'success', data: { file_key, form_code: safeFormCode } });
 
