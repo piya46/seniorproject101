@@ -19,8 +19,10 @@ Last updated: `2026-03-31`
 หมายเหตุด้าน policy ล่าสุด:
 
 - production ไม่ควรเปิด `ALLOW_BEARER_SESSION_TOKEN`
+- ถ้าเปิด `PFS_V2_ENABLED=true` protected JSON endpoints สามารถรับ envelope แบบ `v2` ได้
 - `POST /documents/merge` อาจตอบ `413` ถ้าขนาดรวมของ source files เกินเพดาน
 - `POST /upload` อาจตอบ `413` โดยเฉพาะกรณี PDF ที่เกินเพดาน sanitize ของ backend
+- `POST /upload` และ `POST /documents/merge` ตอนนี้ตอบ `202 queued` แล้ว client ต้อง poll job status ต่อ
 
 ## Base URL
 
@@ -218,6 +220,52 @@ print(response.text)
 ```bash
 curl -s https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/auth/public-key
 ```
+
+## 5. PFS V2 Handshake
+
+### cURL
+
+```bash
+curl -s https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v2/auth/handshake
+```
+
+หมายเหตุ:
+
+- route นี้จะคืน `404` ถ้า `PFS_V2_ENABLED=false`
+- frontend/BFF ต้องใช้ metadata นี้เพื่อ derive `request_key` และ `response_key` แยกกัน
+
+## 6. Async Upload Status
+
+หลัง `POST /upload` สำเร็จในโหมด async backend จะตอบ `202` พร้อม `job.id`
+
+### cURL
+
+```bash
+curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/upload/jobs/<job-id>
+```
+
+สถานะหลัก:
+
+- `queued`
+- `processing`
+- `succeeded`
+- `failed`
+
+## 7. Async Merge Status And Download
+
+หลัง `POST /documents/merge` backend จะตอบ `202` พร้อม `job.id`
+
+### cURL
+
+```bash
+curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/documents/jobs/<job-id>
+curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/documents/jobs/<job-id>/download
+```
+
+หมายเหตุ:
+
+- endpoint `/download` จะใช้ได้เมื่อ job อยู่ในสถานะ `succeeded`
+- signed URL มีอายุสั้นและควรใช้ทันที
 
 ### JavaScript
 

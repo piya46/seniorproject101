@@ -23,6 +23,7 @@ Last updated: `2026-03-31`
 8. จากนั้นค่อยเรียก `POST /session/init`
 9. endpoint ที่เปลี่ยน state ทุกตัวต้องส่ง header `x-csrf-token` ให้ตรงกับ token ปัจจุบัน
 10. ถ้าต้องอ่านข้อมูลส่วนตัวระดับเข้มขึ้น ให้ใช้ `POST /profile/details` ผ่าน secure JSON transport
+11. ถ้าเปิด `PFS_V2_ENABLED=true` ให้ frontend/BFF เริ่มด้วย `GET /api/v2/auth/handshake` แล้วค่อยส่ง protected JSON endpoints ด้วย envelope แบบ `v2`
 
 ## Legacy/Direct Mode
 
@@ -64,9 +65,17 @@ secure JSON endpoints:
 - `POST /documents/merge`
 - `POST /chat/recommend`
 
+ถ้าเปิด `PFS_V2_ENABLED=true`:
+
+- secure JSON endpoints ด้านบนสามารถใช้ envelope แบบ `v2` ได้
+- backend จะ derive `request_key` และ `response_key` แยกกัน
+- rollout ควรทำแบบ opt-in ฝั่ง frontend/BFF ก่อน ไม่ควร flip พร้อมกันทั้งหมดทันที
+
 หมายเหตุสำหรับ `POST /documents/merge`:
 
-- `download_url` ที่ได้กลับมาควรถูกใช้ทันที เพราะ signed URL มีอายุสั้นตาม policy ของ backend
+- route นี้จะตอบ `202 queued` พร้อม `job.id`
+- frontend ต้อง poll `GET /documents/jobs/:jobId`
+- เมื่อ job สำเร็จค่อยเรียก `GET /documents/jobs/:jobId/download`
 - backend อาจตอบ `413` ถ้าขนาดรวมของไฟล์ต้นฉบับเกินเพดานที่ระบบยอมรับ
 
 และ multipart endpoints ที่ต้องแนบ CSRF เช่นกัน:
@@ -76,8 +85,16 @@ secure JSON endpoints:
 
 หมายเหตุสำหรับ `POST /upload`:
 
+- route นี้จะตอบ `202 queued` พร้อม `job.id`
+- frontend ต้อง poll `GET /upload/jobs/:jobId` จน `status=succeeded`
 - PDF มีเพดานขนาดที่เข้มกว่ารูปภาพเพื่อจำกัดความเสี่ยงด้าน memory/resource exhaustion
 - backend อาจตอบ `413` ถ้าไฟล์เกิน policy หลัง verification หรือหลัง decrypt แล้ว
+
+หมายเหตุสำหรับ production BFF hardening:
+
+- ถ้าต้องการ tighten service identity เพิ่ม ให้เปิด `TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN=true`
+- frontend/BFF ต้องส่ง `x-bff-identity-token` ที่เป็น Google-signed identity token มาด้วย
+- ดู header contract เพิ่มเติมที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
 
 frontend ควรมี API client กลางที่รับผิดชอบ:
 

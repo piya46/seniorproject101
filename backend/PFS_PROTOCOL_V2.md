@@ -110,16 +110,28 @@ v2 ต้องยังคง replay protection เดิม และ bind ใ
 - server ephemeral key ต้องมีอายุสั้น
 - server ต้อง reject handshake metadata ที่หมดอายุ
 
+## Implementation Status
+
+ตอนนี้ backend ทำได้แล้ว:
+
+1. มี `GET /api/v2/auth/handshake`
+2. runtime รองรับทั้ง `v1` และ `v2`
+3. protected endpoints สามารถรับ envelope แบบ `v2`
+4. response ของ `v2` ใช้ `response_key` แยกจาก `request_key`
+
+สิ่งที่ยังเหลือ:
+
+1. frontend/BFF client rollout ใช้ `v2` จริง
+2. telemetry/metrics แยก `v1` กับ `v2`
+3. deprecate `v1` เมื่อ rollout ครบ
+
 ## Rollout Plan
 
 ลำดับ rollout ที่แนะนำ:
 
-1. เพิ่ม `protocol_version` negotiation ใน runtime
-2. เปิด endpoint handshake สำหรับ v2
-3. runtime รองรับทั้ง `v1` และ `v2`
-4. frontend/BFF client rollout ใช้ `v2` แบบ opt-in
-5. track metrics ว่า traffic `v2` ครบหรือยัง
-6. เมื่อมั่นใจแล้วค่อย deprecate `v1`
+1. frontend/BFF client rollout ใช้ `v2` แบบ opt-in
+2. track metrics ว่า traffic `v2` ครบหรือยัง
+3. เมื่อมั่นใจแล้วค่อย deprecate `v1`
 
 หลักสำคัญ:
 
@@ -145,9 +157,9 @@ v2 ต้องยังคง replay protection เดิม และ bind ใ
 
 ## Recommended Next Step
 
-ก่อน implement จริง ควรทำ:
+งานถัดไปที่แนะนำ:
 
 1. threat model addendum สำหรับ `v2`
-2. handshake transcript spec แบบ field-by-field
-3. client compatibility plan สำหรับ frontend/BFF
-4. telemetry plan สำหรับ dual-stack `v1` + `v2`
+2. client compatibility plan สำหรับ frontend/BFF
+3. telemetry plan สำหรับ dual-stack `v1` + `v2`
+4. deprecation criteria สำหรับปิด `v1`
