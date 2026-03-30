@@ -10,6 +10,7 @@ const SUB_COLLECTION_NAME = process.env.FIRESTORE_FILES_SUBCOLLECTION || 'files'
 const AI_USAGE_COLLECTION_NAME = 'AI_USAGE_DAILY';
 const DEFAULT_AI_USAGE_RETENTION_DAYS = 30;
 const DEFAULT_DB_KEY_VERSION = 'v1';
+const DB_ENCRYPTED_FILE_FIELDS = ['file_key', 'gcs_path', 'file_type', 'form_code'];
 
 const getAiUsageRetentionDays = () => {
     const parsed = Number.parseInt(String(process.env.AI_USAGE_RETENTION_DAYS || DEFAULT_AI_USAGE_RETENTION_DAYS), 10);
@@ -98,6 +99,95 @@ const parseEncryptedValue = (text) => {
     return null;
 };
 
+const getEncryptedFieldMigrationState = (value, targetVersion = getCurrentDbKeyVersion()) => {
+    if (value === null || typeof value === 'undefined') {
+        return {
+            hasValue: false,
+            isEncrypted: false,
+            keyVersion: null,
+            needsMigration: false,
+            isLegacyFormat: false
+        };
+    }
+
+    const parsed = parseEncryptedValue(value);
+    if (!parsed) {
+        return {
+            hasValue: true,
+            isEncrypted: false,
+            keyVersion: null,
+            needsMigration: false,
+            isLegacyFormat: false
+        };
+    }
+
+    const normalizedTargetVersion = normalizeDbKeyVersion(targetVersion);
+    const effectiveVersion = parsed.isLegacyFormat ? 'legacy' : parsed.keyVersion;
+
+    return {
+        hasValue: true,
+        isEncrypted: true,
+        keyVersion: effectiveVersion,
+        needsMigration: parsed.isLegacyFormat || parsed.keyVersion !== normalizedTargetVersion,
+        isLegacyFormat: parsed.isLegacyFormat
+    };
+};
+
+const getSessionFileMigrationPlan = (record = {}, targetVersion = getCurrentDbKeyVersion()) => {
+    const normalizedTargetVersion = normalizeDbKeyVersion(targetVersion);
+    const fieldStates = {};
+    let needsMigration = false;
+    let migratableFieldCount = 0;
+
+    for (const fieldName of DB_ENCRYPTED_FILE_FIELDS) {
+        const state = getEncryptedFieldMigrationState(record[fieldName], normalizedTargetVersion);
+        fieldStates[fieldName] = state;
+
+        if (state.isEncrypted) {
+            migratableFieldCount += 1;
+        }
+
+        if (state.needsMigration) {
+            needsMigration = true;
+        }
+    }
+
+    return {
+        targetVersion: normalizedTargetVersion,
+        needsMigration,
+        migratableFieldCount,
+        fieldStates
+    };
+};
+
+const reencryptSessionFileRecord = (record = {}, options = {}) => {
+    const targetVersion = normalizeDbKeyVersion(options.targetVersion || getCurrentDbKeyVersion());
+    const nextRecord = {};
+
+    for (const fieldName of DB_ENCRYPTED_FILE_FIELDS) {
+        const value = record[fieldName];
+
+        if (value === null || typeof value === 'undefined') {
+            nextRecord[fieldName] = value ?? null;
+            continue;
+        }
+
+        const decryptedValue = decryptData(value, options.sourceKeyBuffer || null);
+        if (decryptedValue === null) {
+            throw new Error(`Unable to decrypt field "${fieldName}" during DB encryption migration.`);
+        }
+
+        nextRecord[fieldName] = encryptData(decryptedValue, options.targetKeyBuffer || null, {
+            keyVersion: targetVersion
+        });
+    }
+
+    nextRecord.encryption_key_version = targetVersion;
+    nextRecord.updated_at = new Date().toISOString();
+
+    return nextRecord;
+};
+
 const encryptData = (text, keyBuffer = null, options = {}) => {
     if (!text) return text;
     try {
@@ -161,6 +251,7 @@ exports.addFileToSession = async (sessionId, fileMeta) => {
         gcs_path: encryptData(fileMeta.gcs_path),
         file_type: encryptData(fileMeta.file_type),
         form_code: encryptData(fileMeta.form_code), // เพิ่ม field form_code
+        encryption_key_version: getCurrentDbKeyVersion(),
         uploaded_at: new Date().toISOString()
     };
     await filesCollRef.add(encryptedFile);
@@ -407,5 +498,11 @@ exports.AI_USAGE_COLLECTION_NAME = AI_USAGE_COLLECTION_NAME;
 exports.getAiUsageRetentionDays = getAiUsageRetentionDays;
 exports.getCurrentDbKeyVersion = getCurrentDbKeyVersion;
 exports.getDbKeyByVersion = getDbKeyByVersion;
+exports.DB_ENCRYPTED_FILE_FIELDS = DB_ENCRYPTED_FILE_FIELDS;
+exports.normalizeDbKeyVersion = normalizeDbKeyVersion;
+exports.parseEncryptedValue = parseEncryptedValue;
+exports.getEncryptedFieldMigrationState = getEncryptedFieldMigrationState;
+exports.getSessionFileMigrationPlan = getSessionFileMigrationPlan;
+exports.reencryptSessionFileRecord = reencryptSessionFileRecord;
 exports.encryptData = encryptData;
 exports.decryptData = decryptData;

@@ -8,6 +8,8 @@
     "test": "node --test tests/*.test.js",
     "test:security": "node --test tests/securityMiddleware.test.js tests/validationMiddleware.test.js",
     "test:support": "node --test tests/supportRoutes.test.js",
+    "db:migrate:versioning:dry-run": "node scripts/migrateDbEncryptionVersioning.js --dry-run",
+    "db:migrate:versioning:write": "node scripts/migrateDbEncryptionVersioning.js --write",
     "docs:build": "node scripts/buildDocs.js",
     "docs:api:sync": "node scripts/syncApiDocumentationFromPostman.js",
     "docs:api:printable": "node scripts/buildPrintableApiDocs.js",

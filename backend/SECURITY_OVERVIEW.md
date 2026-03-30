@@ -136,6 +136,7 @@ AI usage รายวันถูกเก็บใน Firestore collection `AI_
 
 ข้อมูลที่เข้ารหัสระดับแอปใน Firestore ใช้ format แบบ versioned สำหรับข้อมูลใหม่แล้วในลักษณะ `vN:iv:ciphertext:authTag`
 โดย runtime ยังคง decrypt ข้อมูล legacy format เดิม (`iv:ciphertext:authTag`) ได้เพื่อรองรับ backward compatibility ระหว่างช่วง migration
+และฝั่ง operator มี script สำหรับ dry-run / write migration อยู่ที่ [migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js)
 
 ข้อมูลที่เก็บไม่ได้มีแค่ token รวม แต่รวม context สำหรับ analytics ด้วย เช่น `degree_levels`, `form_codes`, `success_count`, `failure_count`, และ `last_failure_reason`
 
@@ -268,6 +269,22 @@ FRONTEND_EXTRA_URLS=
 - `TRUSTED_BFF_AUTH_ENABLED=true`
 - Google OIDC credentials เก็บใน Secret Manager
 - trusted BFF shared secret เก็บใน Secret Manager
+
+## DB Encryption Migration Notes
+
+ถ้าจะหมุน DB encryption key ในอนาคต ให้ใช้แนวทางนี้:
+
+1. เพิ่ม key version ใหม่เข้า runtime ก่อน เช่น `DB_ENCRYPTION_KEY_V2`
+2. คง `DB_ENCRYPTION_KEY_VERSION` เดิมไว้ระหว่าง migration
+3. ใช้ script migration แบบ dry-run เพื่อนับ backlog ของ legacy / old-version docs
+4. ใช้ write mode เพื่อ re-encrypt fields ให้เป็น version ใหม่
+5. ตรวจว่า legacy backlog เหลือศูนย์ก่อนค่อย flip default version
+
+เหตุผลที่ต้องทำตามลำดับนี้:
+
+- legacy payload เดิมไม่มี KID
+- runtime จึงต้องอาศัย current DB key ในการถอดรหัส legacy docs
+- ถ้า flip default เร็วเกินไป legacy docs อาจ decrypt ไม่ผ่านจนกระทบ file lookup และ merge flows
 
 ## Summary
 

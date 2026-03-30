@@ -37,6 +37,7 @@ Last updated: `2026-03-31`
 - endpoint ธุรกิจหลักยังต้องผ่าน session-based auth
 - secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด
 - DB field encryption สำหรับข้อมูลใหม่ใช้ format แบบ versioned (`vN:iv:ciphertext:authTag`) และ backend ยังอ่าน legacy format เดิมได้
+- operator สามารถใช้ [migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js) เพื่อ dry-run / migrate legacy DB records ก่อน flip `DB_ENCRYPTION_KEY_VERSION`
 
 ## Authentication Flow
 

@@ -205,6 +205,52 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - ถ้ายังต้องการรองรับ legacy/direct mode ค่อยเพิ่ม backend callback `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback` แยกอีกตัว
 - ถ้าจะเปิด `TRUSTED_BFF_AUTH_ENABLED=true` ควรสร้าง shared secret แบบสุ่มยาวและเก็บเฉพาะใน Secret Manager เท่านั้น
 
+## DB Encryption Key Rotation And Migration
+
+runtime ปัจจุบันรองรับ mixed mode ดังนี้:
+
+- ข้อมูลใหม่จะถูกเขียนเป็น `vN:iv:ciphertext:authTag`
+- ข้อมูล legacy เดิมยังอ่านได้ในรูป `iv:ciphertext:authTag`
+- script migration สำหรับย้ายเอกสารเก่าอยู่ที่ [scripts/migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js)
+
+ข้อสำคัญ:
+
+- legacy format ไม่มี KID ติดอยู่ใน payload
+- ดังนั้นช่วง migration legacy decrypt จะยังอาศัย `DB_ENCRYPTION_KEY` เดิม
+- อย่าเพิ่ง flip `DB_ENCRYPTION_KEY_VERSION` ไป version ใหม่ จนกว่าจะ migrate backlog ของ legacy เสร็จ
+
+ลำดับงานที่แนะนำ:
+
+1. สร้าง key ใหม่ เช่น `DB_ENCRYPTION_KEY_V2`
+2. deploy runtime ที่รู้จัก key ใหม่แล้ว แต่ยังคง `DB_ENCRYPTION_KEY_VERSION=v1`
+3. รัน dry-run เพื่อนับ backlog
+4. รัน write mode เพื่อ re-encrypt เอกสารเก่าให้เป็น `v2:*`
+5. ตรวจว่ากลุ่ม legacy เหลือ `0`
+6. ค่อย update `DB_ENCRYPTION_KEY_VERSION=v2` และ deploy อีกรอบ
+7. เก็บ observation ช่วงหนึ่งก่อนค่อยถอด key เก่าออก
+
+ตัวอย่างคำสั่ง:
+
+```bash
+cd /Users/pst./senior/backend
+npm run db:migrate:versioning:dry-run
+```
+
+```bash
+cd /Users/pst./senior/backend
+node scripts/migrateDbEncryptionVersioning.js --write --target-version=v2 --batch-size=100 --max-docs=all
+```
+
+รองรับ option สำคัญ:
+
+- `--dry-run` สแกนอย่างเดียว ไม่เขียน Firestore
+- `--write` เขียนข้อมูลที่ต้อง migrate
+- `--target-version=v2` ระบุ version ปลายทาง
+- `--batch-size=100` กำหนดขนาดต่อ batch
+- `--max-docs=1000` จำกัดจำนวนเอกสารต่อรอบ
+- `--session-id=<id>` จำกัดเฉพาะ session เดียว
+- `--start-after-path=SESSION/<sessionId>/files/<docId>` ใช้ resume ต่อจาก cursor เดิม
+
 ## Optional Deploy Flags
 
 ค่าพวกนี้ไม่จำเป็นสำหรับ production ปกติ แต่ `deploy.sh` รองรับและอาจมีประโยชน์ในบางรอบ deploy:
