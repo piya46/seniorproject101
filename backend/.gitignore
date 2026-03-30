@@ -40,4 +40,3 @@ coverage/
 
 # Local temp files
 temp_files/
-backend/deploy.sh
