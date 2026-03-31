@@ -75,6 +75,21 @@ const buildQueueInfo = (aheadCount) => ({
     estimated_wait_tier: buildEstimatedWaitTier(aheadCount)
 });
 
+const deriveBatchDocumentJobStatus = ({ succeeded = 0, failed = 0 } = {}) => {
+    const normalizedSucceeded = Number.isFinite(Number(succeeded)) ? Number(succeeded) : 0;
+    const normalizedFailed = Number.isFinite(Number(failed)) ? Number(failed) : 0;
+
+    if (normalizedFailed > 0 && normalizedSucceeded > 0) {
+        return DOCUMENT_JOB_STATUSES.PARTIAL_FAILED;
+    }
+
+    if (normalizedFailed > 0 && normalizedSucceeded === 0) {
+        return DOCUMENT_JOB_STATUSES.FAILED;
+    }
+
+    return DOCUMENT_JOB_STATUSES.SUCCEEDED;
+};
+
 const sanitizeDocumentJobForResponse = (job) => {
     if (!job) {
         return null;
@@ -294,6 +309,7 @@ module.exports = {
     DOCUMENT_JOB_TYPES,
     buildAheadCountBucket,
     buildQueueInfo,
+    deriveBatchDocumentJobStatus,
     buildDocumentJobResponse,
     sanitizeDocumentJobForResponse,
     createDocumentJob,

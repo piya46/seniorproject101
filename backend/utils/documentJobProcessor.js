@@ -16,7 +16,11 @@ const { getDocumentAvScanMode } = require('./documentAvConfig');
 const { scanDocumentFile } = require('./documentAvScan');
 const { decryptDocumentIntakeToFile } = require('./documentIntakeEncryption');
 const { baseLog } = require('./logger');
-const { DOCUMENT_JOB_STATUSES, DOCUMENT_JOB_TYPES } = require('./documentJobs');
+const {
+    DOCUMENT_JOB_STATUSES,
+    DOCUMENT_JOB_TYPES,
+    deriveBatchDocumentJobStatus
+} = require('./documentJobs');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -263,12 +267,10 @@ const processPrepareSessionDocumentsJob = async (job) => {
         }
     }
 
-    let aggregateStatus = DOCUMENT_JOB_STATUSES.SUCCEEDED;
-    if (failed > 0 && succeeded > 0) {
-        aggregateStatus = DOCUMENT_JOB_STATUSES.PARTIAL_FAILED;
-    } else if (failed > 0 && succeeded === 0) {
-        aggregateStatus = DOCUMENT_JOB_STATUSES.FAILED;
-    }
+    const aggregateStatus = deriveBatchDocumentJobStatus({
+        succeeded,
+        failed
+    });
 
     return {
         __job_status: aggregateStatus,

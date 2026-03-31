@@ -161,7 +161,7 @@
 <li>backend regenerate `session_id` ใหม่หลัง OIDC login callback</li>
 <li>`POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist</li>
 <li>endpoint ธุรกิจหลักยังต้องผ่าน session-based auth</li>
-<li>upload sanitize และ document merge ทำงานแบบ async job แล้ว โดย API หลักจะ enqueue งานและให้ client poll status</li>
+<li>document preparation และ document merge ทำงานแบบ async job แล้ว โดย API หลักจะ stage upload ก่อน และจะ enqueue งานเมื่อถึงขั้น validation/merge</li>
 <li>secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด</li>
 <li>เมื่อเปิด `PFS_V2_ENABLED=true` protected JSON endpoints สามารถรับ envelope แบบ `v2` ได้ด้วย โดย `securityMiddleware` จะ derive request/response keys แยกกัน</li>
 <li>raw intake object ของ upload async flow ถูกเข้ารหัสระดับแอปด้วย KMS envelope encryption ก่อนเก็บลง GCS และ worker จะถอดรหัสเฉพาะตอนประมวลผล</li>
@@ -337,21 +337,21 @@
 <td>`POST multipart/form-data`</td>
 <td>ต้อง</td>
 <td>ไม่ใช้ secure JSON wrapper</td>
-<td>รับไฟล์และ enqueue sanitize/upload job</td>
+<td>รับไฟล์และ stage ไว้แบบปลอดภัยก่อนตรวจสอบ</td>
 </tr>
 <tr>
 <td>`/upload/jobs/:jobId`</td>
 <td>`GET`</td>
 <td>ต้อง</td>
 <td>ไม่ต้อง</td>
-<td>อ่านสถานะ upload sanitize job</td>
+<td>อ่านสถานะ document preparation job สำหรับ upload/validation flow</td>
 </tr>
 <tr>
 <td>`/validation/check-completeness`</td>
 <td>`POST`</td>
 <td>ต้อง</td>
 <td>ต้อง</td>
-<td>ตรวจเอกสาร</td>
+<td>ตรวจเอกสาร และ enqueue batch preparation job เมื่อไฟล์ยังไม่พร้อม</td>
 </tr>
 <tr>
 <td>`/documents/merge`</td>
@@ -402,10 +402,10 @@
 </ul>
 <h2>Async Document Jobs</h2>
 <p>flow ใหม่สำหรับงานหนัก:</p>
-<p>1. `POST /upload` ตอบ `202` พร้อม `job.id` 2. client poll `GET /upload/jobs/:jobId` จน `status=succeeded` 3. เมื่อไฟล์พร้อมแล้วค่อยเรียก validation หรือ merge 4. `POST /documents/merge` ตอบ `202` พร้อม `job.id` 5. client poll `GET /documents/jobs/:jobId` 6. เมื่อ `status=succeeded` ให้เรียก `GET /documents/jobs/:jobId/download`</p>
+<p>1. `POST /upload` ตอบ `200 success` พร้อม staged file metadata 2. ตอนกด `POST /validation/check-completeness` ถ้าไฟล์ยังไม่พร้อม backend จะตอบ `202 queued` พร้อม batch `job` 3. client poll `GET /upload/jobs/:jobId` จน `status=succeeded` หรือ `status=partial_failed` 4. เมื่อ prepare job สำเร็จ backend จะตรวจ validation ต่อ 5. `POST /documents/merge` ตอบ `202 queued` พร้อม `job.id` 6. client poll `GET /documents/jobs/:jobId` 7. เมื่อ `status=succeeded` ให้เรียก `GET /documents/jobs/:jobId/download`</p>
 <p>หมายเหตุด้าน operation:</p>
 <ul>
-<li>backend จะ enqueue job อย่างเดียว</li>
+<li>backend จะ stage upload ทันที และ enqueue job ตอน validation/merge เฉพาะส่วนที่ต้องประมวลผลหนัก</li>
 <li>worker service จะเป็นคน claim งานจาก `DOCUMENT_JOBS`</li>
 <li>raw intake files ของ upload job จะถูกลบทิ้งทั้งกรณีสำเร็จและล้มเหลว เพื่อลด object leakage</li>
 <li>ถ้าเปิด AV scan แบบ `required` งานจะ fail ด้วย `422` เมื่อ scanner ระบุว่าไฟล์ไม่ clean และจะ fail ด้วย `503` ถ้า scanner ใช้งานไม่ได้</li>
@@ -727,6 +727,8 @@
 <li>ขนาดไฟล์อัปโหลดทั่วไปยังถูกคุมด้วย policy ของ backend</li>
 <li>PDF มีเพดานขนาดที่เข้มกว่ารูปภาพสำหรับการ sanitize อย่างปลอดภัย</li>
 <li>backend อาจตอบ `413` ถ้าไฟล์เกินเพดานที่ยอมรับได้หลัง verification/decryption</li>
+<li>route นี้จะ stage ไฟล์ไว้ก่อนและตอบ `200 success`</li>
+<li>document preparation job จะถูกสร้างตอน `POST /validation/check-completeness` ถ้าไฟล์ยังไม่อยู่ในสถานะ `ready`</li>
 </ul>
 <h2>Support Endpoint</h2>
 <h3>`POST /support/technical-email`</h3>

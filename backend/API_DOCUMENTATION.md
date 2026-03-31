@@ -36,7 +36,7 @@ Last updated: `2026-03-31`
 - backend regenerate `session_id` ใหม่หลัง OIDC login callback
 - `POST /oidc/logout` จะลบทั้ง cookie และ session record ฝั่ง server และจะรับเฉพาะ browser origin ที่อยู่ใน frontend allowlist
 - endpoint ธุรกิจหลักยังต้องผ่าน session-based auth
-- upload sanitize และ document merge ทำงานแบบ async job แล้ว โดย API หลักจะ enqueue งานและให้ client poll status
+- document preparation และ document merge ทำงานแบบ async job แล้ว โดย API หลักจะ stage upload ก่อน และจะ enqueue งานเมื่อถึงขั้น validation/merge
 - secure JSON encryption layer เดิมยังอยู่สำหรับ `POST` JSON ที่กำหนด
 - เมื่อเปิด `PFS_V2_ENABLED=true` protected JSON endpoints สามารถรับ envelope แบบ `v2` ได้ด้วย โดย `securityMiddleware` จะ derive request/response keys แยกกัน
 - raw intake object ของ upload async flow ถูกเข้ารหัสระดับแอปด้วย KMS envelope encryption ก่อนเก็บลง GCS และ worker จะถอดรหัสเฉพาะตอนประมวลผล
