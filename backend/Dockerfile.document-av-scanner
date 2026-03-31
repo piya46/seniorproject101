@@ -16,7 +16,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV TMPDIR=/tmp
+ENV PORT=8080
 
 COPY --from=build --chown=nonroot:nonroot /workspace /app
 
-CMD ["services/document-av-scanner/index.js"]
+EXPOSE 8080
+
+CMD ["/app/services/document-av-scanner/index.js"]

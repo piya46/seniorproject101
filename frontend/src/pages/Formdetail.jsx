@@ -6,6 +6,20 @@ import Footer from './Footer'
 import { encryptAndKeepKey, decryptResponse } from './crypto' 
 import { ensureAuthenticatedOrRedirect } from '../lib/auth'
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const parseApiResponse = (data) => (typeof data === 'string' ? JSON.parse(data) : data);
+
+const buildCachedUploadedFiles = (files) =>
+  Object.keys(files).reduce((acc, key) => {
+    acc[key] = {
+      name: files[key].name,
+      uploaded: Boolean(files[key].uploaded),
+      mimeType: files[key].mimeType || null
+    };
+    return acc;
+  }, {});
+
 export default function Formdetail() {
   const { id } = useParams(); 
   const navigate = useNavigate();
@@ -116,13 +130,67 @@ export default function Formdetail() {
         validateStatus: (status) => status < 500 
       });
 
-      const responseData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+      const responseData = parseApiResponse(res.data);
 
-      if (responseData?.status !== 'success') {
-        throw new Error("Upload failed on server");
+      const legacyUploadData = responseData?.data || responseData;
+      if (res.status === 200 && responseData?.status === 'success') {
+        const pathOrKey = legacyUploadData?.file_key || docKey;
+
+        setUploadStatuses(prev => ({ ...prev, [index]: { progress: 100, status: 'success' } }));
+
+        setUploadedFiles(prev => {
+          const updated = {
+            ...prev,
+            [index]: {
+              name: file.name,
+              localUrl: localBlobUrl,
+              uploaded: true,
+              fileKey: pathOrKey,
+              formCode: formData.form_code || id,
+              mimeType: file.type || null
+            }
+          };
+
+          const cacheData = buildCachedUploadedFiles(updated);
+          sessionStorage.setItem(`uploaded_files_${id}`, JSON.stringify(cacheData));
+
+          return updated;
+        });
+
+        return;
       }
 
-      const pathOrKey = responseData?.data?.file_key || docKey;
+      if (res.status !== 202 || responseData?.status !== 'queued' || !responseData?.job?.id) {
+        throw new Error(responseData?.message || responseData?.error || "Upload queueing failed on server");
+      }
+
+      const jobId = responseData.job.id;
+      setUploadStatuses(prev => ({ ...prev, [index]: { progress: 100, status: 'processing' } }));
+
+      let uploadJob = null;
+      for (let attempt = 0; attempt < 120; attempt += 1) {
+        const jobRes = await axios.get(`/api/v1/upload/jobs/${jobId}`, {
+          validateStatus: (status) => status < 500
+        });
+        const jobData = parseApiResponse(jobRes.data);
+        uploadJob = jobData?.job || null;
+
+        if (uploadJob?.status === 'succeeded') {
+          break;
+        }
+
+        if (uploadJob?.status === 'failed') {
+          throw new Error(uploadJob?.error?.message || 'Upload processing failed on server');
+        }
+
+        await sleep(1000);
+      }
+
+      if (!uploadJob || uploadJob.status !== 'succeeded') {
+        throw new Error('Upload processing timed out. Please try again.');
+      }
+
+      const uploadResult = uploadJob.result || {};
 
       setUploadStatuses(prev => ({ ...prev, [index]: { progress: 100, status: 'success' } }));
 
@@ -132,15 +200,14 @@ export default function Formdetail() {
           [index]: {
             name: file.name,
             localUrl: localBlobUrl,
-            view_url: `/api/v1/documents/view?path=${pathOrKey}`, 
-            gcs_path: pathOrKey 
+            uploaded: true,
+            fileKey: uploadResult.file_key || docKey,
+            formCode: uploadResult.form_code || formData.form_code || id,
+            mimeType: uploadResult.mime_type || file.type || null
           }
         };
 
-        const cacheData = Object.keys(updated).reduce((acc, key) => {
-          acc[key] = { name: updated[key].name, view_url: updated[key].view_url, gcs_path: updated[key].gcs_path };
-          return acc;
-        }, {});
+        const cacheData = buildCachedUploadedFiles(updated);
         sessionStorage.setItem(`uploaded_files_${id}`, JSON.stringify(cacheData));
 
         return updated;
@@ -157,10 +224,7 @@ export default function Formdetail() {
     setUploadedFiles(prev => {
       const newFiles = { ...prev };
       delete newFiles[index];
-      const cacheData = Object.keys(newFiles).reduce((acc, key) => {
-        acc[key] = { name: newFiles[key].name, view_url: newFiles[key].view_url, gcs_path: newFiles[key].gcs_path };
-        return acc;
-      }, {});
+      const cacheData = buildCachedUploadedFiles(newFiles);
       sessionStorage.setItem(`uploaded_files_${id}`, JSON.stringify(cacheData));
       return newFiles;
     });
@@ -274,16 +338,14 @@ export default function Formdetail() {
       const mergePayload = {
         form_code: formData.form_code || id,
         degree_level: degreeLevel,
-        sub_type: subType || null,
-        department_id: formData.department_id || "central",
-        gcs_paths: Object.values(uploadedFiles).map(file => file.gcs_path).filter(Boolean)
+        sub_type: subType || null
       };
 
       const { requestPayload, aesKeyRaw } = await encryptAndKeepKey(mergePayload, publicKey);
       
       const res = await axios.post('/api/v1/documents/merge', requestPayload, reqConfig);
       
-      let responseData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+      let responseData = parseApiResponse(res.data);
       
       let encryptedPkg = null;
       if (responseData.payload && responseData.iv) {
@@ -302,12 +364,53 @@ export default function Formdetail() {
       }
 
       const mergeData = responseData?.data || responseData;
+
+      if (res.status === 200 && responseData?.status !== 'error' && !mergeData?.error) {
+        setMergeResult(mergeData);
+        return;
+      }
       
-      if (responseData?.status === 'error' || mergeData.error) {
-         throw new Error(mergeData.user_message || mergeData.message || mergeData.error || "เกิดข้อผิดพลาดจากการรวมไฟล์");
+      if (res.status !== 202 || mergeData?.status !== 'queued' || !mergeData?.job?.id) {
+         throw new Error(mergeData?.user_message || mergeData?.message || mergeData?.error || "เกิดข้อผิดพลาดจากการเริ่มรวมไฟล์");
       }
 
-      setMergeResult(mergeData);
+      const jobId = mergeData.job.id;
+      let mergeJob = null;
+      for (let attempt = 0; attempt < 120; attempt += 1) {
+        const jobRes = await axios.get(`/api/v1/documents/jobs/${jobId}`, {
+          validateStatus: (status) => status < 500
+        });
+        const jobData = parseApiResponse(jobRes.data);
+        mergeJob = jobData?.job || null;
+
+        if (mergeJob?.status === 'succeeded') {
+          break;
+        }
+
+        if (mergeJob?.status === 'failed') {
+          throw new Error(mergeJob?.error?.message || 'Document merge failed on server');
+        }
+
+        await sleep(1000);
+      }
+
+      if (!mergeJob || mergeJob.status !== 'succeeded') {
+        throw new Error('Document merge timed out. Please try again.');
+      }
+
+      const downloadRes = await axios.get(`/api/v1/documents/jobs/${jobId}/download`, {
+        validateStatus: (status) => status < 500
+      });
+      const downloadData = parseApiResponse(downloadRes.data);
+
+      if (downloadRes.status !== 200 || downloadData?.status !== 'success' || !downloadData?.download_url) {
+        throw new Error(downloadData?.message || downloadData?.error || 'Merged file is not ready for download');
+      }
+
+      setMergeResult({
+        ...(mergeJob.result || {}),
+        ...downloadData
+      });
 
     } catch (err) {
       console.error("Merge API Error:", err.response?.data || err.message);
@@ -473,15 +576,24 @@ export default function Formdetail() {
                             {uploadStatuses[index]?.status === 'success' ? (
                               <>
                                 <div className="flex items-center gap-2">
-                                  <a 
-                                    href={uploadedFiles[index].localUrl || uploadedFiles[index].view_url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-black font-medium truncate cursor-pointer hover:underline"
-                                    title="คลิกเพื่อดูเอกสาร"
-                                  >
-                                    {uploadedFiles[index].name}
-                                  </a>
+                                  {uploadedFiles[index].localUrl ? (
+                                    <a 
+                                      href={uploadedFiles[index].localUrl} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-black font-medium truncate cursor-pointer hover:underline"
+                                      title="คลิกเพื่อดูเอกสาร"
+                                    >
+                                      {uploadedFiles[index].name}
+                                    </a>
+                                  ) : (
+                                    <span
+                                      className="text-black font-medium truncate"
+                                      title="อัปโหลดสำเร็จแล้ว แต่ต้องเลือกไฟล์ใหม่หากต้องการพรีวิวหลังรีเฟรชหน้า"
+                                    >
+                                      {uploadedFiles[index].name}
+                                    </span>
+                                  )}
                                   
                                   {validationResults[doc.key]?.status === 'valid' && (
                                     <svg className="w-5 h-5 text-[#22C55E] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -503,6 +615,12 @@ export default function Formdetail() {
                                   {uploadStatuses[index].progress}%
                                 </span>
                               </div>
+                            )}
+
+                            {uploadStatuses[index]?.status === 'processing' && (
+                              <p className="text-[#777777] text-base mt-1">
+                                อัปโหลดแล้ว กำลังประมวลผลเอกสาร...
+                              </p>
                             )}
 
                             {uploadStatuses[index]?.status === 'error' && (
@@ -579,7 +697,7 @@ export default function Formdetail() {
                         {mergeResult.instruction && (
                            <>
                              <p className="mt-2">ส่งอีเมลไปที่: {mergeResult.instruction.target_email}</p>
-                             <p className="mt-2">หัวข้ออีเมล: {mergeResult.instruction.email_subject_suggestion}</p>
+                             <p className="mt-2">หัวข้ออีเมล: {mergeResult.instruction.email_subject}</p>
                            </>
                         )}
                       </div>

@@ -939,11 +939,6 @@ ensure_document_av_scanner_source_exists() {
         echo -e "${RED}❌ Document AV scanner source is incomplete: $SCRIPT_DIR/services/document-av-scanner${NC}"
         exit 1
     fi
-
-    if [ ! -f "$SCRIPT_DIR/Dockerfile.document-av-scanner" ] || [ ! -f "$SCRIPT_DIR/cloudbuild.document-av-scanner.yaml" ]; then
-        echo -e "${RED}❌ Document AV scanner build files are incomplete in $SCRIPT_DIR${NC}"
-        exit 1
-    fi
 }
 
 ensure_document_job_worker_artifact_repository() {
@@ -1032,13 +1027,10 @@ deploy_document_job_worker_service() {
 deploy_document_av_scanner_service() {
     local TARGET_REGION=$1
 
-    ensure_document_av_scanner_artifact_repository
-    build_document_av_scanner_image
-
     gcloud run deploy "$DOCUMENT_AV_SCANNER_SERVICE_NAME" \
         --project "$PROJECT_ID" \
         --region "$TARGET_REGION" \
-        --image "$DOCUMENT_AV_SCANNER_IMAGE_URI" \
+        --source "$SCRIPT_DIR/services/document-av-scanner" \
         --port 8080 \
         --ingress all \
         --no-allow-unauthenticated \

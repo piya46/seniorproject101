@@ -12,6 +12,7 @@ const PORT = Number.parseInt(process.env.PORT || '8080', 10);
 const BACKEND_URL = String(process.env.BACKEND_URL || '').trim().replace(/\/+$/, '');
 const TRUSTED_BFF_SHARED_SECRET = String(process.env.TRUSTED_BFF_SHARED_SECRET || '').trim();
 const TRUSTED_BFF_AUTH_HEADER_NAME = String(process.env.TRUSTED_BFF_AUTH_HEADER_NAME || 'x-bff-auth').trim();
+const TRUSTED_BFF_IDENTITY_TOKEN_HEADER = String(process.env.TRUSTED_BFF_IDENTITY_TOKEN_HEADER || 'x-bff-identity-token').trim();
 const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 const MIME_TYPES = {
@@ -206,6 +207,7 @@ function buildProxyHeaders(req, idToken) {
   }
 
   headers.set('Authorization', `Bearer ${idToken}`);
+  headers.set(TRUSTED_BFF_IDENTITY_TOKEN_HEADER, idToken);
 
   if (TRUSTED_BFF_SHARED_SECRET) {
     headers.set(TRUSTED_BFF_AUTH_HEADER_NAME, TRUSTED_BFF_SHARED_SECRET);
@@ -230,6 +232,7 @@ function buildBffRequestHeaders(req, idToken) {
   const headers = new Headers({
     Authorization: `Bearer ${idToken}`
   });
+  headers.set(TRUSTED_BFF_IDENTITY_TOKEN_HEADER, idToken);
 
   if (TRUSTED_BFF_SHARED_SECRET) {
     headers.set(TRUSTED_BFF_AUTH_HEADER_NAME, TRUSTED_BFF_SHARED_SECRET);
