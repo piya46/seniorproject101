@@ -1004,13 +1004,10 @@ deploy_cleanup_service() {
 deploy_document_job_worker_service() {
     local TARGET_REGION=$1
 
-    ensure_document_job_worker_artifact_repository
-    build_document_job_worker_image
-
     gcloud run deploy "$DOCUMENT_JOB_WORKER_SERVICE_NAME" \
         --project "$PROJECT_ID" \
         --region "$TARGET_REGION" \
-        --image "$DOCUMENT_JOB_WORKER_IMAGE_URI" \
+        --source "$SCRIPT_DIR/services/document-job-worker" \
         --port 8080 \
         --ingress all \
         --no-allow-unauthenticated \
