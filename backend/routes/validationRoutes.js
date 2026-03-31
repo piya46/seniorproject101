@@ -16,8 +16,7 @@ const {
   DOCUMENT_JOB_STATUSES,
   DOCUMENT_JOB_TYPES,
   createDocumentJob,
-  getDocumentJob,
-  sanitizeDocumentJobForResponse
+  getDocumentJob
 } = require('../utils/documentJobs');
 
 const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req }) => {

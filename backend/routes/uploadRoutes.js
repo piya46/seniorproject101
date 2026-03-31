@@ -22,8 +22,7 @@ const {
     buildDocumentJobResponse,
     DOCUMENT_JOB_TYPES,
     ensureDocumentJobAccess,
-    getDocumentJob,
-    sanitizeDocumentJobForResponse
+    getDocumentJob
 } = require('../utils/documentJobs');
 const { addStagedFileToSession, deleteFileRecord, getDecryptedSessionFiles } = require('../utils/dbUtils');
 const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc } = require('../utils/fileSelection');

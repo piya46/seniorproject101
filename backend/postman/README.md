@@ -56,7 +56,7 @@ legacy/direct mode ที่ยังคงอยู่เพื่อ backward 
 - `GET /system/status/storage-signing` ตอนนี้เป็น authenticated probe แล้ว ไม่ใช่ public smoke probe
 - BFF production flow ใช้ frontend callback `/auth/callback`; backend callback `/oidc/google/callback` เป็น legacy/direct mode เป็นหลัก
 - `POST /documents/merge` ตอบ `202 queued`; client ต้อง poll `/documents/jobs/:jobId` และค่อยเรียก `/documents/jobs/:jobId/download`
-- `POST /upload` ตอบ `202 queued`; client ต้อง poll `/upload/jobs/:jobId`
+- `POST /upload` ตอบ `200 success` เพื่อ stage ไฟล์ไว้ก่อน; ถ้า validation ต้องเตรียมเอกสารเพิ่ม client จะ poll `/upload/jobs/:jobId`
 - `POST /documents/merge` และ `POST /upload` ยังอาจตอบ `413` เมื่อชน policy ขนาดไฟล์/ขนาดรวม
 - trusted BFF flow ตอนนี้ harden เพิ่มได้ด้วย `TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN=true` และ `x-bff-identity-token`
 

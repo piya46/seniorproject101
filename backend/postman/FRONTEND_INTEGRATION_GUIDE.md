@@ -85,8 +85,9 @@ secure JSON endpoints:
 
 หมายเหตุสำหรับ `POST /upload`:
 
-- route นี้จะตอบ `202 queued` พร้อม `job.id`
-- frontend ต้อง poll `GET /upload/jobs/:jobId` จน `status=succeeded`
+- route นี้จะตอบ `200 success` เพื่อ stage ไฟล์ไว้ก่อน
+- ถ้าไฟล์ยังไม่พร้อมตอนเรียก `POST /validation/check-completeness` backend จะตอบ `202 queued` พร้อม batch `job.id`
+- frontend ต้อง poll `GET /upload/jobs/:jobId` จน `status=succeeded` หรือ `status=partial_failed`
 - PDF มีเพดานขนาดที่เข้มกว่ารูปภาพเพื่อจำกัดความเสี่ยงด้าน memory/resource exhaustion
 - backend อาจตอบ `413` ถ้าไฟล์เกิน policy หลัง verification หรือหลัง decrypt แล้ว
 

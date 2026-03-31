@@ -15,8 +15,7 @@ const {
   DOCUMENT_JOB_STATUSES,
   createDocumentJob,
   ensureDocumentJobAccess,
-  getDocumentJob,
-  sanitizeDocumentJobForResponse
+  getDocumentJob
 } = require('../utils/documentJobs');
 
 const storage = new Storage();

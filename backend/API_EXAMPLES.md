@@ -22,7 +22,9 @@ Last updated: `2026-03-31`
 - ถ้าเปิด `PFS_V2_ENABLED=true` protected JSON endpoints สามารถรับ envelope แบบ `v2` ได้
 - `POST /documents/merge` อาจตอบ `413` ถ้าขนาดรวมของ source files เกินเพดาน
 - `POST /upload` อาจตอบ `413` โดยเฉพาะกรณี PDF ที่เกินเพดาน sanitize ของ backend
-- `POST /upload` และ `POST /documents/merge` ตอนนี้ตอบ `202 queued` แล้ว client ต้อง poll job status ต่อ
+- `POST /upload` ตอนนี้ตอบ `200 success` เพื่อ stage ไฟล์ไว้ก่อน
+- `POST /validation/check-completeness` อาจตอบ `202 queued` ถ้า backend ต้องเตรียมเอกสารก่อนตรวจ
+- `POST /documents/merge` ตอบ `202 queued` แล้ว client ต้อง poll job status ต่อ
 
 ## Base URL
 
@@ -234,9 +236,9 @@ curl -s https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/ap
 - route นี้จะคืน `404` ถ้า `PFS_V2_ENABLED=false`
 - frontend/BFF ต้องใช้ metadata นี้เพื่อ derive `request_key` และ `response_key` แยกกัน
 
-## 6. Async Upload Status
+## 6. Document Preparation Status
 
-หลัง `POST /upload` สำเร็จในโหมด async backend จะตอบ `202` พร้อม `job.id`
+หลัง `POST /validation/check-completeness` ถ้าไฟล์ยังไม่พร้อม backend จะตอบ `202` พร้อม `job.id`
 
 ### cURL
 
