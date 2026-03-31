@@ -349,9 +349,25 @@ async function handleCallback(req, res) {
     copyResponseHeaders(backendResponse.headers, res);
 
     if (!backendResponse.ok) {
-      res.writeHead(backendResponse.status);
       const responseText = await backendResponse.text();
-      res.end(responseText);
+      let authError = 'login_failed';
+
+      try {
+        const payload = JSON.parse(responseText);
+        const message = String(payload?.message || payload?.error || '').toLowerCase();
+        if (
+          backendResponse.status === 401 ||
+          backendResponse.status === 403 ||
+          message.includes('domain is not allowed') ||
+          message.includes('account domain is not allowed')
+        ) {
+          authError = 'unauthorized_account';
+        }
+      } catch (_error) {
+        // Fall back to a generic login error when the upstream error is not JSON.
+      }
+
+      redirect(res, `/login?auth_error=${encodeURIComponent(authError)}`);
       return;
     }
 
