@@ -1,7 +1,6 @@
 const { Firestore } = require('@google-cloud/firestore');
 const crypto = require('crypto');
 const { baseLog } = require('./logger');
-const { isUpstashRedisConfigured, setWithExpiryIfNotExists } = require('./upstashRedis');
 
 const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || 'ai-formcheck';
 const firestore = new Firestore({
@@ -484,18 +483,8 @@ const checkAndMarkNonceViaFirestore = async (nonce, expireSeconds) => {
     }
 };
 
-exports.checkAndMarkNonce = async (nonce, expireSeconds) => {
-    if (isUpstashRedisConfigured()) {
-        try {
-            return await setWithExpiryIfNotExists('nonce', nonce, '1', expireSeconds);
-        } catch (error) {
-            console.error('❌ Upstash Nonce Error:', error);
-            return false;
-        }
-    }
-
-    return checkAndMarkNonceViaFirestore(nonce, expireSeconds);
-};
+exports.checkAndMarkNonce = async (nonce, expireSeconds) =>
+    checkAndMarkNonceViaFirestore(nonce, expireSeconds);
 
 const buildAiUsageDocRef = (usageKey, dateKey) =>
     firestore.collection(AI_USAGE_COLLECTION_NAME).doc(`${dateKey}:${usageKey}`);

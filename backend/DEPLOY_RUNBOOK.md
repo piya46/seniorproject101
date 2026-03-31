@@ -48,36 +48,11 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 - apply bucket lifecycle policy ถ้าเปิด flag ที่เกี่ยวข้อง
 - create/check Firestore database ที่ app ใช้งาน
 - enable Firestore TTL policies สำหรับ `used_nonces.expire_at`, `RATE_LIMITS.expireAt`, และ `AI_USAGE_DAILY.expire_at`
-- ถ้าต้องการย้าย hot-path state ออกจาก Firestore ให้เปิด `ENABLE_UPSTASH_REDIS=true`
-  สคริปต์สามารถ reuse `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` จาก Secret Manager ได้
-  หรือถ้าเปิด `UPSTASH_AUTO_CREATE_REDIS=true` และให้ `UPSTASH_MANAGEMENT_EMAIL` + `UPSTASH_MANAGEMENT_API_KEY`
-  สคริปต์จะ create/reuse Upstash Redis database ให้อัตโนมัติแล้วผูก secret/runtime env ให้ในรอบเดียว
 - enable Firestore TTL policy สำหรับ `DOCUMENT_JOBS.expire_at`
 - create/update app service account และ cleanup service account
 - grant IAM bindings ที่ backend และ cleanup service ต้องใช้
 - create/update secrets สำหรับ JWT, DB encryption key, SMTP, OIDC client secret values, และ key pair
-- create/update Upstash Redis secrets (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`) เมื่อเปิดใช้งาน Redis
 - deploy cleanup service และ create/update Cloud Scheduler job
-
-ตัวอย่างการเปิดใช้ Redis แบบ one-shot:
-
-```bash
-ENABLE_UPSTASH_REDIS=true \
-UPSTASH_AUTO_CREATE_REDIS=true \
-UPSTASH_MANAGEMENT_EMAIL="you@example.com" \
-UPSTASH_MANAGEMENT_API_KEY="upstash-api-key" \
-./deploy.sh
-```
-
-ถ้ามี database อยู่แล้วและไม่ต้องการให้สคริปต์สร้างใหม่:
-
-```bash
-ENABLE_UPSTASH_REDIS=true \
-UPSTASH_AUTO_CREATE_REDIS=false \
-UPSTASH_REDIS_REST_URL_VALUE="https://<db>.upstash.io" \
-UPSTASH_REDIS_REST_TOKEN_VALUE="<rest-token>" \
-./deploy.sh
-```
 
 ข้อควรทราบ:
 
