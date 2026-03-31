@@ -33,12 +33,16 @@ const waitForJobStatusChange = async (basePath, jobId, lastStatus = '') => {
   return data?.job || null;
 };
 
-const pollUploadPreparationJobs = async (jobs) => {
+const pollUploadPreparationJobs = async (jobs, onUpdate) => {
   const pendingJobs = new Map(
     jobs
       .filter((job) => job?.id)
       .map((job) => [job.id, job.status || 'queued'])
   );
+
+  if (typeof onUpdate === 'function') {
+    onUpdate(jobs);
+  }
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if (pendingJobs.size === 0) {
@@ -53,6 +57,9 @@ const pollUploadPreparationJobs = async (jobs) => {
     );
 
     pendingJobs.clear();
+    if (typeof onUpdate === 'function') {
+      onUpdate(results.filter(Boolean));
+    }
     for (const job of results) {
       if (!job) {
         throw new Error('ไม่พบสถานะงานเตรียมเอกสาร');
@@ -88,6 +95,9 @@ export default function Formdetail() {
   const [checkedDocs, setCheckedDocs] = useState({});
   const [uploadStatuses, setUploadStatuses] = useState({});
   const [isValidating, setIsValidating] = useState(false);
+  const [validationStage, setValidationStage] = useState(null);
+  const [showValidationDelayHint, setShowValidationDelayHint] = useState(false);
+  const [validationPreparationJobs, setValidationPreparationJobs] = useState([]);
   const [validationResults, setValidationResults] = useState({}); 
   const [isStep2Validated, setIsStep2Validated] = useState(false); 
   const [isMerging, setIsMerging] = useState(false);
@@ -139,6 +149,19 @@ export default function Formdetail() {
     };
     fetchDetailAndKey();
   }, [id, degreeLevel, subType]);
+
+  useEffect(() => {
+    if (!isValidating) {
+      setShowValidationDelayHint(false);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowValidationDelayHint(true);
+    }, 12000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isValidating]);
 
   const handleCheck = (index) => {
     setCheckedDocs(prev => ({ ...prev, [index]: !prev[index] }));
@@ -299,6 +322,9 @@ export default function Formdetail() {
 
   const handleValidateDocuments = async () => {
     setIsValidating(true);
+    setValidationStage('checking');
+    setShowValidationDelayHint(false);
+    setValidationPreparationJobs([]);
     try {
       if (!publicKey) throw new Error("Public Key is missing. Please refresh.");
       const validatePayload = {
@@ -331,7 +357,10 @@ export default function Formdetail() {
         const actualData = responseData?.data || responseData;
 
         if (res.status === 202 && actualData?.status === 'queued' && Array.isArray(actualData.jobs) && allowPreparationRetry) {
-          await pollUploadPreparationJobs(actualData.jobs);
+          setValidationStage('preparing');
+          await pollUploadPreparationJobs(actualData.jobs, setValidationPreparationJobs);
+          setValidationStage('checking');
+          setValidationPreparationJobs([]);
           return submitValidationRequest(false);
         }
 
@@ -386,8 +415,94 @@ export default function Formdetail() {
       setValidationResults(fallbackErrors);
       setIsStep2Validated(true);
     } finally {
+      setValidationStage(null);
+      setValidationPreparationJobs([]);
       setIsValidating(false); 
     }
+  };
+
+  const getValidationStatusLabel = () => {
+    if (!isValidating) {
+      return '';
+    }
+
+    if (validationStage === 'preparing') {
+      return 'กำลังเตรียมเอกสารสำหรับการตรวจสอบ...';
+    }
+
+    if (validationStage === 'checking') {
+      return 'กำลังตรวจสอบความครบถ้วนของเอกสาร...';
+    }
+
+    return 'กำลังดำเนินการ...';
+  };
+
+  const getValidationQueueSummary = () => {
+    if (!isValidating || validationStage !== 'preparing' || validationPreparationJobs.length === 0) {
+      return null;
+    }
+
+    const queuedJobWithInfo = validationPreparationJobs.find((job) => job?.status === 'queued' && job?.queue_info);
+    if (!queuedJobWithInfo?.queue_info) {
+      return null;
+    }
+
+    return queuedJobWithInfo.queue_info;
+  };
+
+  const getQueueTierClasses = (tier) => {
+    if (tier === 'short') {
+      return {
+        badge: 'bg-[#EEF7ED] text-[#2F7A38]',
+        dot: 'bg-[#4CAF50]',
+      };
+    }
+
+    if (tier === 'medium') {
+      return {
+        badge: 'bg-[#FFF6E7] text-[#9A6300]',
+        dot: 'bg-[#FFB43B]',
+      };
+    }
+
+    if (tier === 'long') {
+      return {
+        badge: 'bg-[#FFF0E8] text-[#B55A1B]',
+        dot: 'bg-[#FF8A3D]',
+      };
+    }
+
+    return {
+      badge: 'bg-[#F7F1EA] text-[#7B542F]',
+      dot: 'bg-[#FF9D00]',
+    };
+  };
+
+  const getPerFileQueueInfo = (docKey) => {
+    if (!isValidating || validationResults[docKey]) {
+      return null;
+    }
+
+    const matchingJob = validationPreparationJobs.find((job) => job?.metadata?.file_key === docKey);
+    if (matchingJob?.status === 'queued' && matchingJob?.queue_info) {
+      return matchingJob.queue_info;
+    }
+
+    if (validationStage === 'preparing') {
+      return {
+        hint_message: 'กำลังเตรียมเอกสาร',
+        estimated_wait_tier: null,
+      };
+    }
+
+    if (validationStage === 'checking') {
+      return {
+        hint_message: 'กำลังตรวจสอบ',
+        estimated_wait_tier: null,
+      };
+    }
+
+    return null;
   };
 
   const handleMergeDocuments = async () => {
@@ -506,51 +621,53 @@ export default function Formdetail() {
       return validationResults[docKey]?.status === 'valid';
     });
 
+  const validationQueueSummary = getValidationQueueSummary();
+
   return (
-    <div className="min-h-screen flex flex-col font-sans">
+    <div className="page-shell font-sans">
       <Navbar />
-      <div className="w-full mt-10 px-10 flex-grow">
-        <div className="flex justify-start w-full pl-5">
+      <div className="page-gutter content-form mt-6 w-full flex-grow lg:mt-10">
+        <div className="flex w-full justify-start">
           <button onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : navigate('/')} className="mb-5 cursor-pointer">
-            <img src="/left-arrow.png" alt="ย้อนกลับ" className="w-10 h-10 object-contain" />
+            <img src="/left-arrow.png" alt="ย้อนกลับ" className="h-9 w-9 object-contain sm:h-10 sm:w-10" />
           </button>
         </div>
         {/* Step Bar */}
-        <div className="w-full max-w-4xl mx-auto mb-12 px-4">
+        <div className="mx-auto mb-10 w-full max-w-4xl px-2 sm:px-4 lg:mb-12">
           <div className="flex w-full">
             <div className="flex-1 flex flex-col items-center relative">
               <div className={`absolute top-[18px] left-1/2 w-full h-[8px] -z-10 ${currentStep >= 2 ? 'bg-[#FF9D00]' : 'bg-[#D9D9D9]'}`}></div>
               <div className={`w-10 h-10 rounded-full shadow-md flex items-center justify-center ${currentStep >= 1 ? 'bg-[#FF9D00]' : 'bg-[#D9D9D9]'}`}>
                 {currentStep > 1 ? <CheckIcon /> : <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>}
               </div>
-              <span className={`text-base mt-3 font-semibold ${currentStep >= 1 ? 'text-[#7B542F]' : 'text-[#999999]'}`}>เตรียมเอกสาร</span>
+              <span className={`mt-3 text-center text-xs font-semibold sm:text-sm lg:text-base ${currentStep >= 1 ? 'text-[#7B542F]' : 'text-[#999999]'}`}>เตรียมเอกสาร</span>
             </div>
             <div className="flex-1 flex flex-col items-center relative">
               <div className={`absolute top-[18px] left-1/2 w-full h-[8px] -z-10 ${currentStep >= 3 ? 'bg-[#FF9D00]' : 'bg-[#D9D9D9]'}`}></div>
               <div className={`w-10 h-10 rounded-full shadow-md flex items-center justify-center ${currentStep >= 2 ? 'bg-[#FF9D00]' : 'bg-[#D9D9D9]'}`}>
                 {currentStep > 2 ? <CheckIcon /> : <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>}
               </div>
-              <span className={`text-base mt-3 font-semibold ${currentStep >= 2 ? 'text-[#7B542F]' : 'text-[#999999]'}`}>ตรวจความครบถ้วนของเอกสาร</span>
+              <span className={`mt-3 text-center text-xs font-semibold sm:text-sm lg:text-base ${currentStep >= 2 ? 'text-[#7B542F]' : 'text-[#999999]'}`}>ตรวจความครบถ้วนของเอกสาร</span>
             </div>
             <div className="flex-1 flex flex-col items-center relative">
               <div className={`w-10 h-10 rounded-full shadow-md flex items-center justify-center ${currentStep >= 3 ? 'bg-[#FF9D00]' : 'bg-[#D9D9D9]'}`}>
                 {currentStep > 3 ? <CheckIcon /> : <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>}
               </div>
-              <span className={`text-base mt-3 font-semibold ${currentStep >= 3 ? 'text-[#7B542F]' : 'text-[#999999]'}`}>ช่องทางการยื่นคำร้อง</span>
+              <span className={`mt-3 text-center text-xs font-semibold sm:text-sm lg:text-base ${currentStep >= 3 ? 'text-[#7B542F]' : 'text-[#999999]'}`}>ช่องทางการยื่นคำร้อง</span>
             </div>
           </div>
         </div>
 
-        <div className="w-full px-24">
-          <div className="bg-white p-10 rounded-xl shadow-sm border border-[#D9D9D9] w-full">
-            <h1 className="text-2xl font-bold ml-4 text-black flex justify-start pb-4">
+        <div className="w-full px-0 sm:px-4 lg:px-10 xl:px-24">
+          <div className="w-full rounded-xl border border-[#D9D9D9] bg-white p-5 shadow-sm sm:p-8 lg:p-10">
+            <h1 className="flex justify-start pb-4 text-xl font-bold text-black sm:ml-2 sm:text-2xl lg:ml-4">
               {formNameTh || '(ไม่พบชื่อเอกสาร)'} 
             </h1>
             {/* Step 1 */}
             {currentStep === 1 && (
               <>
-                <p className='text-[#999999] pt-3 flex justify-start pl-4 ml-7 font-semibold text-lg'>ขั้นตอนการเตรียมเอกสาร</p>
-                <div className="pt-4 pl-12 ml-7 mb-8 text-black text-left">
+                <p className='flex justify-start pt-3 text-base font-semibold text-[#999999] sm:ml-4 sm:pl-4 lg:ml-7 lg:text-lg'>ขั้นตอนการเตรียมเอกสาร</p>
+                <div className="mb-8 pt-4 text-left text-black sm:ml-4 sm:pl-8 lg:ml-7 lg:pl-12">
                   {formData ? (
                     formData.submission_steps && formData.submission_steps.length > 0 ? (
                       <div className="flex flex-col gap-2">
@@ -566,8 +683,8 @@ export default function Formdetail() {
                   )}
                 </div>
 
-                <p className='text-[#999999] pt-3 flex justify-start pl-4 ml-7 font-semibold text-lg'>เตรียมเอกสารดังต่อไปนี้</p>
-                <div className="min-h-[150px] pt-4 pl-12 ml-7 text-left">
+                <p className='flex justify-start pt-3 text-base font-semibold text-[#999999] sm:ml-4 sm:pl-4 lg:ml-7 lg:text-lg'>เตรียมเอกสารดังต่อไปนี้</p>
+                <div className="min-h-[150px] pt-4 text-left sm:ml-4 sm:pl-8 lg:ml-7 lg:pl-12">
                   {formData ? (
                     formData.required_documents && formData.required_documents.length > 0 ? (
                       <div className="flex flex-col gap-5">
@@ -582,7 +699,7 @@ export default function Formdetail() {
                                   onChange={() => handleCheck(index)}
                                 />
                               </div>
-                              <span className={`ml-4 text-lg transition-colors ${checkedDocs[index] ? 'text-black' : 'text-gray-700'}`}>
+                              <span className={`ml-4 text-base transition-colors sm:text-lg ${checkedDocs[index] ? 'text-black' : 'text-gray-700'}`}>
                                 {doc.label} {doc.required !== false && <span className="text-red-500 ml-1">*</span>}
                               </span>
                             </label>
@@ -610,7 +727,7 @@ export default function Formdetail() {
             {/* Step 2 */}
             {currentStep === 2 && (
               <>
-                <div className="min-h-[250px] pt-8 pl-12 ml-7 pr-12 text-left">
+                <div className="min-h-[250px] pt-6 text-left sm:ml-4 sm:pl-8 sm:pr-6 lg:ml-7 lg:pl-12 lg:pr-12 lg:pt-8">
                   {formData?.required_documents?.map((doc, index) => (
                     <div key={index} className="mb-8">
                       <div className="mb-3">
@@ -626,10 +743,10 @@ export default function Formdetail() {
                       </div>
                       
                       {uploadedFiles[index] ? (
-                        <div className={'border border-black rounded-xl px-6 py-3 flex items-center w-full bg-white shadow-sm hover:border-[#7B542F] transition-colors relative group'}>
-                          <img src="/pdf.png" alt="PDF" className="w-10 h-10 object-contain mr-4" />
+                        <div className={'relative group flex w-full items-center rounded-xl border border-black bg-white px-4 py-3 shadow-sm transition-colors hover:border-[#7B542F] sm:px-6'}>
+                          <img src="/pdf.png" alt="PDF" className="mr-3 h-10 w-10 object-contain sm:mr-4" />
 
-                          <div className="flex-grow flex flex-col justify-center overflow-hidden">
+                          <div className="flex flex-grow flex-col justify-center overflow-hidden">
                             {uploadStatuses[index]?.status === 'success' ? (
                               <>
                                 <div className="flex items-center gap-2">
@@ -664,11 +781,11 @@ export default function Formdetail() {
                             )}
 
                             {uploadStatuses[index]?.status === 'uploading' && (
-                              <div className="flex items-center mt-2 w-full gap-4 pr-4">
+                              <div className="mt-2 flex w-full items-center gap-3 pr-0 sm:gap-4 sm:pr-4">
                                 <div className="flex-grow bg-[#E5E5E5] h-3 rounded-full overflow-hidden">
                                   <div className="bg-[#7B542F] h-full rounded-full transition-all duration-200" style={{ width: `${uploadStatuses[index].progress}%` }}></div>
                                 </div>
-                                <span className="text-black font-semibold text-lg w-12 text-right">
+                                <span className="w-10 text-right text-base font-semibold text-black sm:w-12 sm:text-lg">
                                   {uploadStatuses[index].progress}%
                                 </span>
                               </div>
@@ -685,9 +802,20 @@ export default function Formdetail() {
                                 Upload failed <span className="text-red-500 font-semibold cursor-pointer hover:underline" onClick={(e) => { e.preventDefault(); handleRetry(index); }}>Try again</span>
                               </p>
                             )}
+
+                            {getPerFileQueueInfo(doc.key)?.hint_message && uploadStatuses[index]?.status === 'success' && (
+                              <div
+                                className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${getQueueTierClasses(getPerFileQueueInfo(doc.key)?.estimated_wait_tier).badge}`}
+                              >
+                                <span
+                                  className={`inline-block h-2 w-2 rounded-full animate-pulse ${getQueueTierClasses(getPerFileQueueInfo(doc.key)?.estimated_wait_tier).dot}`}
+                                ></span>
+                                {getPerFileQueueInfo(doc.key).hint_message}
+                              </div>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-4 ml-4 z-10">
+                          <div className="z-10 ml-3 flex items-center gap-3 sm:ml-4 sm:gap-4">
                             {uploadStatuses[index]?.status === 'error' && (
                               <button onClick={(e) => { e.preventDefault(); handleRetry(index); }} className="cursor-pointer hover:opacity-70 transition-opacity">
                                  <img src="/reload.png" alt="Retry" className="w-8 h-8 object-contain" />
@@ -700,7 +828,7 @@ export default function Formdetail() {
                           </div>
                         </div>
                       ) : (
-                        <div className="relative border-2 border-dashed border-[#D9D9D9] rounded-xl py-6 flex flex-col items-center justify-center cursor-pointer hover:border-[#7B542F] transition-colors bg-white">
+                        <div className="relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#D9D9D9] bg-white py-6 transition-colors hover:border-[#7B542F]">
                           <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => handleFileChange(index, e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
                           <div className="flex flex-col items-center pointer-events-none">
                             <img src="/upload.png" alt="Upload Icon" className="w-10 h-10 mb-2 object-contain" />
@@ -717,8 +845,8 @@ export default function Formdetail() {
             {/* Step 3 */}
             {currentStep === 3 && (
               <>
-                <p className='text-[#999999] pt-3 flex justify-start pl-4 ml-7 font-semibold text-lg'>ช่องทางการยื่นคำร้อง</p>
-                <div className="min-h-[250px] pt-8 pl-12 ml-7 text-left">
+                <p className='flex justify-start pt-3 text-base font-semibold text-[#999999] sm:ml-4 sm:pl-4 lg:ml-7 lg:text-lg'>ช่องทางการยื่นคำร้อง</p>
+                <div className="min-h-[250px] pt-6 text-left sm:ml-4 sm:pl-8 lg:ml-7 lg:pl-12 lg:pt-8">
                   <div className="mb-6">
                     <ul className="list-disc pl-5 space-y-2 text-black">
                       {formData?.submission_steps ? (
@@ -765,44 +893,63 @@ export default function Formdetail() {
             )}
           </div>
         </div>
-        <div className="flex justify-end mt-10 px-24 pb-10">
-          <button 
-            onClick={() => {
-              if (currentStep === 1) setCurrentStep(2);
-              else if (currentStep === 2) {
-                if (!isStep2Validated) {
-                  handleValidateDocuments();
-                } 
-                else if (isAllRequiredValid) {
-                  setCurrentStep(3);
+        <div className="mt-8 flex justify-end px-0 pb-8 sm:px-4 lg:mt-10 lg:px-24 lg:pb-10">
+          <div className="flex w-full flex-col items-end gap-3 sm:w-auto">
+            <button 
+              onClick={() => {
+                if (currentStep === 1) setCurrentStep(2);
+                else if (currentStep === 2) {
+                  if (!isStep2Validated) {
+                    handleValidateDocuments();
+                  } 
+                  else if (isAllRequiredValid) {
+                    setCurrentStep(3);
+                  }
                 }
+              }} 
+              disabled={
+                (currentStep === 1 && !isStep1Complete) || 
+                (currentStep === 2 && !isStep2Validated && (!isStep2Complete || isValidating)) ||
+                (currentStep === 2 && isStep2Validated && !isAllRequiredValid) 
               }
-            }} 
-            disabled={
-              (currentStep === 1 && !isStep1Complete) || 
-              (currentStep === 2 && !isStep2Validated && (!isStep2Complete || isValidating)) ||
-              (currentStep === 2 && isStep2Validated && !isAllRequiredValid) 
-            }
-            className={`text-white px-8 py-3 rounded-lg font-bold shadow-md transition-colors flex items-center gap-2 ${
-              (currentStep === 1 && !isStep1Complete) || 
-              (currentStep === 2 && !isStep2Validated && (!isStep2Complete || isValidating)) ||
-              (currentStep === 2 && isStep2Validated && !isAllRequiredValid)
-                ? 'bg-[#D9D9D9] cursor-not-allowed' 
-                : 'bg-[#7B542F] cursor-pointer hover:bg-orange-600'
-            }`}
-          >
-            {currentStep === 2 && !isStep2Validated ? (
-              isValidating ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  กำลังตรวจสอบ...
-                </>
-              ) : 'ตรวจสอบ'
-            ) : 'ถัดไป'}
-          </button>
+              className={`flex w-full items-center justify-center gap-2 rounded-lg px-8 py-3 font-bold text-white shadow-md transition-colors sm:w-auto ${
+                (currentStep === 1 && !isStep1Complete) || 
+                (currentStep === 2 && !isStep2Validated && (!isStep2Complete || isValidating)) ||
+                (currentStep === 2 && isStep2Validated && !isAllRequiredValid)
+                  ? 'bg-[#D9D9D9] cursor-not-allowed' 
+                  : 'bg-[#7B542F] cursor-pointer hover:bg-orange-600'
+              }`}
+            >
+              {currentStep === 2 && !isStep2Validated ? (
+                isValidating ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    กำลังตรวจสอบ...
+                  </>
+                ) : 'ตรวจสอบ'
+              ) : 'ถัดไป'}
+            </button>
+
+            {currentStep === 2 && !isStep2Validated && isValidating && (
+              <div className="w-full text-right sm:w-auto">
+                <p className="text-sm font-medium text-[#7B542F]">{getValidationStatusLabel()}</p>
+                {validationQueueSummary?.hint_message && (
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium bg-[#F9F7F3] text-[#7B542F]">
+                    <span
+                      className={`inline-block h-2 w-2 rounded-full animate-pulse ${getQueueTierClasses(validationQueueSummary?.estimated_wait_tier).dot}`}
+                    ></span>
+                    {validationQueueSummary.hint_message}
+                  </div>
+                )}
+                {showValidationDelayHint && (
+                  <p className="mt-1 text-sm text-[#999999]">ใช้เวลานานกว่าปกติเล็กน้อย กรุณารอสักครู่</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <Footer />

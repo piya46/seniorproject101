@@ -4,7 +4,7 @@ import Footer from './Footer'
 
 function Aboutus(){
     return(
-        <div>
+        <div className="page-shell">
             <Navbar />
             <Footer />
         </div>

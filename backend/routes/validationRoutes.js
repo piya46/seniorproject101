@@ -12,6 +12,7 @@ const { assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUti
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
 const { validationCheckSchema } = require('../validators/schemas');
 const {
+  buildDocumentJobResponse,
   DOCUMENT_JOB_STATUSES,
   DOCUMENT_JOB_TYPES,
   createDocumentJob,
@@ -36,7 +37,7 @@ const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req })
       existingJob &&
       (existingJob.status === DOCUMENT_JOB_STATUSES.QUEUED || existingJob.status === DOCUMENT_JOB_STATUSES.PROCESSING)
     ) {
-      queuedJobs.push(sanitizeDocumentJobForResponse(existingJob));
+      queuedJobs.push(await buildDocumentJobResponse(existingJob));
       continue;
     }
 
@@ -67,7 +68,9 @@ const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req })
         source_bytes: file.source_bytes || null
       },
       metadata: {
-        source_bytes: file.source_bytes || null
+        source_bytes: file.source_bytes || null,
+        file_key: file.file_key,
+        form_code: file.form_code
       }
     });
 
@@ -83,7 +86,7 @@ const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req })
       job_id: job.id
     });
 
-    queuedJobs.push(sanitizeDocumentJobForResponse(job));
+    queuedJobs.push(await buildDocumentJobResponse(job));
   }
 
   if (queuedJobs.length > 0) {
@@ -239,6 +242,7 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
         const specificRule = criteriaMap[file.file_key] || "ตรวจสอบความถูกต้องสมบูรณ์ตามมาตรฐานราชการ";
 
         return {
+            fileKey: file.file_key,
             // [FIX 3 - Step B] ส่งโครงสร้างให้ถูกต้องตาม SDK (part -> inlineData)
             part: {
                 inlineData: {
@@ -290,9 +294,14 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
        - **วันที่:** หากเป็นใบรับรองแพทย์ วันที่ต้องสอดคล้องกับวันที่ระบุขอลาป่วยในแบบฟอร์ม
        - **ความสมเหตุสมผล:** หากคำร้องระบุสาเหตุ A แต่หลักฐานระบุสาเหตุ B ถือว่าขัดแย้ง
 
+    3. **ข้อกำหนดสำคัญของคีย์ในผลลัพธ์:**
+       - ต้องใช้ "เอกสารรหัส" ตามที่ระบบให้ไว้เท่านั้น เช่น "request_form", "supporting_document"
+       - ห้ามใช้ชื่อไฟล์จริง, UUID, นามสกุลไฟล์, หรือข้อความอื่นมาเป็น key เด็ดขาด
+       - ผลลัพธ์ต้องมี key ครบตรงกับเอกสารที่ได้รับทุกใบ
+
     รูปแบบการตอบกลับ (JSON Format เท่านั้น):
     {
-      "key_ของไฟล์": {
+      "document_key_from_system": {
         "status": "valid" หรือ "invalid",
         "reason": "อธิบายเหตุผลภาษาไทยอย่างสุภาพ ทางการ และชัดเจน (สามารถอธิบายยาวได้หากจำเป็น)",
         "confidence": "high" หรือ "medium" หรือ "low"
@@ -350,7 +359,30 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
       req.log?.warn('ai_usage_record_failed', { message: usageError.message });
     }
 
-    res.json(JSON.parse(aiText));
+    const parsedResult = JSON.parse(aiText);
+    const expectedFileKeys = validFiles.map((file) => file.fileKey).filter(Boolean);
+    const parsedEntries = parsedResult && typeof parsedResult === 'object' && !Array.isArray(parsedResult)
+      ? Object.entries(parsedResult)
+      : [];
+
+    const normalizeValidationEntry = (entry = {}) => ({
+      status: entry?.status === 'valid' ? 'valid' : 'invalid',
+      reason: typeof entry?.reason === 'string' && entry.reason.trim()
+        ? entry.reason.trim()
+        : 'เอกสารไม่ผ่านการตรวจสอบ กรุณาตรวจสอบและอัปโหลดใหม่อีกครั้ง',
+      confidence: ['high', 'medium', 'low'].includes(entry?.confidence) ? entry.confidence : 'medium'
+    });
+
+    const normalizedResult = expectedFileKeys.reduce((accumulator, fileKey, index) => {
+      const directMatch = Object.prototype.hasOwnProperty.call(parsedResult || {}, fileKey)
+        ? parsedResult[fileKey]
+        : null;
+      const fallbackEntry = parsedEntries[index]?.[1] || {};
+      accumulator[fileKey] = normalizeValidationEntry(directMatch || fallbackEntry);
+      return accumulator;
+    }, {});
+
+    res.json(normalizedResult);
 
   } catch (error) {
     if (error.statusCode && error.payload) {

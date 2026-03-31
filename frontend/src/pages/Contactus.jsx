@@ -111,11 +111,11 @@ function Contactus() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans relative">
+    <div className="page-shell font-sans">
       <Navbar />
       
-      <div className="flex-grow flex flex-col items-center px-4 md:px-10 mt-10 mb-16">
-        <div className="w-full max-w-4xl">
+      <div className="page-gutter content-reading mt-10 mb-16 flex-grow flex flex-col items-center">
+        <div className="w-full">
           <h1 className="text-[28px] font-extrabold text-[#7B542F] mb-6 text-left">
             แจ้งปัญหาการใช้งาน
           </h1>

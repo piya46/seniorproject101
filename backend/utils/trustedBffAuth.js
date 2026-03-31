@@ -109,7 +109,9 @@ async function verifyTrustedBffIdentityToken(req) {
 
   const audience = getExpectedTrustedBffAudience();
   if (!audience) {
-    return { ok: false, reason: 'missing_identity_token_audience' };
+    return required
+      ? { ok: false, reason: 'missing_identity_token_audience' }
+      : { ok: true, skipped: true, payload: null };
   }
 
   const verifier = identityTokenVerifierOverride || defaultIdentityTokenVerifier;
@@ -120,16 +122,22 @@ async function verifyTrustedBffIdentityToken(req) {
     const actualEmail = String(payload?.email || '').trim().toLowerCase();
 
     if (expectedEmail && actualEmail !== expectedEmail) {
-      return { ok: false, reason: 'unexpected_identity_email', payload };
+      return required
+        ? { ok: false, reason: 'unexpected_identity_email', payload }
+        : { ok: true, skipped: true, payload: null };
     }
 
     return { ok: true, payload };
   } catch (_error) {
-    return { ok: false, reason: 'invalid_identity_token' };
+    return required
+      ? { ok: false, reason: 'invalid_identity_token' }
+      : { ok: true, skipped: true, payload: null };
   }
 }
 
-async function resolveTrustedBffIdentity(req) {
+async function resolveTrustedBffIdentity(req, options = {}) {
+  const requireIdentityHeaders = options.requireIdentityHeaders !== false;
+
   if (!isTrustedBffAuthEnabled()) {
     return { ok: false, statusCode: 503, reason: 'disabled' };
   }
@@ -141,6 +149,19 @@ async function resolveTrustedBffIdentity(req) {
   const identityTokenResult = await verifyTrustedBffIdentityToken(req);
   if (!identityTokenResult.ok) {
     return { ok: false, statusCode: 403, reason: identityTokenResult.reason };
+  }
+
+  if (!requireIdentityHeaders) {
+    return {
+      ok: true,
+      identity: null,
+      attestation: identityTokenResult.payload
+        ? {
+            email: String(identityTokenResult.payload.email || '').trim().toLowerCase() || null,
+            sub: String(identityTokenResult.payload.sub || '').trim() || null
+          }
+        : null
+    };
   }
 
   const sessionId = String(req.headers['x-bff-user-session-id'] || '').trim();

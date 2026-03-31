@@ -34,3 +34,16 @@ export async function ensureAuthenticatedOrRedirect() {
   redirectToLogin();
   return null;
 }
+
+export async function logout() {
+  const response = await axios.post('/auth/logout', null, {
+    withCredentials: true,
+    validateStatus: (status) => status < 500,
+  });
+
+  if (response.status >= 400) {
+    throw new Error(response.data?.message || 'Failed to logout.');
+  }
+
+  return response.data;
+}

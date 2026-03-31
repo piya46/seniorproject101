@@ -621,7 +621,7 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
       ],
       required_documents: [
         { key: "main_form", label: "คำร้อง จท.34", required: true, validation_criteria: "มีลายเซ็นนิสิตและอาจารย์ที่ปรึกษาครบถ้วน" },
-        { key: "leave_doc", label: "เอกสารประกอบการลาพัก (ถ้ามี)", required: true, validation_criteria: "เอกสารที่เกี่ยวข้องกับเหตุผลการขอคืนสถานภาพ" }
+        { key: "leave_doc", label: "เอกสารประกอบการลาพัก", required: true, validation_criteria: "เอกสารที่เกี่ยวข้องกับเหตุผลการขอคืนสถานภาพ" }
       ]
     };
   }

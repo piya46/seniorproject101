@@ -1,6 +1,7 @@
 const express = require('express');
 const authMiddleware = require('../middlewares/authMiddleware');
 const trustedBffMiddleware = require('../middlewares/trustedBffMiddleware');
+const { createTrustedBffMiddleware } = require('../middlewares/trustedBffMiddleware');
 const { ensureAppSession, buildSessionCookieOptions } = require('../utils/sessionUtils');
 const { revokeSessionRecord } = require('../utils/dbUtils');
 const { clearCsrfCookie, ensureCsrfCookie } = require('../utils/csrfUtils');
@@ -14,6 +15,7 @@ const {
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 
 const router = express.Router();
+const trustedBffAttestationOnlyMiddleware = createTrustedBffMiddleware({ requireIdentityHeaders: false });
 
 function isOidcEnabled() {
   return String(process.env.OIDC_ENABLED || 'true').toLowerCase() === 'true';
@@ -63,7 +65,7 @@ router.get('/google/login', (req, res) => {
   }
 });
 
-router.get('/bff/google/login-url', trustedBffMiddleware, (req, res) => {
+router.get('/bff/google/login-url', trustedBffAttestationOnlyMiddleware, (req, res) => {
   if (!isOidcEnabled()) {
     return res.status(503).json({
       error: 'OIDC Disabled',
@@ -145,7 +147,7 @@ router.get('/google/callback', async (req, res) => {
   }
 });
 
-router.get('/bff/google/callback', trustedBffMiddleware, async (req, res) => {
+router.get('/bff/google/callback', trustedBffAttestationOnlyMiddleware, async (req, res) => {
   if (!isOidcEnabled()) {
     return res.status(503).json({
       error: 'OIDC Disabled',

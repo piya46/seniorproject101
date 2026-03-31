@@ -206,12 +206,12 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans relative">
+    <div className="page-shell font-sans">
       <Navbar />
-      <div className='flex flex-row ml-5 mt-10 mr-5 flex-grow'>
-        <div className='basis-64 outline outline-[#D9D9D9] mr-10 p-4 rounded-md h-fit sticky top-10 bg-white'>
+      <div className='page-gutter content-wide mt-6 flex flex-col gap-6 md:mt-10 lg:flex-row lg:gap-10 flex-grow'>
+        <div className='w-full rounded-md bg-white p-4 outline outline-[#D9D9D9] lg:basis-64 lg:sticky lg:top-10 lg:h-fit'>
           <p className='text-[#999999] text-[15px] pb-3 text-left'>ระดับการศึกษา</p>
-          <div className='flex flex-col gap-6'>
+          <div className='grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1 lg:gap-6'>
             {levels.map((level) => (
               <label key={level} className='flex items-center cursor-pointer group'>
                 <div className='relative flex items-center justify-center'>
@@ -233,10 +233,10 @@ export default function Home() {
           </div>
         </div>
 
-        <div className='flex-1'>
+        <div className='min-w-0 flex-1'>
           {!selectedForm ? (
             <>
-              <p className='text-[25px] font-extrabold text-[#7B542F] text-left mb-4'>ค้นหาเอกสารยื่นคำร้อง</p>
+              <p className='mb-4 text-left text-[22px] font-extrabold text-[#7B542F] sm:text-[25px]'>ค้นหาเอกสารยื่นคำร้อง</p>
               
               <div className="relative group mb-10">
                 <input
@@ -245,7 +245,7 @@ export default function Home() {
                   onChange={handleInputChange} 
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="ค้นหาชื่อเอกสารยื่นคำร้อง"
-                  className="w-full p-3 pl-6 pr-12 text-lg border border-[#D9D9D9] rounded-xl shadow-sm outline-none transition-all duration-200 placeholder:text-[#999999] focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C]"
+                  className="w-full rounded-xl border border-[#D9D9D9] p-3 pl-5 pr-12 text-base shadow-sm outline-none transition-all duration-200 placeholder:text-[#999999] focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] sm:pl-6 sm:text-lg"
                 />
                 <button onClick={handleSearch} className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer pr-2">
                     <svg className="h-6 w-6 text-[#999999] hover:text-[#EA580C] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -254,7 +254,7 @@ export default function Home() {
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+              <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
                 {filteredForms.length > 0 ? (
                   filteredForms.map((form) => (
                     <div key={form.form_code} onClick={() => handleFormClick(form)} className="bg-white border border-[#D9D9D9] p-5 rounded-xl shadow-sm hover:shadow-md hover:border-[#EA580C] transition-all cursor-pointer flex flex-col items-center">
@@ -274,19 +274,19 @@ export default function Home() {
             </>
           ) : (
             <>
-              <div className="flex items-center gap-4 mb-6">
+              <div className="mb-6 flex items-start gap-4 sm:items-center">
                 <button onClick={() => {setSelectedForm(null);
-                  sessionStorage.removeItem('last_selected_form');}} className="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-[#D9D9D9] hover:border-[#EA580C] hover:text-[#EA580C] transition-colors text-[#999999] cursor-pointer shadow-sm">
+                  sessionStorage.removeItem('last_selected_form');}} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#D9D9D9] bg-white text-[#999999] shadow-sm transition-colors hover:border-[#EA580C] hover:text-[#EA580C]">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
                 <div className="flex flex-col">
-                  <p className='text-[22px] font-extrabold text-[#7B542F] text-left'>โปรดระบุประเภทของคำร้อง</p>
+                  <p className='text-left text-[20px] font-extrabold text-[#7B542F] sm:text-[22px]'>โปรดระบุประเภทของคำร้อง</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10 animate-fade-in">
+              <div className="mb-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 animate-fade-in">
                 {selectedForm.sub_categories.map((subCat) => (
                   <div key={subCat.value} onClick={() => handleSubCategoryClick(subCat)} className="bg-white border border-[#D9D9D9] p-5 rounded-xl shadow-sm hover:shadow-md hover:border-[#EA580C] transition-all cursor-pointer flex flex-col items-center">
                     <div className="flex flex-col h-full w-full">
@@ -307,7 +307,7 @@ export default function Home() {
 
       <button 
         onClick={() => setIsChatOpen(!isChatOpen)} 
-        className="fixed bottom-8 right-8 z-50 w-16 h-16 bg-[#FF9D00] rounded-full shadow-lg hover:scale-105 transition-transform cursor-pointer flex items-center justify-center"
+        className="fixed bottom-4 right-4 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-[#FF9D00] shadow-lg transition-transform hover:scale-105 sm:bottom-8 sm:right-8 sm:h-16 sm:w-16"
       >
         <img 
           src="/assistant.png" 
@@ -318,7 +318,7 @@ export default function Home() {
       </button>
 
       {isChatOpen && (
-        <div className="fixed bottom-28 right-8 z-50 w-[350px] h-[450px] bg-white rounded-2xl shadow-2xl border border-[#D9D9D9] flex flex-col overflow-hidden animate-fade-in">
+        <div className="fixed bottom-24 right-4 z-50 flex h-[450px] w-[calc(100vw-2rem)] max-w-[350px] flex-col overflow-hidden rounded-2xl border border-[#D9D9D9] bg-white shadow-2xl animate-fade-in sm:bottom-28 sm:right-8">
           
           <div className="bg-[#7B542F] text-white p-4 flex justify-between items-center shadow-sm z-10">
             <div className="flex items-center gap-2">

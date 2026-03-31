@@ -25,6 +25,7 @@ FIRESTORE_TYPE="${FIRESTORE_TYPE:-firestore-native}"
 FIRESTORE_COLLECTION_NAME="${FIRESTORE_COLLECTION_NAME:-SESSION}"
 FIRESTORE_FILES_SUBCOLLECTION="${FIRESTORE_FILES_SUBCOLLECTION:-files}"
 ENABLE_FIRESTORE_TTL_POLICIES="${ENABLE_FIRESTORE_TTL_POLICIES:-true}"
+ENABLE_FIRESTORE_COMPOSITE_INDEXES="${ENABLE_FIRESTORE_COMPOSITE_INDEXES:-true}"
 AUTO_CREATE_BUCKET_ON_LOCATION_MISMATCH="${AUTO_CREATE_BUCKET_ON_LOCATION_MISMATCH:-false}"
 ENABLE_BUCKET_LIFECYCLE_CLEANUP="${ENABLE_BUCKET_LIFECYCLE_CLEANUP:-false}"
 BUCKET_DELETE_AFTER_DAYS="${BUCKET_DELETE_AFTER_DAYS:-1}"
@@ -113,7 +114,7 @@ GOOGLE_OIDC_CLIENT_SECRET_VALUE="${GOOGLE_OIDC_CLIENT_SECRET_VALUE:-}"
 GOOGLE_OIDC_CALLBACK_URL="${GOOGLE_OIDC_CALLBACK_URL:-}"
 TRUSTED_BFF_AUTH_ENABLED="${TRUSTED_BFF_AUTH_ENABLED:-true}"
 TRUSTED_BFF_AUTH_HEADER_NAME="${TRUSTED_BFF_AUTH_HEADER_NAME:-x-bff-auth}"
-TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN="${TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN:-false}"
+TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN="${TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN:-true}"
 TRUSTED_BFF_IDENTITY_TOKEN_HEADER="${TRUSTED_BFF_IDENTITY_TOKEN_HEADER:-x-bff-identity-token}"
 TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL="${TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL:-}"
 TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE="${TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE:-}"
@@ -681,6 +682,43 @@ ensure_firestore_ttl_policies() {
     ensure_firestore_ttl_policy "RATE_LIMITS" "expireAt"
     ensure_firestore_ttl_policy "AI_USAGE_DAILY" "expire_at"
     ensure_firestore_ttl_policy "DOCUMENT_JOBS" "expire_at"
+}
+
+ensure_firestore_document_jobs_queue_index() {
+    local OUTPUT=""
+
+    echo -e "   ⏳ Ensuring Firestore composite index: ${YELLOW}DOCUMENT_JOBS(status, created_at)${NC}"
+
+    if OUTPUT=$(gcloud firestore indexes composite create \
+        --project "$PROJECT_ID" \
+        --database "$FIRESTORE_DATABASE_ID" \
+        --collection-group "DOCUMENT_JOBS" \
+        --query-scope "collection" \
+        --field-config "field-path=status,order=ascending" \
+        --field-config "field-path=created_at,order=ascending" \
+        --async 2>&1); then
+        echo -e "   ✅ Firestore composite index is ready or being created."
+        return
+    fi
+
+    if printf '%s' "$OUTPUT" | grep -qiE 'already exists|ALREADY_EXISTS'; then
+        echo -e "   ✅ Firestore composite index already exists."
+        return
+    fi
+
+    echo -e "${RED}❌ Failed to ensure Firestore composite index for DOCUMENT_JOBS.${NC}"
+    printf '%s\n' "$OUTPUT"
+    exit 1
+}
+
+ensure_firestore_composite_indexes() {
+    if [ "$ENABLE_FIRESTORE_COMPOSITE_INDEXES" != "true" ]; then
+        echo -e "   ℹ️  Skipping Firestore composite indexes because ENABLE_FIRESTORE_COMPOSITE_INDEXES=false"
+        return
+    fi
+
+    echo -e "${YELLOW}⏳ Configuring Firestore composite indexes...${NC}"
+    ensure_firestore_document_jobs_queue_index
 }
 
 ensure_bucket_exists() {
@@ -2634,6 +2672,7 @@ handle_leftover_temp_bucket_if_needed
 ensure_bucket_lifecycle_policy
 ensure_firestore_database
 ensure_firestore_ttl_policies
+ensure_firestore_composite_indexes
 
 # 5. จัดการ Secrets และ Keys
 echo -e "${YELLOW}🔐 Managing Secrets & Keys...${NC}"

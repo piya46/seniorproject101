@@ -25,6 +25,54 @@ const createDocumentJobId = () => `job_${crypto.randomBytes(16).toString('hex')}
 
 const getDocumentJobsCollection = () => firestore.collection(DOCUMENT_JOBS_COLLECTION);
 
+const buildAheadCountBucket = (count) => {
+    if (count <= 0) {
+        return '0';
+    }
+
+    if (count <= 3) {
+        return '1-3';
+    }
+
+    if (count <= 10) {
+        return '4-10';
+    }
+
+    return '10+';
+};
+
+const buildEstimatedWaitTier = (count) => {
+    if (count <= 0) {
+        return 'none';
+    }
+
+    if (count <= 3) {
+        return 'short';
+    }
+
+    if (count <= 10) {
+        return 'medium';
+    }
+
+    return 'long';
+};
+
+const buildQueueHintMessage = (count) => {
+    if (count <= 0) {
+        return 'งานของคุณกำลังจะเริ่มประมวลผล';
+    }
+
+    const bucket = buildAheadCountBucket(count);
+    return `ระบบกำลังจัดเตรียมเอกสาร มีผู้รอก่อนหน้า ${bucket} คิว`;
+};
+
+const buildQueueInfo = (aheadCount) => ({
+    is_queued: true,
+    ahead_count_bucket: buildAheadCountBucket(aheadCount),
+    hint_message: buildQueueHintMessage(aheadCount),
+    estimated_wait_tier: buildEstimatedWaitTier(aheadCount)
+});
+
 const sanitizeDocumentJobForResponse = (job) => {
     if (!job) {
         return null;
@@ -43,6 +91,47 @@ const sanitizeDocumentJobForResponse = (job) => {
         result: job.result || null,
         metadata: job.metadata || null
     };
+};
+
+const getQueuedJobsAheadCount = async (job) => {
+    if (!job || job.status !== DOCUMENT_JOB_STATUSES.QUEUED || !job.created_at) {
+        return null;
+    }
+
+    const snapshot = await getDocumentJobsCollection()
+        .where('status', '==', DOCUMENT_JOB_STATUSES.QUEUED)
+        .where('created_at', '<', job.created_at)
+        .orderBy('created_at', 'asc')
+        .limit(11)
+        .get();
+
+    return snapshot.size;
+};
+
+const buildDocumentJobResponse = async (job) => {
+    const sanitizedJob = sanitizeDocumentJobForResponse(job);
+    if (!sanitizedJob || sanitizedJob.status !== DOCUMENT_JOB_STATUSES.QUEUED) {
+        return sanitizedJob;
+    }
+
+    try {
+        const aheadCount = await getQueuedJobsAheadCount(job);
+        if (aheadCount === null) {
+            return sanitizedJob;
+        }
+
+        return {
+            ...sanitizedJob,
+            queue_info: buildQueueInfo(aheadCount)
+        };
+    } catch (error) {
+        console.error('document_job_queue_info_failed', {
+            job_id: sanitizedJob.id,
+            session_id: sanitizedJob.session_id,
+            message: error?.message || 'Unknown queue_info error.'
+        });
+        return sanitizedJob;
+    }
 };
 
 const createDocumentJob = async ({ type, sessionId, requestedBy, payload, metadata = {} }) => {
@@ -179,6 +268,9 @@ module.exports = {
     DOCUMENT_JOBS_COLLECTION,
     DOCUMENT_JOB_STATUSES,
     DOCUMENT_JOB_TYPES,
+    buildAheadCountBucket,
+    buildQueueInfo,
+    buildDocumentJobResponse,
     sanitizeDocumentJobForResponse,
     createDocumentJob,
     getDocumentJob,

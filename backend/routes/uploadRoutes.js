@@ -19,6 +19,7 @@ const { wipeBufferList } = require('../utils/memorySecurity');
 const { sanitizeFormCode } = require('../utils/documentJobProcessor');
 const { encryptDocumentIntakeToFile } = require('../utils/documentIntakeEncryption');
 const {
+    buildDocumentJobResponse,
     DOCUMENT_JOB_TYPES,
     ensureDocumentJobAccess,
     getDocumentJob,
@@ -308,7 +309,7 @@ router.get('/jobs/:jobId', authMiddleware, async (req, res) => {
         if (!waitForChange || !lastStatus || job.status !== lastStatus || Date.now() >= deadline) {
             return res.status(200).json({
                 status: 'success',
-                job: sanitizeDocumentJobForResponse(job)
+                job: await buildDocumentJobResponse(job)
             });
         }
 

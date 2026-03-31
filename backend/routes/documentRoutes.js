@@ -10,6 +10,7 @@ const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
 const { getMergedDownloadUrlTtlMs } = require('../utils/documentMergeSecurity');
 const {
+  buildDocumentJobResponse,
   DOCUMENT_JOB_TYPES,
   DOCUMENT_JOB_STATUSES,
   createDocumentJob,
@@ -83,7 +84,7 @@ router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res)
 
     return res.status(202).json({
       status: 'queued',
-      job: sanitizeDocumentJobForResponse(job)
+      job: await buildDocumentJobResponse(job)
     });
   } catch (error) {
     req.log?.error('document_merge_enqueue_error', { message: error.message });
@@ -113,7 +114,7 @@ router.get('/jobs/:jobId', authMiddleware, async (req, res) => {
     if (!waitForChange || !lastStatus || job.status !== lastStatus || Date.now() >= deadline) {
       return res.status(200).json({
         status: 'success',
-        job: sanitizeDocumentJobForResponse(job)
+        job: await buildDocumentJobResponse(job)
       });
     }
 
