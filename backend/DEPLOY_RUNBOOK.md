@@ -63,6 +63,7 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 - app service account ตอนนี้ใช้ secret-level access สำหรับ secrets ที่ runtime ใช้จริง แทน project-wide `secretmanager.secretAccessor`
 - app และ cleanup service account ถูกลด bucket role ลงมาเป็น `roles/storage.objectUser` ซึ่งยังพอสำหรับ read/write/delete object ตาม flow ปัจจุบัน
 - app service account มี self `roles/iam.serviceAccountTokenCreator` เพื่อรองรับ `getSignedUrl()` ผ่าน `signBlob`
+- หลัง deploy ควรตั้ง log-based alerts ใน Cloud Monitoring สำหรับ event อย่าง `payload_replay_blocked`, `csrf_validation_failed`, `unencrypted_request_blocked`, `document_job_queue_info_failed`, `temp_cleanup_failed`, และ `document_intake_cleanup_failed` เพื่อให้ทีมเห็น attack spikes หรือ cleanup failures โดยไม่ต้องรอ user report
 
 ## Manual OAuth Provider Setup
 

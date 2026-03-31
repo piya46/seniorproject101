@@ -15,6 +15,7 @@ const { strictLimiter, createScopedLimiter } = require('../middlewares/rateLimit
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
 const { decryptEnvelopeKey } = require('../utils/cryptoUtils');
 const { getMaxPdfSourceBytes, getMaxUploadBytes } = require('../utils/uploadSecurity');
+const { baseLog } = require('../utils/logger');
 const { wipeBufferList } = require('../utils/memorySecurity');
 const { sanitizeFormCode } = require('../utils/documentJobProcessor');
 const { encryptDocumentIntakeToFile } = require('../utils/documentIntakeEncryption');
@@ -105,7 +106,12 @@ const cleanupTempFile = async (filePath) => {
         return;
     }
 
-    await fsp.rm(filePath, { force: true }).catch(() => {});
+    await fsp.rm(filePath, { force: true }).catch((error) => {
+        baseLog('warn', 'temp_cleanup_failed', {
+            file_path: filePath,
+            message: error.message
+        });
+    });
 };
 
 const uploadProcessedFileToGcs = async (blob, filePath, contentType, sessionId) =>
@@ -238,7 +244,12 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
     for (const obsoleteFile of obsoleteFiles) {
         const cleanupTargets = [obsoleteFile.gcs_path, obsoleteFile.raw_gcs_path].filter(Boolean);
         for (const cleanupPath of cleanupTargets) {
-            await bucket.file(cleanupPath).delete({ ignoreNotFound: true }).catch(() => {});
+            await bucket.file(cleanupPath).delete({ ignoreNotFound: true }).catch((error) => {
+                baseLog('warn', 'staged_upload_cleanup_failed', {
+                    gcs_path: cleanupPath,
+                    message: error.message
+                });
+            });
         }
         await deleteFileRecord(sessionId, obsoleteFile.id);
     }

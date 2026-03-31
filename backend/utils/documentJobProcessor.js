@@ -36,7 +36,12 @@ const cleanupTempFile = async (filePath) => {
         return;
     }
 
-    await fsp.rm(filePath, { force: true }).catch(() => {});
+    await fsp.rm(filePath, { force: true }).catch((error) => {
+        baseLog('warn', 'temp_cleanup_failed', {
+            file_path: filePath,
+            message: error.message
+        });
+    });
 };
 
 const uploadProcessedFileToGcs = async (blob, filePath, contentType, sessionId) =>
@@ -165,8 +170,12 @@ const processUploadSanitizeJob = async (job) => {
             for (const cleanupPath of cleanupTargets) {
                 try {
                     await bucket.file(cleanupPath).delete({ ignoreNotFound: true });
-                } catch (_storageDeleteError) {
-                    // best effort cleanup only
+                } catch (error) {
+                    baseLog('warn', 'document_cleanup_failed', {
+                        gcs_path: cleanupPath,
+                        file_key: fileKey,
+                        message: error.message
+                    });
                 }
             }
             await deleteFileRecord(sessionId, obsoleteFile.id);
@@ -187,7 +196,13 @@ const processUploadSanitizeJob = async (job) => {
             processed_at: new Date().toISOString()
         });
 
-        await rawFile.delete({ ignoreNotFound: true }).catch(() => {});
+        await rawFile.delete({ ignoreNotFound: true }).catch((error) => {
+            baseLog('warn', 'document_intake_cleanup_failed', {
+                gcs_path: rawObjectPath,
+                file_key: fileKey,
+                message: error.message
+            });
+        });
 
         return {
             file_key: fileKey,
@@ -197,7 +212,13 @@ const processUploadSanitizeJob = async (job) => {
             source_bytes: sourceBytes
         };
     } finally {
-        await rawFile.delete({ ignoreNotFound: true }).catch(() => {});
+        await rawFile.delete({ ignoreNotFound: true }).catch((error) => {
+            baseLog('warn', 'document_intake_cleanup_failed', {
+                gcs_path: rawObjectPath,
+                file_key: fileKey,
+                message: error.message
+            });
+        });
         await cleanupTempFile(encryptedIntakePath);
         await cleanupTempFile(sourcePath);
         await cleanupTempFile(processedPath);

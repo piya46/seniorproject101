@@ -1,4 +1,5 @@
 const { firestore } = require('./dbUtils');
+const { baseLog } = require('./logger');
 
 const COLLECTION_NAME = 'RATE_LIMITS';
 
@@ -76,7 +77,13 @@ class FirestoreRateLimitStore {
     }
 
     async resetKey(key) {
-        await this.getDocRef(key).delete().catch(() => {});
+        await this.getDocRef(key).delete().catch((error) => {
+            baseLog('warn', 'rate_limit_reset_failed', {
+                rate_limit_prefix: this.prefix,
+                rate_limit_key: key,
+                message: error.message
+            });
+        });
     }
 }
 

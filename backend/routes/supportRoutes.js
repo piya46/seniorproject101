@@ -8,6 +8,7 @@ const authMiddleware = require('../middlewares/authMiddleware');
 const { createScopedLimiter } = require('../middlewares/rateLimitMiddleware');
 const { sendTechnicalSupportEmail } = require('../utils/emailUtils');
 const { isAllowedBrowserOrigin } = require('../utils/browserOrigin');
+const { baseLog } = require('../utils/logger');
 
 const router = express.Router();
 
@@ -93,7 +94,12 @@ const cleanupTempFile = async (filePath) => {
     return;
   }
 
-  await fs.rm(filePath, { force: true }).catch(() => {});
+  await fs.rm(filePath, { force: true }).catch((error) => {
+    baseLog('warn', 'temp_cleanup_failed', {
+      file_path: filePath,
+      message: error.message
+    });
+  });
 };
 
 router.post('/technical-email', supportLimiter, authMiddleware, checkBrowserOrigin, (req, res, next) => {

@@ -152,6 +152,7 @@ AI usage รายวันถูกเก็บใน Firestore collection `AI_
 และฝั่ง operator มี script สำหรับ dry-run / write migration อยู่ที่ [migrateDbEncryptionVersioning.js](/Users/pst./senior/backend/scripts/migrateDbEncryptionVersioning.js)
 
 best-effort memory wiping ถูกเพิ่มในจุดที่คุม buffer ได้ เช่น AES session key, IV, auth tag, และ validation probes เพื่อลด lifetime ของข้อมูลลับในหน่วยความจำ แต่ยังต้องถือว่าเป็น defense-in-depth เท่านั้น ไม่ใช่ hard guarantee ใน Node/V8
+temp file cleanup หรือ raw intake cleanup ที่ล้มเหลวจะถูกเขียนเป็น warning logs (`temp_cleanup_failed`, `document_intake_cleanup_failed`, `staged_upload_cleanup_failed`) เพื่อให้ทีมมอนิเตอร์ storage leak หรือ cleanup drift ได้โดยไม่ต้องรอให้พื้นที่เต็มก่อน
 
 ข้อมูลที่เก็บไม่ได้มีแค่ token รวม แต่รวม context สำหรับ analytics ด้วย เช่น `degree_levels`, `form_codes`, `success_count`, `failure_count`, และ `last_failure_reason`
 
@@ -215,6 +216,19 @@ service account แยกของระบบและสิทธิ์ Secret
 ถ้าดูในเชิงแอป auth/control, ระบบยังเข้มอยู่
 
 ## Risk Notes
+
+### 0. Log-Based Alerts ที่ควรตั้ง
+
+Cloud Monitoring ควรมี log-based alerts อย่างน้อยสำหรับ event เหล่านี้:
+
+- `payload_replay_blocked`
+- `csrf_validation_failed`
+- `unencrypted_request_blocked`
+- `document_job_queue_info_failed`
+- `temp_cleanup_failed`
+- `document_intake_cleanup_failed`
+
+แนวทางที่แนะนำคือ alert เมื่อ warning/error พุ่งเกิน baseline ในช่วงเวลา 5-10 นาที เพื่อแยก attack spike, misconfiguration, หรือ cleanup drift ออกจาก incident ปกติให้เร็วที่สุด
 
 ### 1. OIDC Client Secret ต้องดูแลดี
 
