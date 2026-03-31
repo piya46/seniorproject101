@@ -76,6 +76,21 @@ DOCUMENT_AV_SCAN_TIMEOUT_MS="${DOCUMENT_AV_SCAN_TIMEOUT_MS:-30000}"
 DOCUMENT_INTAKE_KMS_LOCATION="${DOCUMENT_INTAKE_KMS_LOCATION:-}"
 DOCUMENT_INTAKE_KMS_KEYRING="${DOCUMENT_INTAKE_KMS_KEYRING:-${APP_NAME}-document-intake}"
 DOCUMENT_INTAKE_KMS_KEY="${DOCUMENT_INTAKE_KMS_KEY:-intake-key}"
+ENABLE_UPSTASH_REDIS="${ENABLE_UPSTASH_REDIS:-false}"
+UPSTASH_AUTO_CREATE_REDIS="${UPSTASH_AUTO_CREATE_REDIS:-true}"
+UPSTASH_REDIS_DATABASE_NAME="${UPSTASH_REDIS_DATABASE_NAME:-${APP_NAME}-backend-cache}"
+UPSTASH_REDIS_PLATFORM="${UPSTASH_REDIS_PLATFORM:-aws}"
+UPSTASH_REDIS_PRIMARY_REGION="${UPSTASH_REDIS_PRIMARY_REGION:-ap-southeast-1}"
+UPSTASH_REDIS_PLAN="${UPSTASH_REDIS_PLAN:-payg}"
+UPSTASH_REDIS_BUDGET="${UPSTASH_REDIS_BUDGET:-20}"
+UPSTASH_REDIS_TLS="${UPSTASH_REDIS_TLS:-true}"
+UPSTASH_REDIS_EVICTION="${UPSTASH_REDIS_EVICTION:-true}"
+UPSTASH_REDIS_TIMEOUT_MS="${UPSTASH_REDIS_TIMEOUT_MS:-3000}"
+UPSTASH_REDIS_KEY_PREFIX="${UPSTASH_REDIS_KEY_PREFIX:-${APP_NAME}}"
+UPSTASH_REDIS_REST_URL_VALUE="${UPSTASH_REDIS_REST_URL_VALUE:-}"
+UPSTASH_REDIS_REST_TOKEN_VALUE="${UPSTASH_REDIS_REST_TOKEN_VALUE:-}"
+UPSTASH_MANAGEMENT_EMAIL="${UPSTASH_MANAGEMENT_EMAIL:-}"
+UPSTASH_MANAGEMENT_API_KEY="${UPSTASH_MANAGEMENT_API_KEY:-}"
 APP_SERVICE_ACCOUNT_NAME="${APP_SERVICE_ACCOUNT_NAME:-${SERVICE_NAME}-sa}"
 CLEANUP_SCHEDULER_JOB_NAME="${CLEANUP_SCHEDULER_JOB_NAME:-${CLEANUP_SERVICE_NAME}-daily}"
 CLEANUP_SCHEDULER_LOCATION="${CLEANUP_SCHEDULER_LOCATION:-}"
@@ -147,6 +162,8 @@ TECH_SUPPORT_TARGET_EMAIL_SECRET="${TECH_SUPPORT_TARGET_EMAIL_SECRET:-TECH_SUPPO
 OIDC_CLIENT_ID_SECRET="${OIDC_CLIENT_ID_SECRET:-GOOGLE_OIDC_CLIENT_ID}"
 OIDC_CLIENT_SECRET_SECRET="${OIDC_CLIENT_SECRET_SECRET:-GOOGLE_OIDC_CLIENT_SECRET}"
 TRUSTED_BFF_SHARED_SECRET_SECRET="${TRUSTED_BFF_SHARED_SECRET_SECRET:-TRUSTED_BFF_SHARED_SECRET}"
+UPSTASH_REDIS_REST_URL_SECRET="${UPSTASH_REDIS_REST_URL_SECRET:-UPSTASH_REDIS_REST_URL}"
+UPSTASH_REDIS_REST_TOKEN_SECRET="${UPSTASH_REDIS_REST_TOKEN_SECRET:-UPSTASH_REDIS_REST_TOKEN}"
 
 # 📍 App Region (แนะนำ asia-southeast1 (Singapore) เป็น Main Hub ใกล้ไทยสุดที่มีฟีเจอร์ครบ)
 # หากต้องการใช้ Server ไทยแท้ๆ ให้เปลี่ยนเป็น "asia-southeast3" (แต่ต้องเช็ค Quota ของโปรเจ็คก่อน)
@@ -210,6 +227,21 @@ TRUSTED_BFF_IDENTITY_TOKEN_HEADER="$(trim_value "$TRUSTED_BFF_IDENTITY_TOKEN_HEA
 TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL="$(trim_value "$TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL")"
 TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE="$(trim_value "$TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE")"
 TRUSTED_BFF_SHARED_SECRET_VALUE="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_VALUE")"
+ENABLE_UPSTASH_REDIS="$(trim_value "$ENABLE_UPSTASH_REDIS")"
+UPSTASH_AUTO_CREATE_REDIS="$(trim_value "$UPSTASH_AUTO_CREATE_REDIS")"
+UPSTASH_REDIS_DATABASE_NAME="$(trim_value "$UPSTASH_REDIS_DATABASE_NAME")"
+UPSTASH_REDIS_PLATFORM="$(trim_value "$UPSTASH_REDIS_PLATFORM")"
+UPSTASH_REDIS_PRIMARY_REGION="$(trim_value "$UPSTASH_REDIS_PRIMARY_REGION")"
+UPSTASH_REDIS_PLAN="$(trim_value "$UPSTASH_REDIS_PLAN")"
+UPSTASH_REDIS_BUDGET="$(trim_value "$UPSTASH_REDIS_BUDGET")"
+UPSTASH_REDIS_TLS="$(trim_value "$UPSTASH_REDIS_TLS")"
+UPSTASH_REDIS_EVICTION="$(trim_value "$UPSTASH_REDIS_EVICTION")"
+UPSTASH_REDIS_TIMEOUT_MS="$(trim_value "$UPSTASH_REDIS_TIMEOUT_MS")"
+UPSTASH_REDIS_KEY_PREFIX="$(trim_value "$UPSTASH_REDIS_KEY_PREFIX")"
+UPSTASH_REDIS_REST_URL_VALUE="$(trim_value "$UPSTASH_REDIS_REST_URL_VALUE")"
+UPSTASH_REDIS_REST_TOKEN_VALUE="$(trim_value "$UPSTASH_REDIS_REST_TOKEN_VALUE")"
+UPSTASH_MANAGEMENT_EMAIL="$(trim_value "$UPSTASH_MANAGEMENT_EMAIL")"
+UPSTASH_MANAGEMENT_API_KEY="$(trim_value "$UPSTASH_MANAGEMENT_API_KEY")"
 CLOUD_RUN_AUTH_MODE="$(trim_value "$CLOUD_RUN_AUTH_MODE")"
 TRUST_PROXY="$(trim_value "$TRUST_PROXY")"
 COOKIE_SAME_SITE="$(trim_value "$COOKIE_SAME_SITE")"
@@ -220,6 +252,8 @@ BROWSER_ORIGIN_HEADER_NAME="$(trim_value "$BROWSER_ORIGIN_HEADER_NAME")"
 OIDC_CLIENT_ID_SECRET="$(trim_value "$OIDC_CLIENT_ID_SECRET")"
 OIDC_CLIENT_SECRET_SECRET="$(trim_value "$OIDC_CLIENT_SECRET_SECRET")"
 TRUSTED_BFF_SHARED_SECRET_SECRET="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_SECRET")"
+UPSTASH_REDIS_REST_URL_SECRET="$(trim_value "$UPSTASH_REDIS_REST_URL_SECRET")"
+UPSTASH_REDIS_REST_TOKEN_SECRET="$(trim_value "$UPSTASH_REDIS_REST_TOKEN_SECRET")"
 BUCKET_LOCATION="$(trim_value "$BUCKET_LOCATION")"
 BUCKET_STORAGE_CLASS="$(trim_value "$BUCKET_STORAGE_CLASS")"
 FIRESTORE_DATABASE_ID="$(trim_value "$FIRESTORE_DATABASE_ID")"
@@ -494,6 +528,11 @@ validate_boolean_string() {
     [[ "$VALUE" = "true" || "$VALUE" = "false" ]]
 }
 
+validate_url() {
+    local VALUE=$1
+    [[ "$VALUE" =~ ^https://[^[:space:]]+$ ]]
+}
+
 validate_positive_integer() {
     local VALUE=$1
     [[ "$VALUE" =~ ^[1-9][0-9]*$ ]]
@@ -509,6 +548,34 @@ validate_document_av_scan_mode() {
     local VALUE
     VALUE="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
     [[ "$VALUE" = "off" || "$VALUE" = "log-only" || "$VALUE" = "required" ]]
+}
+
+validate_upstash_platform() {
+    local VALUE
+    VALUE="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    [[ "$VALUE" = "aws" || "$VALUE" = "gcp" ]]
+}
+
+normalize_upstash_rest_url() {
+    local VALUE
+    VALUE="$(trim_value "${1:-}")"
+
+    if [ -z "$VALUE" ]; then
+        printf ''
+        return
+    fi
+
+    if [[ "$VALUE" =~ ^https?:// ]]; then
+        printf '%s' "$VALUE"
+        return
+    fi
+
+    if [[ "$VALUE" == *.* ]]; then
+        printf 'https://%s' "$VALUE"
+        return
+    fi
+
+    printf 'https://%s.upstash.io' "$VALUE"
 }
 
 add_project_iam_policy_binding_if_enabled() {
@@ -1261,6 +1328,10 @@ ensure_app_service_account_and_permissions() {
     if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ]; then
         grant_secret_accessor_on_secret "$TRUSTED_BFF_SHARED_SECRET_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
     fi
+    if [ "$ENABLE_UPSTASH_REDIS" = "true" ]; then
+        grant_secret_accessor_on_secret "$UPSTASH_REDIS_REST_URL_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
+        grant_secret_accessor_on_secret "$UPSTASH_REDIS_REST_TOKEN_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
+    fi
 
     if gcloud secrets describe "$PREV_PRIV_KEY_SECRET" --project "$PROJECT_ID" >/dev/null 2>&1; then
         grant_secret_accessor_on_secret "$PREV_PRIV_KEY_SECRET" "$APP_SERVICE_ACCOUNT_EMAIL"
@@ -1862,6 +1933,169 @@ reuse_trusted_bff_secret_from_secret_manager() {
     fi
 }
 
+reuse_upstash_redis_from_secret_manager() {
+    if [ "$ENABLE_UPSTASH_REDIS" != "true" ]; then
+        return
+    fi
+
+    if [ -z "$UPSTASH_REDIS_REST_URL_VALUE" ] && gcloud secrets describe "$UPSTASH_REDIS_REST_URL_SECRET" &> /dev/null; then
+        UPSTASH_REDIS_REST_URL_VALUE="$(gcloud secrets versions access latest --secret="$UPSTASH_REDIS_REST_URL_SECRET" 2>/dev/null || true)"
+        UPSTASH_REDIS_REST_URL_VALUE="$(normalize_upstash_rest_url "$UPSTASH_REDIS_REST_URL_VALUE")"
+        if [ -n "$UPSTASH_REDIS_REST_URL_VALUE" ]; then
+            echo -e "   ✅ Reusing existing Upstash Redis REST URL from Secret Manager."
+        fi
+    fi
+
+    if [ -z "$UPSTASH_REDIS_REST_TOKEN_VALUE" ] && gcloud secrets describe "$UPSTASH_REDIS_REST_TOKEN_SECRET" &> /dev/null; then
+        UPSTASH_REDIS_REST_TOKEN_VALUE="$(gcloud secrets versions access latest --secret="$UPSTASH_REDIS_REST_TOKEN_SECRET" 2>/dev/null || true)"
+        UPSTASH_REDIS_REST_TOKEN_VALUE="$(trim_value "$UPSTASH_REDIS_REST_TOKEN_VALUE")"
+        if [ -n "$UPSTASH_REDIS_REST_TOKEN_VALUE" ]; then
+            echo -e "   ✅ Reusing existing Upstash Redis REST token from Secret Manager."
+        fi
+    fi
+}
+
+upstash_api_request() {
+    local METHOD=$1
+    local PATH_VALUE=$2
+    local BODY_VALUE=${3:-}
+
+    local AUTH_B64
+    AUTH_B64="$(printf '%s:%s' "$UPSTASH_MANAGEMENT_EMAIL" "$UPSTASH_MANAGEMENT_API_KEY" | base64 | tr -d '\n')"
+
+    if [ -n "$BODY_VALUE" ]; then
+        curl -fsS --request "$METHOD" \
+            --url "https://api.upstash.com${PATH_VALUE}" \
+            --header "Authorization: Basic $AUTH_B64" \
+            --header 'Content-Type: application/json' \
+            --data "$BODY_VALUE"
+        return
+    fi
+
+    curl -fsS --request "$METHOD" \
+        --url "https://api.upstash.com${PATH_VALUE}" \
+        --header "Authorization: Basic $AUTH_B64"
+}
+
+resolve_upstash_redis_connection_from_json() {
+    local JSON_VALUE=$1
+
+    local PARSED_OUTPUT
+    PARSED_OUTPUT="$(
+        printf '%s' "$JSON_VALUE" | node -e '
+const fs = require("fs");
+const raw = fs.readFileSync(0, "utf8");
+const data = JSON.parse(raw);
+const endpoint = String(
+  data.rest_url ||
+  data.restUrl ||
+  data.endpoint ||
+  data.endpoint_url ||
+  data.endpointUrl ||
+  ""
+).trim();
+const token = String(
+  data.rest_token ||
+  data.restToken ||
+  data.token ||
+  ""
+).trim();
+if (!endpoint || !token) {
+  process.exit(1);
+}
+process.stdout.write(`${endpoint}\n${token}`);
+' 2>/dev/null
+    )" || return 1
+
+    UPSTASH_REDIS_REST_URL_VALUE="$(normalize_upstash_rest_url "$(printf '%s' "$PARSED_OUTPUT" | sed -n '1p')")"
+    UPSTASH_REDIS_REST_TOKEN_VALUE="$(printf '%s' "$PARSED_OUTPUT" | sed -n '2p' | tr -d '\r')"
+
+    [ -n "$UPSTASH_REDIS_REST_URL_VALUE" ] && [ -n "$UPSTASH_REDIS_REST_TOKEN_VALUE" ]
+}
+
+ensure_upstash_redis_database() {
+    if [ "$ENABLE_UPSTASH_REDIS" != "true" ]; then
+        return
+    fi
+
+    reuse_upstash_redis_from_secret_manager
+    if [ -n "$UPSTASH_REDIS_REST_URL_VALUE" ] && [ -n "$UPSTASH_REDIS_REST_TOKEN_VALUE" ]; then
+        return
+    fi
+
+    if [ "$UPSTASH_AUTO_CREATE_REDIS" != "true" ]; then
+        return
+    fi
+
+    if [ -z "$UPSTASH_MANAGEMENT_EMAIL" ]; then
+        prompt_value_if_empty UPSTASH_MANAGEMENT_EMAIL "Upstash management email"
+        UPSTASH_MANAGEMENT_EMAIL="$(trim_value "$UPSTASH_MANAGEMENT_EMAIL")"
+    fi
+
+    if [ -z "$UPSTASH_MANAGEMENT_API_KEY" ]; then
+        prompt_value_if_empty UPSTASH_MANAGEMENT_API_KEY "Upstash management API key" "" true
+        UPSTASH_MANAGEMENT_API_KEY="$(trim_value "$UPSTASH_MANAGEMENT_API_KEY")"
+    fi
+
+    if [ -z "$UPSTASH_MANAGEMENT_EMAIL" ] || [ -z "$UPSTASH_MANAGEMENT_API_KEY" ]; then
+        echo -e "${RED}❌ Upstash management credentials are required when UPSTASH_AUTO_CREATE_REDIS=true and no existing REST credentials were found.${NC}"
+        exit 1
+    fi
+
+    echo -e "${YELLOW}🧠 Ensuring Upstash Redis database...${NC}"
+    echo -e "   Database name           : ${YELLOW}$UPSTASH_REDIS_DATABASE_NAME${NC}"
+    echo -e "   Platform                : ${YELLOW}$UPSTASH_REDIS_PLATFORM${NC}"
+    echo -e "   Primary region          : ${YELLOW}$UPSTASH_REDIS_PRIMARY_REGION${NC}"
+    echo -e "   Plan                    : ${YELLOW}$UPSTASH_REDIS_PLAN${NC}"
+
+    local LIST_RESPONSE
+    LIST_RESPONSE="$(upstash_api_request GET '/v2/redis/database')"
+
+    local MATCHED_DB_JSON
+    MATCHED_DB_JSON="$(
+        printf '%s' "$LIST_RESPONSE" | node -e '
+const fs = require("fs");
+const raw = fs.readFileSync(0, "utf8");
+const data = JSON.parse(raw);
+const items = Array.isArray(data) ? data : (Array.isArray(data.databases) ? data.databases : []);
+const target = process.argv[1];
+const match = items.find((item) => String(item.database_name || item.name || "").trim() === target);
+if (!match) process.exit(1);
+process.stdout.write(JSON.stringify(match));
+' "$UPSTASH_REDIS_DATABASE_NAME" 2>/dev/null
+    )" || true
+
+    if [ -n "$MATCHED_DB_JSON" ] && resolve_upstash_redis_connection_from_json "$MATCHED_DB_JSON"; then
+        echo -e "   ✅ Reusing existing Upstash Redis database."
+        return
+    fi
+
+    local CREATE_BODY
+    CREATE_BODY="$(node -e '
+const payload = {
+  database_name: process.argv[1],
+  platform: process.argv[2],
+  primary_region: process.argv[3],
+  plan: process.argv[4],
+  budget: Number(process.argv[5]),
+  eviction: process.argv[6] === "true",
+  tls: process.argv[7] === "true"
+};
+process.stdout.write(JSON.stringify(payload));
+' "$UPSTASH_REDIS_DATABASE_NAME" "$UPSTASH_REDIS_PLATFORM" "$UPSTASH_REDIS_PRIMARY_REGION" "$UPSTASH_REDIS_PLAN" "$UPSTASH_REDIS_BUDGET" "$UPSTASH_REDIS_EVICTION" "$UPSTASH_REDIS_TLS")"
+
+    local CREATE_RESPONSE
+    CREATE_RESPONSE="$(upstash_api_request POST '/v2/redis/database' "$CREATE_BODY")"
+
+    if ! resolve_upstash_redis_connection_from_json "$CREATE_RESPONSE"; then
+        echo -e "${RED}❌ Failed to parse Upstash Redis create response.${NC}"
+        echo "$CREATE_RESPONSE" >&2
+        exit 1
+    fi
+
+    echo -e "   ✅ Created Upstash Redis database automatically."
+}
+
 generate_trusted_bff_secret_if_needed() {
     if [ "$TRUSTED_BFF_AUTH_ENABLED" != "true" ]; then
         return
@@ -1906,6 +2140,16 @@ prompt_for_missing_config() {
         echo -e "${YELLOW}🛡️  Trusted BFF auth is enabled. Backend will accept shared-secret-authenticated proxy requests from the frontend service.${NC}"
         generate_trusted_bff_secret_if_needed
     fi
+    if [ "$ENABLE_UPSTASH_REDIS" = "true" ]; then
+        echo -e "${YELLOW}⚡ Upstash Redis hot-path cache is enabled for rate limits + nonce replay protection.${NC}"
+        ensure_upstash_redis_database
+        if [ -z "$UPSTASH_REDIS_REST_URL_VALUE" ]; then
+            prompt_value_if_empty UPSTASH_REDIS_REST_URL_VALUE "Upstash Redis REST URL"
+        fi
+        if [ -z "$UPSTASH_REDIS_REST_TOKEN_VALUE" ]; then
+            prompt_value_if_empty UPSTASH_REDIS_REST_TOKEN_VALUE "Upstash Redis REST token" "" true
+        fi
+    fi
 
     SMTP_HOST_VALUE="$(trim_value "$SMTP_HOST_VALUE")"
     SMTP_USER_VALUE="$(trim_value "$SMTP_USER_VALUE")"
@@ -1918,6 +2162,8 @@ prompt_for_missing_config() {
     GOOGLE_OIDC_CLIENT_SECRET_VALUE="$(trim_value "$GOOGLE_OIDC_CLIENT_SECRET_VALUE")"
     GOOGLE_OIDC_CALLBACK_URL="$(trim_value "$GOOGLE_OIDC_CALLBACK_URL")"
     TRUSTED_BFF_SHARED_SECRET_VALUE="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_VALUE")"
+    UPSTASH_REDIS_REST_URL_VALUE="$(normalize_upstash_rest_url "$UPSTASH_REDIS_REST_URL_VALUE")"
+    UPSTASH_REDIS_REST_TOKEN_VALUE="$(trim_value "$UPSTASH_REDIS_REST_TOKEN_VALUE")"
 }
 
 ensure_smtp_password() {
@@ -2007,6 +2253,63 @@ validate_smtp_config() {
     if ! validate_boolean_string "$ENABLE_FIRESTORE_TTL_POLICIES"; then
         echo -e "${RED}❌ Invalid ENABLE_FIRESTORE_TTL_POLICIES: $ENABLE_FIRESTORE_TTL_POLICIES (must be true or false)${NC}"
         exit 1
+    fi
+
+    if ! validate_boolean_string "$ENABLE_UPSTASH_REDIS"; then
+        echo -e "${RED}❌ Invalid ENABLE_UPSTASH_REDIS: $ENABLE_UPSTASH_REDIS (must be true or false)${NC}"
+        exit 1
+    fi
+
+    if ! validate_boolean_string "$UPSTASH_AUTO_CREATE_REDIS"; then
+        echo -e "${RED}❌ Invalid UPSTASH_AUTO_CREATE_REDIS: $UPSTASH_AUTO_CREATE_REDIS (must be true or false)${NC}"
+        exit 1
+    fi
+
+    if [ "$ENABLE_UPSTASH_REDIS" = "true" ]; then
+        if ! validate_upstash_platform "$UPSTASH_REDIS_PLATFORM"; then
+            echo -e "${RED}❌ Invalid UPSTASH_REDIS_PLATFORM: $UPSTASH_REDIS_PLATFORM (must be aws or gcp)${NC}"
+            exit 1
+        fi
+
+        if [ -z "$UPSTASH_REDIS_DATABASE_NAME" ] || [ -z "$UPSTASH_REDIS_PRIMARY_REGION" ] || [ -z "$UPSTASH_REDIS_PLAN" ]; then
+            echo -e "${RED}❌ Upstash Redis config is incomplete.${NC}"
+            exit 1
+        fi
+
+        if ! validate_positive_integer "$UPSTASH_REDIS_BUDGET"; then
+            echo -e "${RED}❌ Invalid UPSTASH_REDIS_BUDGET: $UPSTASH_REDIS_BUDGET (must be a positive integer)${NC}"
+            exit 1
+        fi
+
+        if ! validate_boolean_string "$UPSTASH_REDIS_TLS"; then
+            echo -e "${RED}❌ Invalid UPSTASH_REDIS_TLS: $UPSTASH_REDIS_TLS (must be true or false)${NC}"
+            exit 1
+        fi
+
+        if ! validate_boolean_string "$UPSTASH_REDIS_EVICTION"; then
+            echo -e "${RED}❌ Invalid UPSTASH_REDIS_EVICTION: $UPSTASH_REDIS_EVICTION (must be true or false)${NC}"
+            exit 1
+        fi
+
+        if ! validate_positive_integer "$UPSTASH_REDIS_TIMEOUT_MS"; then
+            echo -e "${RED}❌ Invalid UPSTASH_REDIS_TIMEOUT_MS: $UPSTASH_REDIS_TIMEOUT_MS (must be a positive integer)${NC}"
+            exit 1
+        fi
+
+        if [ -z "$UPSTASH_REDIS_KEY_PREFIX" ]; then
+            echo -e "${RED}❌ UPSTASH_REDIS_KEY_PREFIX is required when ENABLE_UPSTASH_REDIS=true${NC}"
+            exit 1
+        fi
+
+        if [ -z "$UPSTASH_REDIS_REST_URL_VALUE" ] || [ -z "$UPSTASH_REDIS_REST_TOKEN_VALUE" ]; then
+            echo -e "${RED}❌ Upstash Redis REST credentials are missing. Either provide UPSTASH_REDIS_REST_URL_VALUE + UPSTASH_REDIS_REST_TOKEN_VALUE or enable auto-create with valid management credentials.${NC}"
+            exit 1
+        fi
+
+        if ! validate_url "$UPSTASH_REDIS_REST_URL_VALUE"; then
+            echo -e "${RED}❌ Invalid UPSTASH_REDIS_REST_URL_VALUE: $UPSTASH_REDIS_REST_URL_VALUE${NC}"
+            exit 1
+        fi
     fi
 
     if ! validate_boolean_string "$AUTO_CREATE_BUCKET_ON_LOCATION_MISMATCH"; then
@@ -2340,6 +2643,17 @@ print_deploy_summary() {
     echo -e "   Firestore Session Coll  : ${YELLOW}$FIRESTORE_COLLECTION_NAME${NC}"
     echo -e "   Firestore Files Subcoll : ${YELLOW}$FIRESTORE_FILES_SUBCOLLECTION${NC}"
     echo -e "   Firestore TTL Enabled   : ${YELLOW}$ENABLE_FIRESTORE_TTL_POLICIES${NC}"
+    echo -e "   Upstash Redis Enabled   : ${YELLOW}$ENABLE_UPSTASH_REDIS${NC}"
+    echo -e "   Upstash Auto Create     : ${YELLOW}$UPSTASH_AUTO_CREATE_REDIS${NC}"
+    echo -e "   Upstash DB Name         : ${YELLOW}$UPSTASH_REDIS_DATABASE_NAME${NC}"
+    echo -e "   Upstash Platform        : ${YELLOW}$UPSTASH_REDIS_PLATFORM${NC}"
+    echo -e "   Upstash Region          : ${YELLOW}$UPSTASH_REDIS_PRIMARY_REGION${NC}"
+    echo -e "   Upstash Plan            : ${YELLOW}$UPSTASH_REDIS_PLAN${NC}"
+    echo -e "   Upstash Budget          : ${YELLOW}$UPSTASH_REDIS_BUDGET${NC}"
+    echo -e "   Upstash Timeout (ms)    : ${YELLOW}$UPSTASH_REDIS_TIMEOUT_MS${NC}"
+    echo -e "   Upstash Key Prefix      : ${YELLOW}$UPSTASH_REDIS_KEY_PREFIX${NC}"
+    echo -e "   Upstash REST URL Secret : ${YELLOW}$UPSTASH_REDIS_REST_URL_SECRET${NC}"
+    echo -e "   Upstash Token Secret    : ${YELLOW}$UPSTASH_REDIS_REST_TOKEN_SECRET${NC}"
     echo -e "   Auto Bucket Recreate    : ${YELLOW}$AUTO_CREATE_BUCKET_ON_LOCATION_MISMATCH${NC}"
     echo -e "   Bucket Cleanup Enabled  : ${YELLOW}$ENABLE_BUCKET_LIFECYCLE_CLEANUP${NC}"
     echo -e "   Bucket Delete After Days: ${YELLOW}$BUCKET_DELETE_AFTER_DAYS${NC}"
@@ -2705,6 +3019,10 @@ upsert_secret_value $OIDC_CLIENT_SECRET_SECRET "$GOOGLE_OIDC_CLIENT_SECRET_VALUE
 if [ "$TRUSTED_BFF_AUTH_ENABLED" = "true" ]; then
     upsert_secret_value $TRUSTED_BFF_SHARED_SECRET_SECRET "$TRUSTED_BFF_SHARED_SECRET_VALUE"
 fi
+if [ "$ENABLE_UPSTASH_REDIS" = "true" ]; then
+    upsert_secret_value $UPSTASH_REDIS_REST_URL_SECRET "$UPSTASH_REDIS_REST_URL_VALUE"
+    upsert_secret_value $UPSTASH_REDIS_REST_TOKEN_SECRET "$UPSTASH_REDIS_REST_TOKEN_VALUE"
+fi
 
 
 if ! gcloud secrets describe $PRIV_KEY_SECRET &> /dev/null; then
@@ -2776,6 +3094,19 @@ else
     echo -e "   ℹ️  Previous key pair secrets not found. Deploying with active key pair only."
 fi
 
+if [ "$ENABLE_UPSTASH_REDIS" = "true" ]; then
+    DEPLOY_SET_SECRET_ARGS+=(
+      --set-secrets "UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL_SECRET}:latest"
+      --set-secrets "UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN_SECRET}:latest"
+    )
+fi
+
+DEPLOY_ENV_VARS="^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCP_PROJECT_NUMBER=${PROJECT_NUMBER}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__APP_REGION=${REGION}__ENV_DELIM__AI_LOCATION=${AI_LOCATION}__ENV_DELIM__AI_DAILY_TOKEN_LIMIT=${AI_DAILY_TOKEN_LIMIT}__ENV_DELIM__AI_USAGE_RETENTION_DAYS=${AI_USAGE_RETENTION_DAYS}__ENV_DELIM__GCP_LOCATION=${AI_LOCATION}__ENV_DELIM__FRONTEND_URL=${FRONTEND_URL}__ENV_DELIM__TECH_SUPPORT_TARGET_EMAIL=${TECH_SUPPORT_TARGET_EMAIL}__ENV_DELIM__SMTP_PORT=${SMTP_PORT}__ENV_DELIM__SMTP_SECURE=${SMTP_SECURE}__ENV_DELIM__OIDC_ENABLED=${OIDC_ENABLED}__ENV_DELIM__OIDC_ALLOWED_DOMAINS=${OIDC_ALLOWED_DOMAINS}__ENV_DELIM__OIDC_REQUIRE_HOSTED_DOMAIN=${OIDC_REQUIRE_HOSTED_DOMAIN}__ENV_DELIM__ALLOW_BEARER_SESSION_TOKEN=${ALLOW_BEARER_SESSION_TOKEN}__ENV_DELIM__PFS_V2_ENABLED=${PFS_V2_ENABLED}__ENV_DELIM__PFS_V2_HANDSHAKE_TTL_MS=${PFS_V2_HANDSHAKE_TTL_MS}__ENV_DELIM__DOCUMENT_INTAKE_KMS_KEY_NAME=${DOCUMENT_INTAKE_KMS_KEY_NAME}__ENV_DELIM__DOCUMENT_INTAKE_KMS_ACCESS_MODE=encrypt__ENV_DELIM__GOOGLE_OIDC_CALLBACK_URL=${GOOGLE_OIDC_CALLBACK_URL}__ENV_DELIM__TRUST_PROXY=${TRUST_PROXY}__ENV_DELIM__COOKIE_SAME_SITE=${COOKIE_SAME_SITE}__ENV_DELIM__COOKIE_SECURE=${COOKIE_SECURE}__ENV_DELIM__TRUST_PROXY_BROWSER_ORIGIN_HEADER=${TRUST_PROXY_BROWSER_ORIGIN_HEADER}__ENV_DELIM__BROWSER_ORIGIN_HEADER_NAME=${BROWSER_ORIGIN_HEADER_NAME}__ENV_DELIM__TRUSTED_BFF_AUTH_ENABLED=${TRUSTED_BFF_AUTH_ENABLED}__ENV_DELIM__TRUSTED_BFF_AUTH_HEADER_NAME=${TRUSTED_BFF_AUTH_HEADER_NAME}__ENV_DELIM__TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN=${TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN}__ENV_DELIM__TRUSTED_BFF_IDENTITY_TOKEN_HEADER=${TRUSTED_BFF_IDENTITY_TOKEN_HEADER}__ENV_DELIM__TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL=${TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL}__ENV_DELIM__TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE=${TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE}"
+
+if [ "$ENABLE_UPSTASH_REDIS" = "true" ]; then
+    DEPLOY_ENV_VARS="${DEPLOY_ENV_VARS}__ENV_DELIM__UPSTASH_REDIS_TIMEOUT_MS=${UPSTASH_REDIS_TIMEOUT_MS}__ENV_DELIM__UPSTASH_REDIS_KEY_PREFIX=${UPSTASH_REDIS_KEY_PREFIX}"
+fi
+
 gcloud run deploy "$SERVICE_NAME" \
   --project "$PROJECT_ID" \
   --source "$SCRIPT_DIR" \
@@ -2784,7 +3115,7 @@ gcloud run deploy "$SERVICE_NAME" \
   "$RUN_AUTH_FLAG" \
   "$DEFAULT_URL_FLAG" \
   --service-account "$APP_SERVICE_ACCOUNT_EMAIL" \
-  --set-env-vars "^__ENV_DELIM__^NODE_ENV=${NODE_ENV}__ENV_DELIM__GCP_PROJECT_ID=${PROJECT_ID}__ENV_DELIM__GCP_PROJECT_NUMBER=${PROJECT_NUMBER}__ENV_DELIM__GCS_BUCKET_NAME=${BUCKET_NAME}__ENV_DELIM__FIRESTORE_DATABASE_ID=${FIRESTORE_DATABASE_ID}__ENV_DELIM__FIRESTORE_COLLECTION_NAME=${FIRESTORE_COLLECTION_NAME}__ENV_DELIM__FIRESTORE_FILES_SUBCOLLECTION=${FIRESTORE_FILES_SUBCOLLECTION}__ENV_DELIM__APP_REGION=${REGION}__ENV_DELIM__AI_LOCATION=${AI_LOCATION}__ENV_DELIM__AI_DAILY_TOKEN_LIMIT=${AI_DAILY_TOKEN_LIMIT}__ENV_DELIM__AI_USAGE_RETENTION_DAYS=${AI_USAGE_RETENTION_DAYS}__ENV_DELIM__GCP_LOCATION=${AI_LOCATION}__ENV_DELIM__FRONTEND_URL=${FRONTEND_URL}__ENV_DELIM__TECH_SUPPORT_TARGET_EMAIL=${TECH_SUPPORT_TARGET_EMAIL}__ENV_DELIM__SMTP_PORT=${SMTP_PORT}__ENV_DELIM__SMTP_SECURE=${SMTP_SECURE}__ENV_DELIM__OIDC_ENABLED=${OIDC_ENABLED}__ENV_DELIM__OIDC_ALLOWED_DOMAINS=${OIDC_ALLOWED_DOMAINS}__ENV_DELIM__OIDC_REQUIRE_HOSTED_DOMAIN=${OIDC_REQUIRE_HOSTED_DOMAIN}__ENV_DELIM__ALLOW_BEARER_SESSION_TOKEN=${ALLOW_BEARER_SESSION_TOKEN}__ENV_DELIM__PFS_V2_ENABLED=${PFS_V2_ENABLED}__ENV_DELIM__PFS_V2_HANDSHAKE_TTL_MS=${PFS_V2_HANDSHAKE_TTL_MS}__ENV_DELIM__DOCUMENT_INTAKE_KMS_KEY_NAME=${DOCUMENT_INTAKE_KMS_KEY_NAME}__ENV_DELIM__DOCUMENT_INTAKE_KMS_ACCESS_MODE=encrypt__ENV_DELIM__GOOGLE_OIDC_CALLBACK_URL=${GOOGLE_OIDC_CALLBACK_URL}__ENV_DELIM__TRUST_PROXY=${TRUST_PROXY}__ENV_DELIM__COOKIE_SAME_SITE=${COOKIE_SAME_SITE}__ENV_DELIM__COOKIE_SECURE=${COOKIE_SECURE}__ENV_DELIM__TRUST_PROXY_BROWSER_ORIGIN_HEADER=${TRUST_PROXY_BROWSER_ORIGIN_HEADER}__ENV_DELIM__BROWSER_ORIGIN_HEADER_NAME=${BROWSER_ORIGIN_HEADER_NAME}__ENV_DELIM__TRUSTED_BFF_AUTH_ENABLED=${TRUSTED_BFF_AUTH_ENABLED}__ENV_DELIM__TRUSTED_BFF_AUTH_HEADER_NAME=${TRUSTED_BFF_AUTH_HEADER_NAME}__ENV_DELIM__TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN=${TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN}__ENV_DELIM__TRUSTED_BFF_IDENTITY_TOKEN_HEADER=${TRUSTED_BFF_IDENTITY_TOKEN_HEADER}__ENV_DELIM__TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL=${TRUSTED_BFF_EXPECTED_SERVICE_ACCOUNT_EMAIL}__ENV_DELIM__TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE=${TRUSTED_BFF_IDENTITY_TOKEN_AUDIENCE}" \
+  --set-env-vars "$DEPLOY_ENV_VARS" \
   "${DEPLOY_SET_SECRET_ARGS[@]}"
 
 if [ $? -eq 0 ]; then
