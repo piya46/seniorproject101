@@ -48,6 +48,7 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 - apply bucket lifecycle policy ถ้าเปิด flag ที่เกี่ยวข้อง
 - create/check Firestore database ที่ app ใช้งาน
 - enable Firestore TTL policies สำหรับ `used_nonces.expire_at`, `RATE_LIMITS.expireAt`, และ `AI_USAGE_DAILY.expire_at`
+- ถ้าต้องการย้าย hot-path state ออกจาก Firestore ให้ตั้ง `UPSTASH_REDIS_REST_URL` และ `UPSTASH_REDIS_REST_TOKEN` เพื่อให้ rate limit + nonce cache ไปใช้ Upstash Redis แทน
 - enable Firestore TTL policy สำหรับ `DOCUMENT_JOBS.expire_at`
 - create/update app service account และ cleanup service account
 - grant IAM bindings ที่ backend และ cleanup service ต้องใช้

@@ -1,13 +1,14 @@
 const rateLimit = require('express-rate-limit');
-const { createFirestoreRateLimitStore } = require('../utils/firestoreRateLimitStore');
+const { createRateLimitStore } = require('../utils/firestoreRateLimitStore');
 
 // 1. General Limiter: สำหรับ API ทั่วไป (100 requests / 15 นาที)
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 100, 
-    store: createFirestoreRateLimitStore('general'),
+    store: createRateLimitStore('general'),
     standardHeaders: true, 
     legacyHeaders: false,
+    passOnStoreError: false,
     message: { status: 'error', message: 'Too many requests, please try again later.' }
 });
 
@@ -15,9 +16,10 @@ const generalLimiter = rateLimit({
 const strictLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 20, 
-    store: createFirestoreRateLimitStore('strict'),
+    store: createRateLimitStore('strict'),
     standardHeaders: true, 
     legacyHeaders: false,
+    passOnStoreError: false,
     keyGenerator: (req) => {
         const sessionId = req.user?.session_id;
         const email = req.user?.email;
@@ -35,9 +37,10 @@ const strictLimiter = rateLimit({
 const createScopedLimiter = (prefix, options = {}) => rateLimit({
     windowMs: options.windowMs ?? 15 * 60 * 1000,
     max: options.max ?? 10,
-    store: createFirestoreRateLimitStore(prefix),
+    store: createRateLimitStore(prefix),
     standardHeaders: true,
     legacyHeaders: false,
+    passOnStoreError: false,
     message: options.message ?? { status: 'error', message: 'Too many requests, please try again later.' }
 });
 

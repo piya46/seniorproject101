@@ -1,6 +1,7 @@
 const { Firestore } = require('@google-cloud/firestore');
 const crypto = require('crypto');
 const { baseLog } = require('./logger');
+const { isUpstashRedisConfigured, setWithExpiryIfNotExists } = require('./upstashRedis');
 
 const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || 'ai-formcheck';
 const firestore = new Firestore({
@@ -455,12 +456,10 @@ exports.getChatHistory = async (sessionId) => {
     } catch (e) { return []; }
 };
 
-exports.checkAndMarkNonce = async (nonce, expireSeconds) => {
-    // ใช้ Collection แยกชื่อ 'used_nonces' (เพื่อไม่ให้ปนกับ Session)
+const checkAndMarkNonceViaFirestore = async (nonce, expireSeconds) => {
     const nonceRef = firestore.collection('used_nonces').doc(nonce);
 
     try {
-        // ใช้ Transaction เพื่อความชัวร์ (Atomic Operation) ป้องกัน Race Condition
         return await firestore.runTransaction(async (t) => {
             const doc = await t.get(nonceRef);
             
@@ -481,9 +480,21 @@ exports.checkAndMarkNonce = async (nonce, expireSeconds) => {
         });
     } catch (error) {
         console.error('❌ Firestore Nonce Error:', error);
-        // กรณี Error ให้ถือว่าไม่ผ่านไว้ก่อนเพื่อความปลอดภัย (Fail Closed)
         return false; 
     }
+};
+
+exports.checkAndMarkNonce = async (nonce, expireSeconds) => {
+    if (isUpstashRedisConfigured()) {
+        try {
+            return await setWithExpiryIfNotExists('nonce', nonce, '1', expireSeconds);
+        } catch (error) {
+            console.error('❌ Upstash Nonce Error:', error);
+            return false;
+        }
+    }
+
+    return checkAndMarkNonceViaFirestore(nonce, expireSeconds);
 };
 
 const buildAiUsageDocRef = (usageKey, dateKey) =>

@@ -1,4 +1,10 @@
 const { firestore } = require('./dbUtils');
+const {
+    decrementCounter,
+    deleteScopedKey,
+    incrementExpiringCounter,
+    isUpstashRedisConfigured
+} = require('./upstashRedis');
 
 const COLLECTION_NAME = 'RATE_LIMITS';
 
@@ -80,9 +86,37 @@ class FirestoreRateLimitStore {
     }
 }
 
+class UpstashRateLimitStore {
+    constructor(prefix) {
+        this.prefix = prefix;
+        this.localKeys = false;
+        this.windowMs = 60 * 1000;
+    }
+
+    init(options) {
+        this.windowMs = options.windowMs;
+    }
+
+    async increment(key) {
+        return incrementExpiringCounter(`rate-limit:${this.prefix}`, key, this.windowMs);
+    }
+
+    async decrement(key) {
+        await decrementCounter(`rate-limit:${this.prefix}`, key);
+    }
+
+    async resetKey(key) {
+        await deleteScopedKey(`rate-limit:${this.prefix}`, key);
+    }
+}
+
 const createFirestoreRateLimitStore = (prefix) => new FirestoreRateLimitStore(prefix);
+const createRateLimitStore = (prefix) =>
+    isUpstashRedisConfigured() ? new UpstashRateLimitStore(prefix) : new FirestoreRateLimitStore(prefix);
 
 module.exports = {
     FirestoreRateLimitStore,
-    createFirestoreRateLimitStore
+    UpstashRateLimitStore,
+    createFirestoreRateLimitStore,
+    createRateLimitStore
 };
