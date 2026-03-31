@@ -20,17 +20,21 @@ const { sanitizeFormCode } = require('../utils/documentJobProcessor');
 const { encryptDocumentIntakeToFile } = require('../utils/documentIntakeEncryption');
 const {
     DOCUMENT_JOB_TYPES,
-    createDocumentJob,
     ensureDocumentJobAccess,
     getDocumentJob,
     sanitizeDocumentJobForResponse
 } = require('../utils/documentJobs');
+const { addStagedFileToSession, deleteFileRecord, getDecryptedSessionFiles } = require('../utils/dbUtils');
+const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc } = require('../utils/fileSelection');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 const TEMP_UPLOAD_DIR = os.tmpdir();
 const maxUploadBytes = getMaxUploadBytes();
 const maxPdfSourceBytes = getMaxPdfSourceBytes();
+const MAX_JOB_WAIT_TIMEOUT_MS = 25000;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Rate Limiter
 const uploadLimiter = createScopedLimiter('upload', {
@@ -226,37 +230,50 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
         }
     });
 
-    const job = await createDocumentJob({
-        type: DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE,
-        sessionId,
-        requestedBy: {
-            email: req.user.email || null,
-            session_id: sessionId
-        },
-        payload: {
-            file_key,
-            form_code: safeFormCode,
-            raw_gcs_path: rawObjectPath,
-            detected_mime: detectedType.mime,
-            detected_ext: detectedType.ext,
-            source_bytes: verifiedInputBytes
-        },
-        metadata: {
-            source_bytes: verifiedInputBytes
+    const existingFiles = await getDecryptedSessionFiles(sessionId);
+    const obsoleteFiles = sortFilesByUploadedAtDesc(
+        findFilesByKeyAndForm(existingFiles, file_key, safeFormCode)
+    );
+
+    for (const obsoleteFile of obsoleteFiles) {
+        const cleanupTargets = [obsoleteFile.gcs_path, obsoleteFile.raw_gcs_path].filter(Boolean);
+        for (const cleanupPath of cleanupTargets) {
+            await bucket.file(cleanupPath).delete({ ignoreNotFound: true }).catch(() => {});
         }
+        await deleteFileRecord(sessionId, obsoleteFile.id);
+    }
+
+    const fileRecordId = await addStagedFileToSession(sessionId, {
+        file_key,
+        gcs_path: null,
+        raw_gcs_path: rawObjectPath,
+        file_type: detectedType.mime,
+        form_code: safeFormCode,
+        file_processing_status: 'staged',
+        processing_job_id: null,
+        processing_error: null,
+        detected_mime: detectedType.mime,
+        detected_ext: detectedType.ext,
+        source_bytes: verifiedInputBytes
     });
 
-    req.log?.audit('upload_job_queued', {
+    req.log?.audit('upload_staged', {
         file_key,
         form_code: safeFormCode,
         mime_type: detectedType.mime,
-        job_id: job.id,
+        file_record_id: fileRecordId,
         raw_gcs_path: rawObjectPath,
         source_bytes: verifiedInputBytes
     });
-    res.status(202).json({
-        status: 'queued',
-        job: sanitizeDocumentJobForResponse(job)
+    res.status(200).json({
+        status: 'success',
+        data: {
+            file_record_id: fileRecordId,
+            file_key,
+            form_code: safeFormCode,
+            processing_status: 'staged',
+            mime_type: detectedType.mime
+        }
     });
 
   } catch (error) {
@@ -270,19 +287,33 @@ router.post('/', uploadLimiter, authMiddleware, checkBrowserOrigin, strictLimite
 });
 
 router.get('/jobs/:jobId', authMiddleware, async (req, res) => {
-    const job = await getDocumentJob(req.params.jobId);
-    if (!job || job.type !== DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE) {
-        return res.status(404).json({ error: 'Job not found.' });
-    }
+    const waitForChange = String(req.query.wait_for_change || '').trim() === '1';
+    const lastStatus = String(req.query.last_status || '').trim();
+    const timeoutMs = Math.min(
+        Math.max(Number.parseInt(String(req.query.timeout_ms || MAX_JOB_WAIT_TIMEOUT_MS), 10) || MAX_JOB_WAIT_TIMEOUT_MS, 1000),
+        MAX_JOB_WAIT_TIMEOUT_MS
+    );
+    const deadline = Date.now() + timeoutMs;
 
-    if (!ensureDocumentJobAccess(job, req.user)) {
-        return res.status(403).json({ error: 'Forbidden' });
-    }
+    while (true) {
+        const job = await getDocumentJob(req.params.jobId);
+        if (!job || job.type !== DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE) {
+            return res.status(404).json({ error: 'Job not found.' });
+        }
 
-    return res.status(200).json({
-        status: 'success',
-        job: sanitizeDocumentJobForResponse(job)
-    });
+        if (!ensureDocumentJobAccess(job, req.user)) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        if (!waitForChange || !lastStatus || job.status !== lastStatus || Date.now() >= deadline) {
+            return res.status(200).json({
+                status: 'success',
+                job: sanitizeDocumentJobForResponse(job)
+            });
+        }
+
+        await sleep(1000);
+    }
 });
 
 module.exports = router;

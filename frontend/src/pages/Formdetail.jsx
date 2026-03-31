@@ -20,6 +20,61 @@ const buildCachedUploadedFiles = (files) =>
     return acc;
   }, {});
 
+const waitForJobStatusChange = async (basePath, jobId, lastStatus = '') => {
+  const res = await axios.get(`${basePath}/${jobId}`, {
+    params: {
+      wait_for_change: 1,
+      last_status: lastStatus || '',
+      timeout_ms: 25000
+    },
+    validateStatus: (status) => status < 500
+  });
+  const data = parseApiResponse(res.data);
+  return data?.job || null;
+};
+
+const pollUploadPreparationJobs = async (jobs) => {
+  const pendingJobs = new Map(
+    jobs
+      .filter((job) => job?.id)
+      .map((job) => [job.id, job.status || 'queued'])
+  );
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (pendingJobs.size === 0) {
+      return;
+    }
+
+    const results = await Promise.all(
+      Array.from(pendingJobs.entries()).map(async ([jobId, lastStatus]) => {
+        const job = await waitForJobStatusChange('/api/v1/upload/jobs', jobId, lastStatus);
+        return job;
+      })
+    );
+
+    pendingJobs.clear();
+    for (const job of results) {
+      if (!job) {
+        throw new Error('ไม่พบสถานะงานเตรียมเอกสาร');
+      }
+
+      if (job.status === 'failed') {
+        throw new Error(job?.error?.message || 'การเตรียมเอกสารล้มเหลว');
+      }
+
+      if (job.status !== 'succeeded') {
+        pendingJobs.set(job.id, job.status || 'queued');
+      }
+    }
+
+    if (pendingJobs.size === 0) {
+      return;
+    }
+  }
+
+  throw new Error('การเตรียมเอกสารใช้เวลานานเกินไป กรุณาลองอีกครั้ง');
+};
+
 export default function Formdetail() {
   const { id } = useParams(); 
   const navigate = useNavigate();
@@ -246,36 +301,44 @@ export default function Formdetail() {
     setIsValidating(true);
     try {
       if (!publicKey) throw new Error("Public Key is missing. Please refresh.");
-
       const validatePayload = {
         form_code: formData.form_code || id,
         degree_level: degreeLevel,
         sub_type: subType || ""
       };
 
-      const { requestPayload, aesKeyRaw } = await encryptAndKeepKey(validatePayload, publicKey);
-      
-      const res = await axios.post('/api/v1/validation/check-completeness', requestPayload, reqConfig);
-      
-      let responseData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+      const submitValidationRequest = async (allowPreparationRetry = true) => {
+        const { requestPayload, aesKeyRaw } = await encryptAndKeepKey(validatePayload, publicKey);
+        const res = await axios.post('/api/v1/validation/check-completeness', requestPayload, reqConfig);
+        let responseData = parseApiResponse(res.data);
 
-      let encryptedPkg = null;
-      if (responseData.payload && responseData.iv) {
-        encryptedPkg = responseData;
-      } else if (responseData.data && responseData.data.payload && responseData.data.iv) {
-        encryptedPkg = responseData.data;
-      }
-
-      if (encryptedPkg) {
-        const decryptedResult = await decryptResponse(encryptedPkg, aesKeyRaw);
-        if (responseData.data && responseData.data.payload) {
-          responseData.data = decryptedResult;
-        } else {
-          responseData = decryptedResult;
+        let encryptedPkg = null;
+        if (responseData.payload && responseData.iv) {
+          encryptedPkg = responseData;
+        } else if (responseData.data && responseData.data.payload && responseData.data.iv) {
+          encryptedPkg = responseData.data;
         }
-      }
 
-      const actualData = responseData?.data || responseData;
+        if (encryptedPkg) {
+          const decryptedResult = await decryptResponse(encryptedPkg, aesKeyRaw);
+          if (responseData.data && responseData.data.payload) {
+            responseData.data = decryptedResult;
+          } else {
+            responseData = decryptedResult;
+          }
+        }
+
+        const actualData = responseData?.data || responseData;
+
+        if (res.status === 202 && actualData?.status === 'queued' && Array.isArray(actualData.jobs) && allowPreparationRetry) {
+          await pollUploadPreparationJobs(actualData.jobs);
+          return submitValidationRequest(false);
+        }
+
+        return { res, responseData, actualData };
+      };
+
+      const { responseData, actualData } = await submitValidationRequest(true);
 
       if (responseData?.status === 'success' || actualData === 'success') {
         const successResults = {};
@@ -375,13 +438,9 @@ export default function Formdetail() {
       }
 
       const jobId = mergeData.job.id;
-      let mergeJob = null;
-      for (let attempt = 0; attempt < 120; attempt += 1) {
-        const jobRes = await axios.get(`/api/v1/documents/jobs/${jobId}`, {
-          validateStatus: (status) => status < 500
-        });
-        const jobData = parseApiResponse(jobRes.data);
-        mergeJob = jobData?.job || null;
+      let mergeJob = { id: jobId, status: mergeData.job.status || 'queued' };
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        mergeJob = await waitForJobStatusChange('/api/v1/documents/jobs', jobId, mergeJob?.status || 'queued');
 
         if (mergeJob?.status === 'succeeded') {
           break;
@@ -390,8 +449,6 @@ export default function Formdetail() {
         if (mergeJob?.status === 'failed') {
           throw new Error(mergeJob?.error?.message || 'Document merge failed on server');
         }
-
-        await sleep(1000);
       }
 
       if (!mergeJob || mergeJob.status !== 'succeeded') {

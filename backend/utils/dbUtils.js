@@ -11,7 +11,7 @@ const SUB_COLLECTION_NAME = process.env.FIRESTORE_FILES_SUBCOLLECTION || 'files'
 const AI_USAGE_COLLECTION_NAME = 'AI_USAGE_DAILY';
 const DEFAULT_AI_USAGE_RETENTION_DAYS = 30;
 const DEFAULT_DB_KEY_VERSION = 'v1';
-const DB_ENCRYPTED_FILE_FIELDS = ['file_key', 'gcs_path', 'file_type', 'form_code'];
+const DB_ENCRYPTED_FILE_FIELDS = ['file_key', 'gcs_path', 'file_type', 'form_code', 'raw_gcs_path'];
 
 const getAiUsageRetentionDays = () => {
     const parsed = Number.parseInt(String(process.env.AI_USAGE_RETENTION_DAYS || DEFAULT_AI_USAGE_RETENTION_DAYS), 10);
@@ -245,17 +245,103 @@ exports.revokeSessionRecord = async (sessionId) => {
     }
 };
 
+const buildSessionFileRecord = (fileMeta = {}) => ({
+    file_key: fileMeta.file_key ? encryptData(fileMeta.file_key) : null,
+    gcs_path: fileMeta.gcs_path ? encryptData(fileMeta.gcs_path) : null,
+    raw_gcs_path: fileMeta.raw_gcs_path ? encryptData(fileMeta.raw_gcs_path) : null,
+    file_type: fileMeta.file_type ? encryptData(fileMeta.file_type) : null,
+    form_code: fileMeta.form_code ? encryptData(fileMeta.form_code) : null,
+    encryption_key_version: getCurrentDbKeyVersion(),
+    file_processing_status: String(fileMeta.file_processing_status || 'ready'),
+    processing_job_id: fileMeta.processing_job_id || null,
+    processing_error: fileMeta.processing_error || null,
+    detected_mime: fileMeta.detected_mime || null,
+    detected_ext: fileMeta.detected_ext || null,
+    source_bytes: Number.isFinite(Number(fileMeta.source_bytes)) ? Number(fileMeta.source_bytes) : null,
+    uploaded_at: fileMeta.uploaded_at || new Date().toISOString(),
+    processed_at: fileMeta.processed_at || null,
+    updated_at: new Date().toISOString()
+});
+
+const buildPartialSessionFileRecord = (fileMeta = {}) => {
+    const payload = {
+        updated_at: new Date().toISOString()
+    };
+
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'file_key')) {
+        payload.file_key = fileMeta.file_key ? encryptData(fileMeta.file_key) : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'gcs_path')) {
+        payload.gcs_path = fileMeta.gcs_path ? encryptData(fileMeta.gcs_path) : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'raw_gcs_path')) {
+        payload.raw_gcs_path = fileMeta.raw_gcs_path ? encryptData(fileMeta.raw_gcs_path) : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'file_type')) {
+        payload.file_type = fileMeta.file_type ? encryptData(fileMeta.file_type) : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'form_code')) {
+        payload.form_code = fileMeta.form_code ? encryptData(fileMeta.form_code) : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'file_processing_status')) {
+        payload.file_processing_status = fileMeta.file_processing_status || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'processing_job_id')) {
+        payload.processing_job_id = fileMeta.processing_job_id || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'processing_error')) {
+        payload.processing_error = fileMeta.processing_error || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'detected_mime')) {
+        payload.detected_mime = fileMeta.detected_mime || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'detected_ext')) {
+        payload.detected_ext = fileMeta.detected_ext || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'source_bytes')) {
+        payload.source_bytes = Number.isFinite(Number(fileMeta.source_bytes)) ? Number(fileMeta.source_bytes) : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'uploaded_at')) {
+        payload.uploaded_at = fileMeta.uploaded_at || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(fileMeta, 'processed_at')) {
+        payload.processed_at = fileMeta.processed_at || null;
+    }
+
+    return payload;
+};
+
 exports.addFileToSession = async (sessionId, fileMeta) => {
     const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
-    const encryptedFile = {
-        file_key: encryptData(fileMeta.file_key),
-        gcs_path: encryptData(fileMeta.gcs_path),
-        file_type: encryptData(fileMeta.file_type),
-        form_code: encryptData(fileMeta.form_code), // เพิ่ม field form_code
-        encryption_key_version: getCurrentDbKeyVersion(),
-        uploaded_at: new Date().toISOString()
-    };
+    const encryptedFile = buildSessionFileRecord({
+        ...fileMeta,
+        file_processing_status: fileMeta.file_processing_status || 'ready',
+        processed_at: fileMeta.processed_at || new Date().toISOString()
+    });
     await filesCollRef.add(encryptedFile);
+    await firestore.collection(COLLECTION_NAME).doc(sessionId).update({
+        last_active: new Date().toISOString()
+    });
+};
+
+exports.addStagedFileToSession = async (sessionId, fileMeta) => {
+    const filesCollRef = firestore.collection(COLLECTION_NAME).doc(sessionId).collection(SUB_COLLECTION_NAME);
+    const encryptedFile = buildSessionFileRecord({
+        ...fileMeta,
+        file_processing_status: fileMeta.file_processing_status || 'staged',
+        processed_at: null
+    });
+    const docRef = await filesCollRef.add(encryptedFile);
+    await firestore.collection(COLLECTION_NAME).doc(sessionId).update({
+        last_active: new Date().toISOString()
+    });
+    return docRef.id;
+};
+
+exports.updateFileRecord = async (sessionId, docId, fileMeta) => {
+    await firestore.collection(COLLECTION_NAME).doc(sessionId)
+        .collection(SUB_COLLECTION_NAME).doc(docId)
+        .set(buildPartialSessionFileRecord(fileMeta), { merge: true });
     await firestore.collection(COLLECTION_NAME).doc(sessionId).update({
         last_active: new Date().toISOString()
     });
@@ -278,7 +364,10 @@ exports.getFileRecordByKey = async (sessionId, fileKey, formCode) => {
             if (decryptedKey === fileKey && (decryptedForm === formCode || !decryptedForm || formCode === 'general')) {
                 return { 
                     id: doc.id, 
-                    gcs_path: decryptData(data.gcs_path) 
+                    gcs_path: decryptData(data.gcs_path),
+                    raw_gcs_path: decryptData(data.raw_gcs_path),
+                    file_processing_status: data.file_processing_status || 'ready',
+                    processing_job_id: data.processing_job_id || null
                 };
             }
         }
@@ -317,17 +406,27 @@ exports.getDecryptedSessionFiles = async (sessionId) => {
         const files = [];
         snapshot.forEach(doc => {
             const data = doc.data();
-            const gcsPathDecrypted = decryptData(data.gcs_path);
             const fileKeyDecrypted = decryptData(data.file_key);
+            const gcsPathDecrypted = decryptData(data.gcs_path);
+            const rawGcsPathDecrypted = decryptData(data.raw_gcs_path);
             
-            if (gcsPathDecrypted && fileKeyDecrypted) {
+            if ((gcsPathDecrypted || rawGcsPathDecrypted) && fileKeyDecrypted) {
                 files.push({
                     id: doc.id, 
                     file_key: fileKeyDecrypted,
                     gcs_path: gcsPathDecrypted,
+                    raw_gcs_path: rawGcsPathDecrypted,
                     file_type: decryptData(data.file_type),
                     form_code: decryptData(data.form_code),
-                    uploaded_at: data.uploaded_at
+                    uploaded_at: data.uploaded_at,
+                    processed_at: data.processed_at || null,
+                    updated_at: data.updated_at || null,
+                    file_processing_status: data.file_processing_status || 'ready',
+                    processing_job_id: data.processing_job_id || null,
+                    processing_error: data.processing_error || null,
+                    detected_mime: data.detected_mime || null,
+                    detected_ext: data.detected_ext || null,
+                    source_bytes: data.source_bytes || null
                 });
             }
         });
@@ -514,3 +613,5 @@ exports.getSessionFileMigrationPlan = getSessionFileMigrationPlan;
 exports.reencryptSessionFileRecord = reencryptSessionFileRecord;
 exports.encryptData = encryptData;
 exports.decryptData = decryptData;
+exports.buildSessionFileRecord = buildSessionFileRecord;
+exports.buildPartialSessionFileRecord = buildPartialSessionFileRecord;

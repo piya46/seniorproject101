@@ -8,6 +8,7 @@ const {
   markDocumentJobSucceeded
 } = require('../../utils/documentJobs');
 const { processDocumentJob } = require('../../utils/documentJobProcessor');
+const { updateFileRecord } = require('../../utils/dbUtils');
 
 const app = express();
 app.use(express.json({ limit: '256kb' }));
@@ -58,6 +59,25 @@ const processOneJob = async (workerId) => {
       status: 'succeeded'
     };
   } catch (error) {
+    console.error('document_worker_job_failed', {
+      worker_id: workerId,
+      job_id: job.id,
+      job_type: job.type,
+      session_id: job.session_id,
+      message: error.message,
+      stack: error.stack || null,
+      status_code: error.statusCode || 500,
+      payload: error.payload || null
+    });
+
+    if (job.type === DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE && job.payload?.file_record_id) {
+      await updateFileRecord(job.session_id, job.payload.file_record_id, {
+        file_processing_status: 'failed',
+        processing_job_id: null,
+        processing_error: error.message
+      });
+    }
+
     await markDocumentJobFailed(job.id, {
       message: error.message,
       status_code: error.statusCode || 500,
@@ -96,6 +116,12 @@ app.post('/process-next', ensureWorkerAuth, async (req, res) => {
       job: result
     });
   } catch (error) {
+    console.error('document_worker_process_next_failed', {
+      worker_id: workerId,
+      message: error.message,
+      stack: error.stack || null
+    });
+
     return res.status(500).json({
       error: 'Worker processing failed.',
       message: error.message
@@ -125,6 +151,12 @@ app.post('/process-batch', ensureWorkerAuth, async (req, res) => {
       jobs: processed
     });
   } catch (error) {
+    console.error('document_worker_process_batch_failed', {
+      worker_id: workerId,
+      message: error.message,
+      stack: error.stack || null
+    });
+
     return res.status(500).json({
       error: 'Worker batch failed.',
       message: error.message

@@ -7,10 +7,98 @@ const { validate } = require('../middlewares/validationMiddleware');
 // ✅ เพิ่ม Rate Limiter ป้องกันการยิงถล่ม
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { getFormConfig } = require('../data/staticData'); 
-const { getDecryptedSessionFiles } = require('../utils/dbUtils');
+const { getDecryptedSessionFiles, updateFileRecord } = require('../utils/dbUtils');
 const { assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUtils');
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
 const { validationCheckSchema } = require('../validators/schemas');
+const {
+  DOCUMENT_JOB_STATUSES,
+  DOCUMENT_JOB_TYPES,
+  createDocumentJob,
+  getDocumentJob,
+  sanitizeDocumentJobForResponse
+} = require('../utils/documentJobs');
+
+const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req }) => {
+  const queuedJobs = [];
+
+  for (const file of files) {
+    if (file.file_processing_status === 'ready' && file.gcs_path) {
+      continue;
+    }
+
+    let existingJob = null;
+    if (file.processing_job_id) {
+      existingJob = await getDocumentJob(file.processing_job_id);
+    }
+
+    if (
+      existingJob &&
+      (existingJob.status === DOCUMENT_JOB_STATUSES.QUEUED || existingJob.status === DOCUMENT_JOB_STATUSES.PROCESSING)
+    ) {
+      queuedJobs.push(sanitizeDocumentJobForResponse(existingJob));
+      continue;
+    }
+
+    if (!file.raw_gcs_path || !file.detected_mime || !file.detected_ext) {
+      return {
+        statusCode: 400,
+        payload: {
+          status: 'error',
+          message: `Uploaded file "${file.file_key}" is incomplete and cannot be prepared for validation.`
+        }
+      };
+    }
+
+    const job = await createDocumentJob({
+      type: DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE,
+      sessionId,
+      requestedBy: {
+        email: user.email || null,
+        session_id: sessionId
+      },
+      payload: {
+        file_record_id: file.id,
+        file_key: file.file_key,
+        form_code: file.form_code,
+        raw_gcs_path: file.raw_gcs_path,
+        detected_mime: file.detected_mime,
+        detected_ext: file.detected_ext,
+        source_bytes: file.source_bytes || null
+      },
+      metadata: {
+        source_bytes: file.source_bytes || null
+      }
+    });
+
+    await updateFileRecord(sessionId, file.id, {
+      file_processing_status: 'processing',
+      processing_job_id: job.id,
+      processing_error: null
+    });
+
+    req.log?.audit('validation_file_processing_queued', {
+      file_key: file.file_key,
+      form_code: file.form_code,
+      job_id: job.id
+    });
+
+    queuedJobs.push(sanitizeDocumentJobForResponse(job));
+  }
+
+  if (queuedJobs.length > 0) {
+    return {
+      statusCode: 202,
+      payload: {
+        status: 'queued',
+        message: 'Documents are being prepared for validation.',
+        jobs: queuedJobs
+      }
+    };
+  }
+
+  return null;
+};
 
 // ✅ เพิ่ม strictLimiter ใน Route
 router.post('/check-completeness', authMiddleware, strictLimiter, validate(validationCheckSchema), async (req, res) => {
@@ -37,6 +125,17 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     }
 
     const latestUserFiles = selectLatestFilesByKey(userFiles);
+
+    const preparationResult = await ensureFilesPreparedForValidation({
+      files: latestUserFiles,
+      sessionId,
+      user: req.user,
+      req
+    });
+
+    if (preparationResult) {
+      return res.status(preparationResult.statusCode).json(preparationResult.payload);
+    }
 
     req.log?.info('validation_started', {
       form_code,

@@ -7,7 +7,7 @@ const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
 const { v4: uuidv4 } = require('uuid');
 
-const { addFileToSession, deleteFileRecord, getDecryptedSessionFiles } = require('./dbUtils');
+const { deleteFileRecord, getDecryptedSessionFiles, updateFileRecord } = require('./dbUtils');
 const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc, filterFilesForForm, selectLatestFilesByKey } = require('./fileSelection');
 const { departments, getFormConfig } = require('../data/staticData');
 const { getMaxPdfSourceBytes } = require('./uploadSecurity');
@@ -50,12 +50,13 @@ const uploadProcessedFileToGcs = async (blob, filePath, contentType, sessionId) 
 const processUploadSanitizeJob = async (job) => {
     const { session_id: sessionId, payload = {} } = job;
     const rawObjectPath = String(payload.raw_gcs_path || '');
+    const fileRecordId = String(payload.file_record_id || '').trim();
     const detectedMime = String(payload.detected_mime || '');
     const detectedExt = String(payload.detected_ext || '').replace(/^\./, '');
     const fileKey = String(payload.file_key || '').trim();
     const safeFormCode = sanitizeFormCode(payload.form_code);
 
-    if (!sessionId || !rawObjectPath || !fileKey || !detectedMime || !detectedExt) {
+    if (!sessionId || !rawObjectPath || !fileRecordId || !fileKey || !detectedMime || !detectedExt) {
         const error = new Error('Upload job payload is incomplete.');
         error.statusCode = 400;
         throw error;
@@ -152,22 +153,33 @@ const processUploadSanitizeJob = async (job) => {
         const existingFiles = await getDecryptedSessionFiles(sessionId);
         const obsoleteFiles = sortFilesByUploadedAtDesc(
             findFilesByKeyAndForm(existingFiles, fileKey, safeFormCode)
-        );
+        ).filter((obsoleteFile) => obsoleteFile.id !== fileRecordId);
 
         for (const obsoleteFile of obsoleteFiles) {
-            try {
-                await bucket.file(obsoleteFile.gcs_path).delete({ ignoreNotFound: true });
-            } catch (_storageDeleteError) {
-                // best effort cleanup only
+            const cleanupTargets = [obsoleteFile.gcs_path, obsoleteFile.raw_gcs_path].filter(Boolean);
+            for (const cleanupPath of cleanupTargets) {
+                try {
+                    await bucket.file(cleanupPath).delete({ ignoreNotFound: true });
+                } catch (_storageDeleteError) {
+                    // best effort cleanup only
+                }
             }
             await deleteFileRecord(sessionId, obsoleteFile.id);
         }
 
-        await addFileToSession(sessionId, {
+        await updateFileRecord(sessionId, fileRecordId, {
             file_key: fileKey,
             gcs_path: gcsPath,
+            raw_gcs_path: null,
             file_type: finalMimeType,
-            form_code: safeFormCode
+            form_code: safeFormCode,
+            file_processing_status: 'ready',
+            processing_job_id: null,
+            processing_error: null,
+            detected_mime: detectedMime,
+            detected_ext: detectedExt,
+            source_bytes: sourceBytes,
+            processed_at: new Date().toISOString()
         });
 
         await rawFile.delete({ ignoreNotFound: true }).catch(() => {});

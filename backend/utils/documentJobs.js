@@ -98,12 +98,18 @@ const claimNextDocumentJob = async (workerId, allowedTypes = Object.values(DOCUM
 
     const snapshot = await getDocumentJobsCollection()
         .where('status', '==', DOCUMENT_JOB_STATUSES.QUEUED)
-        .where('type', 'in', cappedTypes.slice(0, 10))
-        .orderBy('created_at', 'asc')
-        .limit(10)
+        .limit(25)
         .get();
 
-    for (const doc of snapshot.docs) {
+    const candidateDocs = snapshot.docs
+        .filter((doc) => cappedTypes.includes(String(doc.get('type') || '')))
+        .sort((left, right) => {
+            const leftCreatedAt = String(left.get('created_at') || '');
+            const rightCreatedAt = String(right.get('created_at') || '');
+            return leftCreatedAt.localeCompare(rightCreatedAt);
+        });
+
+    for (const doc of candidateDocs) {
         const claimed = await firestore.runTransaction(async (transaction) => {
             const fresh = await transaction.get(doc.ref);
             if (!fresh.exists) {

@@ -22,6 +22,14 @@ keys/
 scripts/
 postman/
 functions/
-services/
+
+# Keep service entrypoints that are deployed separately or bundled into worker images.
+services/*
+!services/delete-file-cleanup/
+!services/delete-file-cleanup/**
+!services/document-job-worker/
+!services/document-job-worker/**
+!services/document-av-scanner/
+!services/document-av-scanner/**
 
 deploy.sh
