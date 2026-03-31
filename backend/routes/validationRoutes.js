@@ -22,6 +22,7 @@ const {
 
 const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req }) => {
   const queuedJobs = [];
+  const filesNeedingPreparation = [];
 
   for (const file of files) {
     if (file.file_processing_status === 'ready' && file.gcs_path) {
@@ -37,7 +38,9 @@ const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req })
       existingJob &&
       (existingJob.status === DOCUMENT_JOB_STATUSES.QUEUED || existingJob.status === DOCUMENT_JOB_STATUSES.PROCESSING)
     ) {
-      queuedJobs.push(await buildDocumentJobResponse(existingJob));
+      if (!queuedJobs.some((job) => job.id === existingJob.id)) {
+        queuedJobs.push(await buildDocumentJobResponse(existingJob));
+      }
       continue;
     }
 
@@ -51,38 +54,48 @@ const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req })
       };
     }
 
+    filesNeedingPreparation.push(file);
+  }
+
+  if (filesNeedingPreparation.length > 0) {
+    const batchFormCode = String(filesNeedingPreparation[0]?.form_code || '').trim();
     const job = await createDocumentJob({
-      type: DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE,
+      type: DOCUMENT_JOB_TYPES.PREPARE_SESSION_DOCUMENTS,
       sessionId,
       requestedBy: {
         email: user.email || null,
         session_id: sessionId
       },
       payload: {
-        file_record_id: file.id,
-        file_key: file.file_key,
-        form_code: file.form_code,
-        raw_gcs_path: file.raw_gcs_path,
-        detected_mime: file.detected_mime,
-        detected_ext: file.detected_ext,
-        source_bytes: file.source_bytes || null
+        form_code: batchFormCode,
+        files: filesNeedingPreparation.map((file) => ({
+          file_key: file.file_key,
+          form_code: file.form_code,
+          source_file_record_id: file.id,
+          raw_gcs_path: file.raw_gcs_path,
+          detected_mime: file.detected_mime,
+          detected_ext: file.detected_ext,
+          source_bytes: file.source_bytes || null
+        }))
       },
       metadata: {
-        source_bytes: file.source_bytes || null,
-        file_key: file.file_key,
-        form_code: file.form_code
+        form_code: batchFormCode,
+        file_keys: filesNeedingPreparation.map((file) => file.file_key),
+        file_count: filesNeedingPreparation.length
       }
     });
 
-    await updateFileRecord(sessionId, file.id, {
-      file_processing_status: 'processing',
-      processing_job_id: job.id,
-      processing_error: null
-    });
+    for (const file of filesNeedingPreparation) {
+      await updateFileRecord(sessionId, file.id, {
+        file_processing_status: 'processing',
+        processing_job_id: job.id,
+        processing_error: null
+      });
+    }
 
-    req.log?.audit('validation_file_processing_queued', {
-      file_key: file.file_key,
-      form_code: file.form_code,
+    req.log?.audit('validation_file_processing_batch_queued', {
+      form_code: batchFormCode,
+      file_keys: filesNeedingPreparation.map((file) => file.file_key),
       job_id: job.id
     });
 

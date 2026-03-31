@@ -16,6 +16,7 @@ const { getDocumentAvScanMode } = require('./documentAvConfig');
 const { scanDocumentFile } = require('./documentAvScan');
 const { decryptDocumentIntakeToFile } = require('./documentIntakeEncryption');
 const { baseLog } = require('./logger');
+const { DOCUMENT_JOB_STATUSES, DOCUMENT_JOB_TYPES } = require('./documentJobs');
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
@@ -199,6 +200,88 @@ const processUploadSanitizeJob = async (job) => {
     }
 };
 
+const processPrepareSessionDocumentsJob = async (job) => {
+    const { session_id: sessionId, payload = {} } = job;
+    const formCode = String(payload.form_code || '').trim() || null;
+    const files = Array.isArray(payload.files) ? payload.files : [];
+
+    if (!sessionId || !formCode || files.length === 0) {
+        const error = new Error('Batch prepare job payload is incomplete.');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const results = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const file of files) {
+        const fileKey = String(file.file_key || '').trim();
+        const sourceFileRecordId = String(file.source_file_record_id || '').trim();
+        const subTaskStartedAt = new Date().toISOString();
+
+        try {
+            await processUploadSanitizeJob({
+                ...job,
+                type: DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE,
+                payload: {
+                    file_record_id: sourceFileRecordId,
+                    file_key: fileKey,
+                    form_code: file.form_code || formCode,
+                    raw_gcs_path: file.raw_gcs_path,
+                    detected_mime: file.detected_mime,
+                    detected_ext: file.detected_ext,
+                    source_bytes: file.source_bytes || null
+                }
+            });
+
+            results.push({
+                file_key: fileKey,
+                source_file_record_id: sourceFileRecordId,
+                status: 'succeeded',
+                error_message: null,
+                started_at: subTaskStartedAt,
+                completed_at: new Date().toISOString()
+            });
+            succeeded += 1;
+        } catch (error) {
+            await updateFileRecord(sessionId, sourceFileRecordId, {
+                file_processing_status: 'failed',
+                processing_job_id: null,
+                processing_error: error.message
+            });
+
+            results.push({
+                file_key: fileKey,
+                source_file_record_id: sourceFileRecordId,
+                status: 'failed',
+                error_message: error.message,
+                started_at: subTaskStartedAt,
+                completed_at: new Date().toISOString()
+            });
+            failed += 1;
+        }
+    }
+
+    let aggregateStatus = DOCUMENT_JOB_STATUSES.SUCCEEDED;
+    if (failed > 0 && succeeded > 0) {
+        aggregateStatus = DOCUMENT_JOB_STATUSES.PARTIAL_FAILED;
+    } else if (failed > 0 && succeeded === 0) {
+        aggregateStatus = DOCUMENT_JOB_STATUSES.FAILED;
+    }
+
+    return {
+        __job_status: aggregateStatus,
+        form_code: formCode,
+        files: results,
+        summary: {
+            total: files.length,
+            succeeded,
+            failed
+        }
+    };
+};
+
 const processMergeDocumentsJob = async (job) => {
     const { session_id: sessionId, payload = {} } = job;
     const formCode = String(payload.form_code || '').trim();
@@ -339,6 +422,10 @@ const processMergeDocumentsJob = async (job) => {
 const processDocumentJob = async (job) => {
     if (job.type === 'upload_sanitize') {
         return processUploadSanitizeJob(job);
+    }
+
+    if (job.type === DOCUMENT_JOB_TYPES.PREPARE_SESSION_DOCUMENTS) {
+        return processPrepareSessionDocumentsJob(job);
     }
 
     if (job.type === 'merge_documents') {

@@ -69,13 +69,13 @@ const pollUploadPreparationJobs = async (jobs, onUpdate) => {
         throw new Error(job?.error?.message || 'การเตรียมเอกสารล้มเหลว');
       }
 
-      if (job.status !== 'succeeded') {
+      if (job.status !== 'succeeded' && job.status !== 'partial_failed') {
         pendingJobs.set(job.id, job.status || 'queued');
       }
     }
 
     if (pendingJobs.size === 0) {
-      return;
+      return results.filter(Boolean);
     }
   }
 
@@ -358,7 +358,13 @@ export default function Formdetail() {
 
         if (res.status === 202 && actualData?.status === 'queued' && Array.isArray(actualData.jobs) && allowPreparationRetry) {
           setValidationStage('preparing');
-          await pollUploadPreparationJobs(actualData.jobs, setValidationPreparationJobs);
+          const finalJobs = await pollUploadPreparationJobs(actualData.jobs, setValidationPreparationJobs);
+          const partialFailedJobs = finalJobs.filter((job) => job?.status === 'partial_failed');
+          if (partialFailedJobs.length > 0) {
+            setValidationResults(buildBatchPreparationErrors(partialFailedJobs));
+            setIsStep2Validated(true);
+            return { res, responseData, actualData: 'partial_failed', partialFailed: true };
+          }
           setValidationStage('checking');
           setValidationPreparationJobs([]);
           return submitValidationRequest(false);
@@ -367,7 +373,11 @@ export default function Formdetail() {
         return { res, responseData, actualData };
       };
 
-      const { responseData, actualData } = await submitValidationRequest(true);
+      const { responseData, actualData, partialFailed } = await submitValidationRequest(true);
+
+      if (partialFailed) {
+        return;
+      }
 
       if (responseData?.status === 'success' || actualData === 'success') {
         const successResults = {};
@@ -483,7 +493,11 @@ export default function Formdetail() {
       return null;
     }
 
-    const matchingJob = validationPreparationJobs.find((job) => job?.metadata?.file_key === docKey);
+    const matchingJob = validationPreparationJobs.find((job) => {
+      const fileKey = job?.metadata?.file_key;
+      const fileKeys = Array.isArray(job?.metadata?.file_keys) ? job.metadata.file_keys : [];
+      return fileKey === docKey || fileKeys.includes(docKey);
+    });
     if (matchingJob?.status === 'queued' && matchingJob?.queue_info) {
       return matchingJob.queue_info;
     }
@@ -956,3 +970,18 @@ export default function Formdetail() {
     </div>
   );
 }
+  const buildBatchPreparationErrors = (jobs = []) => {
+    const nextErrors = {};
+    jobs.forEach((job) => {
+      const fileResults = Array.isArray(job?.result?.files) ? job.result.files : [];
+      fileResults.forEach((fileResult) => {
+        if (fileResult?.status === 'failed' && fileResult?.file_key) {
+          nextErrors[fileResult.file_key] = {
+            status: 'error',
+            reason: fileResult.error_message || 'การเตรียมเอกสารล้มเหลว'
+          };
+        }
+      });
+    });
+    return nextErrors;
+  };

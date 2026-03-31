@@ -3,7 +3,9 @@ const crypto = require('crypto');
 
 const {
   DOCUMENT_JOB_TYPES,
+  DOCUMENT_JOB_STATUSES,
   claimNextDocumentJob,
+  markDocumentJobPartialFailed,
   markDocumentJobFailed,
   markDocumentJobSucceeded
 } = require('../../utils/documentJobs');
@@ -41,6 +43,7 @@ const ensureWorkerAuth = (req, res, next) => {
 const processOneJob = async (workerId) => {
   const job = await claimNextDocumentJob(workerId, [
     DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE,
+    DOCUMENT_JOB_TYPES.PREPARE_SESSION_DOCUMENTS,
     DOCUMENT_JOB_TYPES.MERGE_DOCUMENTS
   ]);
 
@@ -50,6 +53,40 @@ const processOneJob = async (workerId) => {
 
   try {
     const result = await processDocumentJob(job);
+    const effectiveJobStatus = result?.__job_status || 'succeeded';
+
+    if (effectiveJobStatus === DOCUMENT_JOB_STATUSES.PARTIAL_FAILED) {
+      await markDocumentJobPartialFailed(job.id, result, {
+        worker_id: workerId
+      }, {
+        message: 'Batch processing completed with one or more failed files.',
+        status_code: 207,
+        payload: result
+      });
+      return {
+        id: job.id,
+        type: job.type,
+        status: DOCUMENT_JOB_STATUSES.PARTIAL_FAILED,
+        result
+      };
+    }
+
+    if (effectiveJobStatus === DOCUMENT_JOB_STATUSES.FAILED) {
+      await markDocumentJobFailed(job.id, {
+        message: 'Batch processing completed with one or more failed files.',
+        status_code: 400,
+        payload: result
+      }, {
+        worker_id: workerId
+      });
+      return {
+        id: job.id,
+        type: job.type,
+        status: DOCUMENT_JOB_STATUSES.FAILED,
+        result
+      };
+    }
+
     await markDocumentJobSucceeded(job.id, result, {
       worker_id: workerId
     });

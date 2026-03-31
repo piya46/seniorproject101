@@ -7,11 +7,13 @@ const DOCUMENT_JOB_STATUSES = Object.freeze({
     QUEUED: 'queued',
     PROCESSING: 'processing',
     SUCCEEDED: 'succeeded',
+    PARTIAL_FAILED: 'partial_failed',
     FAILED: 'failed'
 });
 const DOCUMENT_JOB_TYPES = Object.freeze({
     UPLOAD_SANITIZE: 'upload_sanitize',
-    MERGE_DOCUMENTS: 'merge_documents'
+    MERGE_DOCUMENTS: 'merge_documents',
+    PREPARE_SESSION_DOCUMENTS: 'prepare_session_documents'
 });
 
 const buildJobExpireAt = (date = new Date()) => {
@@ -239,12 +241,18 @@ const claimNextDocumentJob = async (workerId, allowedTypes = Object.values(DOCUM
     return null;
 };
 
-const markDocumentJobSucceeded = async (jobId, result, metadata = {}) => {
+const markDocumentJobCompleted = async ({
+    jobId,
+    status,
+    result = null,
+    metadata = {},
+    error = null
+}) => {
     const completedAt = new Date().toISOString();
     await getDocumentJobsCollection().doc(jobId).set({
-        status: DOCUMENT_JOB_STATUSES.SUCCEEDED,
-        result: result || null,
-        error: null,
+        status,
+        result,
+        error,
         metadata,
         completed_at: completedAt,
         updated_at: completedAt,
@@ -252,16 +260,32 @@ const markDocumentJobSucceeded = async (jobId, result, metadata = {}) => {
     }, { merge: true });
 };
 
-const markDocumentJobFailed = async (jobId, errorPayload, metadata = {}) => {
-    const completedAt = new Date().toISOString();
-    await getDocumentJobsCollection().doc(jobId).set({
-        status: DOCUMENT_JOB_STATUSES.FAILED,
-        error: errorPayload || { message: 'Job failed.' },
+const markDocumentJobSucceeded = async (jobId, result, metadata = {}) =>
+    markDocumentJobCompleted({
+        jobId,
+        status: DOCUMENT_JOB_STATUSES.SUCCEEDED,
+        result: result || null,
         metadata,
-        completed_at: completedAt,
-        updated_at: completedAt,
-        expire_at: buildJobExpireAt()
-    }, { merge: true });
+        error: null
+    });
+
+const markDocumentJobPartialFailed = async (jobId, result, metadata = {}, errorPayload = null) =>
+    markDocumentJobCompleted({
+        jobId,
+        status: DOCUMENT_JOB_STATUSES.PARTIAL_FAILED,
+        result: result || null,
+        metadata,
+        error: errorPayload || { message: 'Job partially failed.' }
+    });
+
+const markDocumentJobFailed = async (jobId, errorPayload, metadata = {}) => {
+    await markDocumentJobCompleted({
+        jobId,
+        status: DOCUMENT_JOB_STATUSES.FAILED,
+        result: null,
+        metadata,
+        error: errorPayload || { message: 'Job failed.' }
+    });
 };
 
 module.exports = {
@@ -276,6 +300,8 @@ module.exports = {
     getDocumentJob,
     ensureDocumentJobAccess,
     claimNextDocumentJob,
+    markDocumentJobCompleted,
     markDocumentJobSucceeded,
+    markDocumentJobPartialFailed,
     markDocumentJobFailed
 };

@@ -298,7 +298,10 @@ router.get('/jobs/:jobId', authMiddleware, async (req, res) => {
 
     while (true) {
         const job = await getDocumentJob(req.params.jobId);
-        if (!job || job.type !== DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE) {
+        if (!job || ![
+            DOCUMENT_JOB_TYPES.UPLOAD_SANITIZE,
+            DOCUMENT_JOB_TYPES.PREPARE_SESSION_DOCUMENTS
+        ].includes(job.type)) {
             return res.status(404).json({ error: 'Job not found.' });
         }
 
