@@ -26,6 +26,7 @@ export default function Home() {
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatUsage, setChatUsage] = useState(null);
   const messagesEndRef = useRef(null);
   
   // 💡 เพิ่ม ref สำหรับดักการรันเบิ้ลของ React Strict Mode
@@ -191,6 +192,9 @@ export default function Home() {
 
       const actualData = responseData?.data || responseData;
       const botReply = actualData.reply || actualData.message || actualData || 'ได้รับข้อความแล้ว แต่เซิร์ฟเวอร์ตอบกลับผิดรูปแบบ';
+      if (actualData?.ai_usage) {
+        setChatUsage(actualData.ai_usage);
+      }
 
       setChatMessages(prev => [...prev, { sender: 'bot', text: typeof botReply === 'string' ? botReply : JSON.stringify(botReply) }]);
 
@@ -199,10 +203,63 @@ export default function Home() {
       let errMsg = 'ขออภัย เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง';
       if (err.message) errMsg = err.message; 
       if (err.response?.data?.user_message) errMsg = err.response.data.user_message;
+      if (err.response?.data?.data?.daily_limit || err.response?.data?.data?.used_tokens !== undefined) {
+        const quotaData = err.response.data.data;
+        const dailyLimit = Number(quotaData.daily_limit || 0);
+        const usedTokens = Number(quotaData.used_tokens || 0);
+        const remainingTokens = Math.max(0, dailyLimit - usedTokens);
+        const usedPercent = dailyLimit > 0 ? Math.min(100, Math.max(0, Math.round((usedTokens / dailyLimit) * 100))) : 0;
+        setChatUsage({
+          daily_limit: dailyLimit,
+          used_tokens: usedTokens,
+          remaining_tokens: remainingTokens,
+          used_percent: usedPercent
+        });
+      }
       setChatMessages(prev => [...prev, { sender: 'bot', text: errMsg }]);
     } finally {
       setIsChatLoading(false);
     }
+  };
+
+  const getChatUsageToneClasses = () => {
+    const usedPercent = Number(chatUsage?.used_percent || 0);
+
+    if (usedPercent >= 90) {
+      return {
+        chip: 'bg-[#FFF0E8] text-[#B55A1B]',
+        dot: 'bg-[#FF8A3D]'
+      };
+    }
+
+    if (usedPercent >= 70) {
+      return {
+        chip: 'bg-[#FFF6E7] text-[#9A6300]',
+        dot: 'bg-[#FFB43B]'
+      };
+    }
+
+    return {
+      chip: 'bg-[#EEF7ED] text-[#2F7A38]',
+      dot: 'bg-[#4CAF50]'
+    };
+  };
+
+  const getChatUsageLabel = () => {
+    if (!chatUsage) {
+      return 'พร้อมช่วยตอบคำถาม';
+    }
+
+    const usedPercent = Number(chatUsage.used_percent || 0);
+    if (usedPercent >= 90) {
+      return 'โควต้า AI วันนี้ใกล้เต็ม';
+    }
+
+    if (usedPercent >= 70) {
+      return `เหลือประมาณ ${Math.max(0, 100 - usedPercent)}% วันนี้`;
+    }
+
+    return 'AI วันนี้คงเหลือเพียงพอ';
   };
 
   return (
@@ -321,9 +378,15 @@ export default function Home() {
         <div className="fixed bottom-24 right-4 z-50 flex h-[450px] w-[calc(100vw-2rem)] max-w-[350px] flex-col overflow-hidden rounded-2xl border border-[#D9D9D9] bg-white shadow-2xl animate-fade-in sm:bottom-28 sm:right-8">
           
           <div className="bg-[#7B542F] text-white p-4 flex justify-between items-center shadow-sm z-10">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="font-bold text-[16px]">ผู้ช่วยยื่นคำร้อง (Bot)</span>
+            <div className="flex min-w-0 flex-col items-start gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="font-bold text-[16px]">ผู้ช่วยยื่นคำร้อง (Bot)</span>
+              </div>
+              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${getChatUsageToneClasses().chip}`}>
+                <span className={`inline-block h-2 w-2 rounded-full ${getChatUsageToneClasses().dot}`}></span>
+                {getChatUsageLabel()}
+              </div>
             </div>
             <button onClick={() => setIsChatOpen(false)} className="text-white hover:text-[#FF9D00] transition-colors cursor-pointer">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -356,24 +419,31 @@ export default function Home() {
             <div ref={messagesEndRef} />
           </div>
 
-          <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-[#D9D9D9] flex gap-2">
-            <input 
-              type="text" 
-              value={chatInput} 
-              onChange={e => setChatInput(e.target.value)} 
-              placeholder="พิมพ์คำถามที่นี่..." 
-              className="flex-grow px-4 py-2 border border-[#D9D9D9] rounded-full text-[14px] focus:outline-none focus:border-[#FF9D00] focus:ring-1 focus:ring-[#FF9D00] transition-all"
-            />
-            <button 
-              type="submit" 
-              disabled={isChatLoading || !chatInput.trim()} 
-              className="bg-[#7B542F] text-white p-2 w-10 h-10 rounded-full flex items-center justify-center hover:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <svg className="w-5 h-5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          </form>
+          <div className="border-t border-[#D9D9D9] bg-white p-3">
+            {chatUsage && (
+              <p className="mb-2 text-xs text-[#999999]">
+                ใช้ไป {chatUsage.used_percent}% ของโควต้า AI วันนี้
+              </p>
+            )}
+            <form onSubmit={handleSendMessage} className="flex gap-2">
+              <input 
+                type="text" 
+                value={chatInput} 
+                onChange={e => setChatInput(e.target.value)} 
+                placeholder="พิมพ์คำถามที่นี่..." 
+                className="flex-grow px-4 py-2 border border-[#D9D9D9] rounded-full text-[14px] focus:outline-none focus:border-[#FF9D00] focus:ring-1 focus:ring-[#FF9D00] transition-all"
+              />
+              <button 
+                type="submit" 
+                disabled={isChatLoading || !chatInput.trim()} 
+                className="bg-[#7B542F] text-white p-2 w-10 h-10 rounded-full flex items-center justify-center hover:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg className="w-5 h-5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </form>
+          </div>
 
         </div>
       )}

@@ -488,6 +488,30 @@ export default function Formdetail() {
     };
   };
 
+  const getEstimatedWaitLabel = (tier, stage = 'preparing') => {
+    if (stage === 'checking') {
+      return 'ปกติใช้เวลาประมาณ 1-3 นาที';
+    }
+
+    if (tier === 'short') {
+      return 'คาดว่าใช้เวลาไม่นาน';
+    }
+
+    if (tier === 'medium') {
+      return 'ปกติใช้เวลาประมาณ 1-3 นาที';
+    }
+
+    if (tier === 'long') {
+      return 'อาจใช้เวลานานกว่าปกติเล็กน้อย';
+    }
+
+    if (stage === 'preparing') {
+      return 'ระบบจะเริ่มประมวลผลให้อัตโนมัติเมื่อถึงคิว';
+    }
+
+    return 'โปรดรอสักครู่';
+  };
+
   const getPerFileQueueInfo = (docKey) => {
     if (!isValidating || validationResults[docKey]) {
       return null;
@@ -517,6 +541,15 @@ export default function Formdetail() {
     }
 
     return null;
+  };
+
+  const getPerFileWaitLabel = (docKey) => {
+    const queueInfo = getPerFileQueueInfo(docKey);
+    if (!queueInfo?.hint_message) {
+      return null;
+    }
+
+    return getEstimatedWaitLabel(queueInfo.estimated_wait_tier, validationStage);
   };
 
   const handleMergeDocuments = async () => {
@@ -818,13 +851,18 @@ export default function Formdetail() {
                             )}
 
                             {getPerFileQueueInfo(doc.key)?.hint_message && uploadStatuses[index]?.status === 'success' && (
-                              <div
-                                className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${getQueueTierClasses(getPerFileQueueInfo(doc.key)?.estimated_wait_tier).badge}`}
-                              >
-                                <span
-                                  className={`inline-block h-2 w-2 rounded-full animate-pulse ${getQueueTierClasses(getPerFileQueueInfo(doc.key)?.estimated_wait_tier).dot}`}
-                                ></span>
-                                {getPerFileQueueInfo(doc.key).hint_message}
+                              <div className="mt-2 flex flex-col items-start gap-1">
+                                <div
+                                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${getQueueTierClasses(getPerFileQueueInfo(doc.key)?.estimated_wait_tier).badge}`}
+                                >
+                                  <span
+                                    className={`inline-block h-2 w-2 rounded-full animate-pulse ${getQueueTierClasses(getPerFileQueueInfo(doc.key)?.estimated_wait_tier).dot}`}
+                                  ></span>
+                                  {getPerFileQueueInfo(doc.key).hint_message}
+                                </div>
+                                {getPerFileWaitLabel(doc.key) && (
+                                  <p className="text-sm text-[#999999]">{getPerFileWaitLabel(doc.key)}</p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -920,6 +958,9 @@ export default function Formdetail() {
                     setCurrentStep(3);
                   }
                 }
+                else if (currentStep === 3) {
+                  navigate('/');
+                }
               }} 
               disabled={
                 (currentStep === 1 && !isStep1Complete) || 
@@ -944,18 +985,23 @@ export default function Formdetail() {
                     กำลังตรวจสอบ...
                   </>
                 ) : 'ตรวจสอบ'
-              ) : 'ถัดไป'}
+              ) : currentStep === 3 ? 'เสร็จสิ้น' : 'ถัดไป'}
             </button>
 
             {currentStep === 2 && !isStep2Validated && isValidating && (
               <div className="w-full text-right sm:w-auto">
                 <p className="text-sm font-medium text-[#7B542F]">{getValidationStatusLabel()}</p>
                 {validationQueueSummary?.hint_message && (
-                  <div className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium bg-[#F9F7F3] text-[#7B542F]">
-                    <span
-                      className={`inline-block h-2 w-2 rounded-full animate-pulse ${getQueueTierClasses(validationQueueSummary?.estimated_wait_tier).dot}`}
-                    ></span>
-                    {validationQueueSummary.hint_message}
+                  <div className="mt-2 flex flex-col items-end gap-1">
+                    <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium bg-[#F9F7F3] text-[#7B542F]">
+                      <span
+                        className={`inline-block h-2 w-2 rounded-full animate-pulse ${getQueueTierClasses(validationQueueSummary?.estimated_wait_tier).dot}`}
+                      ></span>
+                      {validationQueueSummary.hint_message}
+                    </div>
+                    <p className="text-sm text-[#999999]">
+                      {getEstimatedWaitLabel(validationQueueSummary?.estimated_wait_tier, validationStage)}
+                    </p>
                   </div>
                 )}
                 {showValidationDelayHint && (

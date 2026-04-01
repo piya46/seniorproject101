@@ -4,7 +4,7 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { forms, getFormConfig } = require('../data/staticData');
 const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
-const { assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUtils');
+const { assertAiWithinDailyLimit, buildAiUsageSummary, recordAiUsage } = require('../utils/aiUsageUtils');
 const { validate } = require('../middlewares/validationMiddleware');
 const { chatRecommendSchema } = require('../validators/schemas');
 
@@ -62,6 +62,8 @@ const model = vertex_ai.getGenerativeModel({
 
 router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (req, res) => {
   let usageRecorded = false;
+  let usageGuard = null;
+  let usageSnapshot = null;
 
   try {
     const { message, degree_level } = req.body;
@@ -73,7 +75,7 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
         return res.status(400).json({ error: "Message is required" });
     }
 
-    await assertAiWithinDailyLimit(req.user);
+    usageGuard = await assertAiWithinDailyLimit(req.user);
     
     let history = [];
     try {
@@ -124,7 +126,7 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
     }
 
     try {
-        const usageSnapshot = await recordAiUsage({
+        usageSnapshot = await recordAiUsage({
             user: req.user,
             route: req.path,
             model: 'gemini-2.5-flash',
@@ -147,7 +149,8 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
     // 5. ส่ง Response
     res.json({
         reply: aiResponse.reply || aiResponse.reply_message || "ระบบกำลังประมวลผลคำตอบครับ",
-        recommended_form: aiResponse.recommended_form
+        recommended_form: aiResponse.recommended_form,
+        ai_usage: buildAiUsageSummary(usageSnapshot || usageGuard?.usage || {}, usageGuard?.dailyLimit)
     });
 
   } catch (error) {

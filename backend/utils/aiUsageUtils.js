@@ -4,7 +4,7 @@ const {
   recordAiUsageForToday
 } = require('./dbUtils');
 
-const DEFAULT_AI_DAILY_TOKEN_LIMIT = 50000;
+const DEFAULT_AI_DAILY_TOKEN_LIMIT = 100000;
 
 const normalizeAiIdentity = (user = {}) => {
   const email = String(user.email || '').trim().toLowerCase();
@@ -35,6 +35,20 @@ const normalizeUsageMetadata = (usageMetadata = {}) => ({
   candidate_tokens: Number(usageMetadata.candidatesTokenCount || usageMetadata.candidates_token_count || 0),
   total_tokens: Number(usageMetadata.totalTokenCount || usageMetadata.total_token_count || 0)
 });
+
+const buildAiUsageSummary = (usage = {}, dailyLimit = getAiDailyTokenLimit()) => {
+  const usedTokens = Math.max(0, Number(usage.total_tokens || usage.used_tokens || 0));
+  const limit = Math.max(1, Number(dailyLimit) || DEFAULT_AI_DAILY_TOKEN_LIMIT);
+  const remainingTokens = Math.max(0, limit - usedTokens);
+  const usedPercent = Math.min(100, Math.max(0, Math.round((usedTokens / limit) * 100)));
+
+  return {
+    daily_limit: limit,
+    used_tokens: usedTokens,
+    remaining_tokens: remainingTokens,
+    used_percent: usedPercent
+  };
+};
 
 const assertAiWithinDailyLimit = async (user = {}) => {
   const identity = normalizeAiIdentity(user);
@@ -97,6 +111,7 @@ const recordAiUsage = async ({
 
 module.exports = {
   assertAiWithinDailyLimit,
+  buildAiUsageSummary,
   getAiDailyTokenLimit,
   normalizeUsageMetadata,
   recordAiUsage
