@@ -45,8 +45,11 @@ router.get('/:form_code', authMiddleware, (req, res) => {
 
   // แยก validation_criteria ออกจากเอกสารแต่ละตัว
   const publicDocuments = required_documents.map(doc => {
-      const { validation_criteria, ...safeDoc } = doc; 
-      return safeDoc;
+      const { validation_criteria, template_url, url, ...safeDoc } = doc;
+      return {
+        ...safeDoc,
+        url: url || template_url || null
+      };
   });
 
   const publicCaseRules = case_rules.map((rule) => ({

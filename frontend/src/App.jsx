@@ -13,6 +13,29 @@ import { getAuthenticatedUser, installSessionExpiryInterceptor } from './lib/aut
 // 💡 บังคับให้ Axios ส่ง Cookie (Session) ไปกับทุก API อัตโนมัติ
 axios.defaults.withCredentials = true;
 
+const CONSOLE_WARNING_FLAG = '__sciLegalConsoleWarningShown';
+
+const showConsoleLegalWarning = () => {
+  if (typeof window === 'undefined' || window[CONSOLE_WARNING_FLAG]) {
+    return;
+  }
+
+  window[CONSOLE_WARNING_FLAG] = true;
+
+  console.log(
+    '%cคำเตือน!',
+    'background: #FFF176; color: #C2410C; font-size: 28px; font-weight: 800; padding: 4px 10px;'
+  );
+  console.log(
+    [
+      'การเข้าถึง, แก้ไข, คัดลอก, หรือพยายามดึงข้อมูลของระบบโดยไม่ได้รับอนุญาต',
+      'อาจเข้าข่ายการละเมิดกฎหมายที่เกี่ยวข้อง, พ.ร.บ.คอมพิวเตอร์,',
+      'รวมถึงระเบียบหรือข้อบังคับของมหาวิทยาลัย',
+      'หากคุณไม่ได้รับมอบหมายให้ทดสอบหรือดูแลระบบนี้ โปรดอย่าวางโค้ดหรือคำสั่งใด ๆ ใน Console'
+    ].join(' ')
+  );
+};
+
 const ProtectedRoute = ({ authResolved, isAuthenticated, children }) => {
   if (!authResolved) {
     return null;
@@ -30,6 +53,10 @@ function App() {
 
   useEffect(() => {
     installSessionExpiryInterceptor();
+  }, []);
+
+  useEffect(() => {
+    showConsoleLegalWarning();
   }, []);
 
   useEffect(() => {

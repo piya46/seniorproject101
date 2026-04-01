@@ -660,7 +660,7 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
         "หากผลมีการเปลี่ยนแปลง จะนำเรื่องเข้าคณะกรรมการบริหารคณะเพื่อพิจารณาและดำเนินการส่งสำนักทะเบียน"
       ],
       required_documents: [
-        { key: "main_form", label: "คำร้อง จท.35", required: true, validation_criteria: "ระบุรายวิชาและเกรดที่ต้องการทักท้วงให้ชัดเจน" }
+        { key: "main_form", label: "คำร้อง จท.35", required: true, url: "#", validation_criteria: "ระบุรายวิชาและเกรดที่ต้องการทักท้วงให้ชัดเจน" }
       ]
     };
   }

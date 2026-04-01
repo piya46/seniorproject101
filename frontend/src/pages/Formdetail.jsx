@@ -750,15 +750,17 @@ export default function Formdetail() {
                                 {doc.label} {doc.required !== false && <span className="text-red-500 ml-1">*</span>}
                               </span>
                             </label>
-                            
-                            <a 
-                              href={doc.url || "#"} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="ml-3 mt-1.5 cursor-pointer hover:opacity-70 transition-opacity"
-                            >
-                              <img src="/link.png" alt="ดาวน์โหลดเอกสาร" className="w-5 h-5 object-contain" data-protect-ui="true" draggable={false} />
-                            </a>
+                            {doc.url ? (
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-3 mt-1.5 cursor-pointer hover:opacity-70 transition-opacity"
+                                title="เปิดลิงก์เอกสารตัวอย่าง"
+                              >
+                                <img src="/link.png" alt="เปิดลิงก์เอกสาร" className="w-5 h-5 object-contain" data-protect-ui="true" draggable={false} />
+                              </a>
+                            ) : null}
                           </div>
                         ))}
                       </div>
