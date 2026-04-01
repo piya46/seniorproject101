@@ -8,7 +8,7 @@ const { validate } = require('../middlewares/validationMiddleware');
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { getFormConfig } = require('../data/staticData'); 
 const { getDecryptedSessionFiles, updateFileRecord } = require('../utils/dbUtils');
-const { assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUtils');
+const { AI_USAGE_SCOPES, assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUtils');
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
 const { validationCheckSchema } = require('../validators/schemas');
 const {
@@ -122,7 +122,9 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
   try {
     const { form_code, degree_level, sub_type, case_key } = req.body;
     const sessionId = req.user.session_id;
-    await assertAiWithinDailyLimit(req.user);
+    await assertAiWithinDailyLimit(req.user, {
+      scope: AI_USAGE_SCOPES.VALIDATION_CHECK_COMPLETENESS
+    });
 
     // 1. ดึงไฟล์จาก Firestore (Decrypt อัตโนมัติจาก Utility)
     const allFiles = await getDecryptedSessionFiles(sessionId);
@@ -350,6 +352,7 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     try {
       const usageSnapshot = await recordAiUsage({
         user: req.user,
+        scope: AI_USAGE_SCOPES.VALIDATION_CHECK_COMPLETENESS,
         route: req.path,
         model: 'gemini-2.5-pro',
         usageMetadata: response.usageMetadata || {},
@@ -406,6 +409,7 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
         try {
             await recordAiUsage({
                 user: req.user,
+                scope: AI_USAGE_SCOPES.VALIDATION_CHECK_COMPLETENESS,
                 route: req.path,
                 model: 'gemini-2.5-pro',
                 degreeLevel: req.body?.degree_level || null,

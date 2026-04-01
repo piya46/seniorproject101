@@ -257,20 +257,20 @@ function Contactus() {
                       className="absolute top-3 right-3 z-10 p-1 cursor-pointer"
                       title="ลบไฟล์"
                     >
-                      <img src="/close.png" alt="Remove File" className="w-5 h-5 object-contain" />
+                      <img src="/close.png" alt="Remove File" className="w-5 h-5 object-contain" data-protect-ui="true" draggable={false} />
                     </button>
                   )}
 
                   <div className="flex flex-col items-center pointer-events-none">
                     {file ? (
                       <>
-                        <img src="/pdf.png" alt="File" className="w-10 h-10 mb-2 object-contain" onError={(e) => {e.target.src = '/file.png'}} />
+                        <img src="/pdf.png" alt="File" className="w-10 h-10 mb-2 object-contain" data-protect-ui="true" draggable={false} onError={(e) => {e.target.src = '/file.png'}} />
                         <p className="text-[#7B542F] font-bold text-base truncate max-w-[200px]">{file.name}</p>
                         <p className="text-[#999999] text-xs mt-1">คลิกเพื่อเปลี่ยนไฟล์</p>
                       </>
                     ) : (
                       <>
-                        <img src="/upload.png" alt="Upload Icon" className="w-8 h-8 mb-3 object-contain" />
+                        <img src="/upload.png" alt="Upload Icon" className="w-8 h-8 mb-3 object-contain" data-protect-ui="true" draggable={false} />
                         <p className="text-[#7B542F] font-bold text-base">Click here to upload</p>
                         <p className="text-[#999999] text-xs mt-1">PDF, PNG, JPG, WEBP only (max 2 MB)</p>
                       </>

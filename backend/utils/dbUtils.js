@@ -535,6 +535,7 @@ exports.listAiUsageByDate = async (date = new Date(), limit = 100) => {
 
 exports.recordAiUsageForToday = async ({
     usageKey,
+    aiScope,
     identityType,
     identityValue,
     sessionId,
@@ -561,6 +562,7 @@ exports.recordAiUsageForToday = async ({
             const nextData = {
                 date_key: dateKey,
                 usage_key: usageKey,
+                ai_scope: aiScope || existing.ai_scope || 'default',
                 identity_type: identityType,
                 identity_value: identityValue,
                 session_id: sessionId || null,

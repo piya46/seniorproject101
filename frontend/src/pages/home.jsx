@@ -8,6 +8,7 @@ import { encryptPayload, encryptAndKeepKey, decryptResponse } from './crypto'
 import { ensureAuthenticatedOrRedirect } from '../lib/auth'
 
 export default function Home() {
+  const chatUsageCacheKey = 'chat_usage_summary';
   const navigate = useNavigate();
   const [selectedLabel, setSelectedLabel] = useState(sessionStorage.getItem('last_label') || 'ป.ตรี');
   const [degree, setDegree] = useState(sessionStorage.getItem('last_degree') || 'bachelor');
@@ -74,6 +75,25 @@ export default function Home() {
         }
         
         setPublicKey(pubKey);
+        const cachedChatUsage = sessionStorage.getItem(chatUsageCacheKey);
+        if (cachedChatUsage) {
+          try {
+            setChatUsage(JSON.parse(cachedChatUsage));
+          } catch {
+            sessionStorage.removeItem(chatUsageCacheKey);
+          }
+        }
+
+        try {
+          const usageRes = await axios.get('/api/v1/chat/usage', { withCredentials: true });
+          if (usageRes.data?.ai_usage) {
+            setChatUsage(usageRes.data.ai_usage);
+            sessionStorage.setItem(chatUsageCacheKey, JSON.stringify(usageRes.data.ai_usage));
+          }
+        } catch (usageError) {
+          console.error('Chat usage bootstrap failed:', usageError);
+        }
+
         fetchForms(degree); 
       } catch (err) {
         console.error("Initialization failed:", err);
@@ -194,6 +214,7 @@ export default function Home() {
       const botReply = actualData.reply || actualData.message || actualData || 'ได้รับข้อความแล้ว แต่เซิร์ฟเวอร์ตอบกลับผิดรูปแบบ';
       if (actualData?.ai_usage) {
         setChatUsage(actualData.ai_usage);
+        sessionStorage.setItem(chatUsageCacheKey, JSON.stringify(actualData.ai_usage));
       }
 
       setChatMessages(prev => [...prev, { sender: 'bot', text: typeof botReply === 'string' ? botReply : JSON.stringify(botReply) }]);
@@ -215,6 +236,12 @@ export default function Home() {
           remaining_tokens: remainingTokens,
           used_percent: usedPercent
         });
+        sessionStorage.setItem(chatUsageCacheKey, JSON.stringify({
+          daily_limit: dailyLimit,
+          used_tokens: usedTokens,
+          remaining_tokens: remainingTokens,
+          used_percent: usedPercent
+        }));
       }
       setChatMessages(prev => [...prev, { sender: 'bot', text: errMsg }]);
     } finally {
@@ -228,20 +255,23 @@ export default function Home() {
     if (usedPercent >= 90) {
       return {
         chip: 'bg-[#FFF0E8] text-[#B55A1B]',
-        dot: 'bg-[#FF8A3D]'
+        dot: 'bg-[#FF8A3D]',
+        color: '#FF8A3D'
       };
     }
 
     if (usedPercent >= 70) {
       return {
         chip: 'bg-[#FFF6E7] text-[#9A6300]',
-        dot: 'bg-[#FFB43B]'
+        dot: 'bg-[#FFB43B]',
+        color: '#FFB43B'
       };
     }
 
     return {
       chip: 'bg-[#EEF7ED] text-[#2F7A38]',
-      dot: 'bg-[#4CAF50]'
+      dot: 'bg-[#4CAF50]',
+      color: '#4CAF50'
     };
   };
 
@@ -260,6 +290,41 @@ export default function Home() {
     }
 
     return 'AI วันนี้คงเหลือเพียงพอ';
+  };
+
+  const getChatUsageEtaLabel = () => {
+    if (!chatUsage) {
+      return 'พร้อมใช้งาน';
+    }
+
+    const usedPercent = Number(chatUsage.used_percent || 0);
+    if (usedPercent >= 90) {
+      return 'ใกล้เต็ม';
+    }
+
+    if (usedPercent >= 70) {
+      return 'เหลือจำกัด';
+    }
+
+    return 'ปกติ';
+  };
+
+  const getChatUsageRemainingPercent = () => {
+    if (!chatUsage) {
+      return null;
+    }
+
+    return Math.max(0, 100 - Number(chatUsage.used_percent || 0));
+  };
+
+  const getChatUsageRingStyle = () => {
+    const usedPercent = Math.min(100, Math.max(0, Number(chatUsage?.used_percent || 0)));
+    const remainingPercent = Math.max(0, 100 - usedPercent);
+    const tone = getChatUsageToneClasses();
+
+    return {
+      background: `conic-gradient(from 270deg, ${tone.color} 0deg, ${tone.color} ${remainingPercent * 3.6}deg, rgba(255,255,255,0.18) ${remainingPercent * 3.6}deg 360deg)`
+    };
   };
 
   return (
@@ -316,7 +381,7 @@ export default function Home() {
                   filteredForms.map((form) => (
                     <div key={form.form_code} onClick={() => handleFormClick(form)} className="bg-white border border-[#D9D9D9] p-5 rounded-xl shadow-sm hover:shadow-md hover:border-[#EA580C] transition-all cursor-pointer flex flex-col items-center">
                       <div className="flex flex-col h-full w-full">
-                        <img src="/file.png" alt="file icon" className="w-24 h-24 mx-auto mt-2 mb-4 opacity-90"/>
+                        <img src="/file.png" alt="file icon" className="w-24 h-24 mx-auto mt-2 mb-4 opacity-90" data-protect-ui="true" draggable={false} />
                         <h3 className="text-[#7B542F] font-bold text-lg mb-2 line-clamp-2 text-center">{form.name_th}</h3>
                       </div>
                     </div>
@@ -347,7 +412,7 @@ export default function Home() {
                 {selectedForm.sub_categories.map((subCat) => (
                   <div key={subCat.value} onClick={() => handleSubCategoryClick(subCat)} className="bg-white border border-[#D9D9D9] p-5 rounded-xl shadow-sm hover:shadow-md hover:border-[#EA580C] transition-all cursor-pointer flex flex-col items-center">
                     <div className="flex flex-col h-full w-full">
-                      <img src="/file.png" alt="file icon" className="w-20 h-20 mx-auto mt-2 mb-4 opacity-80"/>
+                      <img src="/file.png" alt="file icon" className="w-20 h-20 mx-auto mt-2 mb-4 opacity-80" data-protect-ui="true" draggable={false} />
                       <h3 className="text-[#7B542F] font-bold text-base mb-2 line-clamp-3 text-center leading-relaxed">
                         {subCat.label}
                       </h3>
@@ -370,6 +435,8 @@ export default function Home() {
           src="/assistant.png" 
           alt="Chatbot" 
           className="w-10 h-10 object-contain" 
+          data-protect-ui="true"
+          draggable={false}
           onError={(e) => { e.target.src = '/file.png'; }}
         />
       </button>
@@ -378,15 +445,25 @@ export default function Home() {
         <div className="fixed bottom-24 right-4 z-50 flex h-[450px] w-[calc(100vw-2rem)] max-w-[350px] flex-col overflow-hidden rounded-2xl border border-[#D9D9D9] bg-white shadow-2xl animate-fade-in sm:bottom-28 sm:right-8">
           
           <div className="bg-[#7B542F] text-white p-4 flex justify-between items-center shadow-sm z-10">
-            <div className="flex min-w-0 flex-col items-start gap-2">
-              <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-col items-start gap-1">
+              <div className="flex items-center gap-3">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="font-bold text-[16px]">ผู้ช่วยยื่นคำร้อง (Bot)</span>
+                <div
+                  className="relative h-10 w-10 flex-shrink-0 rounded-full"
+                  style={getChatUsageRingStyle()}
+                  aria-label="สถานะโควต้า AI"
+                >
+                  <div className="absolute inset-[4px] flex items-center justify-center rounded-full bg-[#7B542F] text-[10px] font-bold text-white">
+                    {chatUsage ? `${getChatUsageRemainingPercent()}%` : '--'}
+                  </div>
+                </div>
               </div>
-              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${getChatUsageToneClasses().chip}`}>
-                <span className={`inline-block h-2 w-2 rounded-full ${getChatUsageToneClasses().dot}`}></span>
-                {getChatUsageLabel()}
-              </div>
+              <p className="pl-5 text-xs text-white/85">
+                {chatUsage
+                  ? `คงเหลือ ${getChatUsageRemainingPercent()}% ของโควต้า AI วันนี้`
+                  : getChatUsageLabel()}
+              </p>
             </div>
             <button onClick={() => setIsChatOpen(false)} className="text-white hover:text-[#FF9D00] transition-colors cursor-pointer">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,8 +498,8 @@ export default function Home() {
 
           <div className="border-t border-[#D9D9D9] bg-white p-3">
             {chatUsage && (
-              <p className="mb-2 text-xs text-[#999999]">
-                ใช้ไป {chatUsage.used_percent}% ของโควต้า AI วันนี้
+              <p className="mb-2 text-xs text-[#9A7A56]">
+                คงเหลือ {getChatUsageRemainingPercent()}% ของโควต้า AI วันนี้ • สถานะ: {getChatUsageEtaLabel()}
               </p>
             )}
             <form onSubmit={handleSendMessage} className="flex gap-2">

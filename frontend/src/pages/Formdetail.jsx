@@ -676,7 +676,7 @@ export default function Formdetail() {
       <div className="page-gutter content-form mt-6 w-full flex-grow lg:mt-10">
         <div className="flex w-full justify-start">
           <button onClick={() => currentStep > 1 ? setCurrentStep(currentStep - 1) : navigate('/')} className="mb-5 cursor-pointer">
-            <img src="/left-arrow.png" alt="ย้อนกลับ" className="h-9 w-9 object-contain sm:h-10 sm:w-10" />
+            <img src="/left-arrow.png" alt="ย้อนกลับ" className="h-9 w-9 object-contain sm:h-10 sm:w-10" data-protect-ui="true" draggable={false} />
           </button>
         </div>
         {/* Step Bar */}
@@ -757,7 +757,7 @@ export default function Formdetail() {
                               rel="noopener noreferrer" 
                               className="ml-3 mt-1.5 cursor-pointer hover:opacity-70 transition-opacity"
                             >
-                              <img src="/link.png" alt="ดาวน์โหลดเอกสาร" className="w-5 h-5 object-contain" />
+                              <img src="/link.png" alt="ดาวน์โหลดเอกสาร" className="w-5 h-5 object-contain" data-protect-ui="true" draggable={false} />
                             </a>
                           </div>
                         ))}
@@ -791,7 +791,7 @@ export default function Formdetail() {
                       
                       {uploadedFiles[index] ? (
                         <div className={'relative group flex w-full items-center rounded-xl border border-black bg-white px-4 py-3 shadow-sm transition-colors hover:border-[#7B542F] sm:px-6'}>
-                          <img src="/pdf.png" alt="PDF" className="mr-3 h-10 w-10 object-contain sm:mr-4" />
+                          <img src="/pdf.png" alt="PDF" className="mr-3 h-10 w-10 object-contain sm:mr-4" data-protect-ui="true" draggable={false} />
 
                           <div className="flex flex-grow flex-col justify-center overflow-hidden">
                             {uploadStatuses[index]?.status === 'success' ? (
@@ -870,12 +870,12 @@ export default function Formdetail() {
                           <div className="z-10 ml-3 flex items-center gap-3 sm:ml-4 sm:gap-4">
                             {uploadStatuses[index]?.status === 'error' && (
                               <button onClick={(e) => { e.preventDefault(); handleRetry(index); }} className="cursor-pointer hover:opacity-70 transition-opacity">
-                                 <img src="/reload.png" alt="Retry" className="w-8 h-8 object-contain" />
+                                 <img src="/reload.png" alt="Retry" className="w-8 h-8 object-contain" data-protect-ui="true" draggable={false} />
                               </button>
                             )}
 
                             <button onClick={(e) => { e.preventDefault(); handleRemoveFile(index); }} className="cursor-pointer hover:opacity-70 transition-opacity" title="ลบไฟล์">
-                               <img src="/close.png" alt="Close" className="w-6 h-6 object-contain" />
+                               <img src="/close.png" alt="Close" className="w-6 h-6 object-contain" data-protect-ui="true" draggable={false} />
                             </button>
                           </div>
                         </div>
@@ -883,7 +883,7 @@ export default function Formdetail() {
                         <div className="relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#D9D9D9] bg-white py-6 transition-colors hover:border-[#7B542F]">
                           <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => handleFileChange(index, e)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
                           <div className="flex flex-col items-center pointer-events-none">
-                            <img src="/upload.png" alt="Upload Icon" className="w-10 h-10 mb-2 object-contain" />
+                            <img src="/upload.png" alt="Upload Icon" className="w-10 h-10 mb-2 object-contain" data-protect-ui="true" draggable={false} />
                             <p className="text-[#7B542F] font-bold text-lg">Click here to upload</p>
                             <p className="text-[#999999] text-sm mt-1">PDF or PNG or JPG only (max 5 MB)</p>
                           </div>

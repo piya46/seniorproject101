@@ -4,7 +4,13 @@ const { VertexAI } = require('@google-cloud/vertexai');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { forms, getFormConfig } = require('../data/staticData');
 const { saveChatMessage, getChatHistory } = require('../utils/dbUtils');
-const { assertAiWithinDailyLimit, buildAiUsageSummary, recordAiUsage } = require('../utils/aiUsageUtils');
+const {
+  AI_USAGE_SCOPES,
+  assertAiWithinDailyLimit,
+  buildAiUsageSummary,
+  getAiUsageSummaryForUser,
+  recordAiUsage
+} = require('../utils/aiUsageUtils');
 const { validate } = require('../middlewares/validationMiddleware');
 const { chatRecommendSchema } = require('../validators/schemas');
 
@@ -60,6 +66,23 @@ const model = vertex_ai.getGenerativeModel({
   }
 });
 
+router.get('/usage', authMiddleware, async (req, res) => {
+  try {
+    const summary = await getAiUsageSummaryForUser(req.user, {
+      scope: AI_USAGE_SCOPES.CHAT_RECOMMEND
+    });
+
+    return res.json({
+      ai_usage: summary.usage
+    });
+  } catch (error) {
+    req.log?.warn('chat_usage_summary_failed', { message: error.message });
+    return res.status(500).json({
+      error: 'Failed to fetch AI usage summary'
+    });
+  }
+});
+
 router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (req, res) => {
   let usageRecorded = false;
   let usageGuard = null;
@@ -75,7 +98,9 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
         return res.status(400).json({ error: "Message is required" });
     }
 
-    usageGuard = await assertAiWithinDailyLimit(req.user);
+    usageGuard = await assertAiWithinDailyLimit(req.user, {
+      scope: AI_USAGE_SCOPES.CHAT_RECOMMEND
+    });
     
     let history = [];
     try {
@@ -128,6 +153,7 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
     try {
         usageSnapshot = await recordAiUsage({
             user: req.user,
+            scope: AI_USAGE_SCOPES.CHAT_RECOMMEND,
             route: req.path,
             model: 'gemini-2.5-flash',
             usageMetadata: response.usageMetadata || {},
@@ -163,6 +189,7 @@ router.post('/recommend', authMiddleware,validate(chatRecommendSchema), async (r
         try {
             await recordAiUsage({
                 user: req.user,
+                scope: AI_USAGE_SCOPES.CHAT_RECOMMEND,
                 route: req.path,
                 model: 'gemini-2.5-flash',
                 degreeLevel: req.body?.degree_level || null,

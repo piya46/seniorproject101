@@ -45,7 +45,9 @@ export default function Login() {
           <img 
             src="https://www.svgrepo.com/show/475656/google-color.svg" 
             alt="Google Icon" 
-            className="w-6 h-6" 
+            className="w-6 h-6"
+            data-protect-ui="true"
+            draggable={false}
           />
           Sign in with Google
         </button>

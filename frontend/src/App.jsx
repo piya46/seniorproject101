@@ -8,7 +8,7 @@ import Aboutus from './pages/Aboutus';
 import FormDetail from './pages/Formdetail';
 import Contactus from './pages/Contactus';
 import Login from './pages/Login';
-import { getAuthenticatedUser } from './lib/auth';
+import { getAuthenticatedUser, installSessionExpiryInterceptor } from './lib/auth';
 
 // 💡 บังคับให้ Axios ส่ง Cookie (Session) ไปกับทุก API อัตโนมัติ
 axios.defaults.withCredentials = true;
@@ -27,6 +27,32 @@ const ProtectedRoute = ({ authResolved, isAuthenticated, children }) => {
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authResolved, setAuthResolved] = useState(false);
+
+  useEffect(() => {
+    installSessionExpiryInterceptor();
+  }, []);
+
+  useEffect(() => {
+    const handleProtectedAssetContextMenu = (event) => {
+      if (event.target?.closest?.('[data-protect-ui="true"]')) {
+        event.preventDefault();
+      }
+    };
+
+    const handleProtectedAssetDragStart = (event) => {
+      if (event.target?.closest?.('[data-protect-ui="true"]')) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener('contextmenu', handleProtectedAssetContextMenu);
+    document.addEventListener('dragstart', handleProtectedAssetDragStart);
+
+    return () => {
+      document.removeEventListener('contextmenu', handleProtectedAssetContextMenu);
+      document.removeEventListener('dragstart', handleProtectedAssetDragStart);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;

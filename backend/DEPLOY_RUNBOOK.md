@@ -165,6 +165,8 @@ export OIDC_ALLOWED_DOMAINS="chula.ac.th,student.chula.ac.th"
 export OIDC_REQUIRE_HOSTED_DOMAIN="true"
 export AI_LOCATION="us-central1"
 export AI_DAILY_TOKEN_LIMIT="50000"
+export AI_CHAT_DAILY_TOKEN_LIMIT="20000"
+export AI_VALIDATION_DAILY_TOKEN_LIMIT="50000"
 export AI_USAGE_RETENTION_DAYS="30"
 export GOOGLE_OIDC_CLIENT_ID_VALUE="your-google-client-id"
 export GOOGLE_OIDC_CLIENT_SECRET_VALUE="your-google-client-secret"
@@ -234,7 +236,9 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - ใน non-interactive mode สคริปต์จะไม่ fallback ไปใช้ค่า placeholder อย่าง `smtp.example.com` หรือ `support@example.com`; ถ้าค่าจำเป็นยังไม่มีจะ fail ทันที
 - ถ้า Secret Manager มี `SMTP_PASS` อยู่แล้วและไม่ต้องการเปลี่ยนค่า สามารถไม่ export `SMTP_PASS_VALUE` ได้ โดยสคริปต์จะ reuse ค่าเดิมให้
 - `AI_LOCATION=us-central1` เป็นค่าที่แนะนำในระบบปัจจุบันเพื่อให้สอดคล้องกับ AI routes ที่ใช้งานจริง
-- `AI_DAILY_TOKEN_LIMIT` ใช้กำหนดเพดาน token ต่อ user ต่อวัน
+- `AI_DAILY_TOKEN_LIMIT` ใช้กำหนดเพดาน token ต่อ user ต่อวันแบบ fallback กลาง
+- `AI_CHAT_DAILY_TOKEN_LIMIT` ใช้กำหนดเพดาน token ต่อ user ต่อวันสำหรับ `POST /chat/recommend`
+- `AI_VALIDATION_DAILY_TOKEN_LIMIT` ใช้กำหนดเพดาน token ต่อ user ต่อวันสำหรับ `POST /validation/check-completeness`
 - `AI_USAGE_RETENTION_DAYS` ใช้กำหนดว่าจะเก็บเอกสาร usage รายวันใน Firestore ไว้กี่วันก่อน TTL ลบออก
 - ไม่ควรปล่อย `localhost` หรือ origin ชั่วคราวค้างใน production โดยไม่จำเป็น
 - ควรใส่ `Authorised redirect URI` ใน Google OAuth client ให้ตรงกับ callback URL ที่ใช้งานจริงแบบ exact match

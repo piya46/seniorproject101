@@ -83,9 +83,15 @@ function Navbar() {
       <nav className="relative z-50 w-full bg-white px-4 py-4 shadow-md sm:px-5">
         <div className="flex w-full flex-wrap items-center justify-between gap-4">
           <div className="flex items-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gray-200">
-              <span className="text-xs text-gray-500">Logo</span>
-            </div>
+            <Link to="/" className="flex items-center" aria-label="ไปหน้าแรก">
+              <img
+                src="/icon.svg"
+                alt="Ai Formcheck"
+                className="h-11 w-11 rounded-xl object-contain"
+                data-protect-ui="true"
+                draggable={false}
+              />
+            </Link>
           </div>
 
           <button
@@ -169,7 +175,7 @@ function Navbar() {
       </nav>
 
       <div className="mx-4 my-4 flex items-start gap-4 rounded-md bg-[#FFCF71]/70 p-4 sm:mx-5 sm:my-5">
-        <img src="/warning.png" alt="warning logo" className="mt-0.5 h-6 w-6 flex-shrink-0" />
+        <img src="/warning.png" alt="warning logo" className="mt-0.5 h-6 w-6 flex-shrink-0" data-protect-ui="true" draggable={false} />
         <p className="py-1 text-left text-[13px] leading-6 sm:text-[14px]">
           เป็นเว็บไซต์ที่จัดทำโดยนิสิต โดยเป็นเพียงเครื่องมือที่ช่วยให้การจัดเตรียมเอกสารยื่นคำร้องทำได้ง่ายมากขึ้นสำหรับนิสิตคณะวิทยาศาตร์เท่านั้น ไม่สามารถยื่นคำร้องได้จริง
         </p>
