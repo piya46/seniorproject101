@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -9,6 +9,10 @@ export default function Login() {
     const returnTo = encodeURIComponent(window.location.origin);
     window.location.href = `/auth/login?return_to=${returnTo}`;
   };
+
+  if (authError === 'unauthorized_account') {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
   const errorMessage = authError === 'unauthorized_account'
     ? 'คุณไม่มีสิทธิ์ในการใช้งานระบบกรุณาเปลี่ยนบัญชีลงชื่อเข้าใช้งาน'

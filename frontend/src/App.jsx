@@ -8,6 +8,7 @@ import Aboutus from './pages/Aboutus';
 import FormDetail from './pages/Formdetail';
 import Contactus from './pages/Contactus';
 import Login from './pages/Login';
+import Unauthorized from './pages/Unauthorized';
 import { getAuthenticatedUser, installSessionExpiryInterceptor } from './lib/auth';
 
 // 💡 บังคับให้ Axios ส่ง Cookie (Session) ไปกับทุก API อัตโนมัติ
@@ -114,6 +115,16 @@ function App() {
                 ? <Navigate to="/" replace />
                 : <Login />
           } 
+        />
+        <Route
+          path="/unauthorized"
+          element={
+            !authResolved
+              ? null
+              : isAuthenticated
+                ? <Navigate to="/" replace />
+                : <Unauthorized />
+          }
         />
         <Route path="/" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><HomePage /></ProtectedRoute>} />
         <Route path="/form/:id" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><FormDetail /></ProtectedRoute>} />
