@@ -10,6 +10,7 @@ const DIST_DIR = resolve(__dirname, 'dist');
 const INDEX_FILE = join(DIST_DIR, 'index.html');
 const PORT = Number.parseInt(process.env.PORT || '8080', 10);
 const BACKEND_URL = String(process.env.BACKEND_URL || '').trim().replace(/\/+$/, '');
+const GA_MEASUREMENT_ID = String(process.env.GA_MEASUREMENT_ID || '').trim();
 const TRUSTED_BFF_SHARED_SECRET = String(process.env.TRUSTED_BFF_SHARED_SECRET || '').trim();
 const TRUSTED_BFF_AUTH_HEADER_NAME = String(process.env.TRUSTED_BFF_AUTH_HEADER_NAME || 'x-bff-auth').trim();
 const TRUSTED_BFF_IDENTITY_TOKEN_HEADER = String(process.env.TRUSTED_BFF_IDENTITY_TOKEN_HEADER || 'x-bff-identity-token').trim();
@@ -75,6 +76,12 @@ function sendJson(res, statusCode, payload) {
     'Content-Length': Buffer.byteLength(body)
   });
   res.end(body);
+}
+
+function sendPublicAppConfig(res) {
+  sendJson(res, 200, {
+    ga_measurement_id: GA_MEASUREMENT_ID || ''
+  });
 }
 
 function redirect(res, location, statusCode = 302) {
@@ -490,6 +497,11 @@ const server = createServer(async (req, res) => {
 
   if (req.url?.startsWith('/api/')) {
     await proxyApiRequest(req, res);
+    return;
+  }
+
+  if (method === 'GET' && req.url === '/__app-config') {
+    sendPublicAppConfig(res);
     return;
   }
 

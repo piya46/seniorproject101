@@ -1,7 +1,13 @@
 import React from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { trackAnalyticsEvent } from '../lib/analytics';
 
 export default function Unauthorized() {
+  useEffect(() => {
+    trackAnalyticsEvent('unauthorized_viewed').catch(() => {});
+  }, []);
+
   const handleChangeAccount = () => {
     const returnTo = encodeURIComponent(window.location.origin);
     window.location.href = `/auth/login?return_to=${returnTo}`;

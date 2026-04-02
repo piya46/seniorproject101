@@ -10,6 +10,7 @@ SERVICE_NAME="${SERVICE_NAME:-ai-formcheck-frontend}"
 SOURCE_DIR="${SOURCE_DIR:-${SCRIPT_DIR}}"
 BACKEND_SERVICE_NAME="${BACKEND_SERVICE_NAME:-ai-formcheck-backend}"
 BACKEND_URL="${BACKEND_URL:-}"
+GA_MEASUREMENT_ID="${GA_MEASUREMENT_ID:-}"
 SA_NAME="${SA_NAME:-ai-formcheck-frontend-sa}"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 TRUSTED_BFF_SHARED_SECRET_SECRET="${TRUSTED_BFF_SHARED_SECRET_SECRET:-TRUSTED_BFF_SHARED_SECRET}"
@@ -84,6 +85,7 @@ derive_canonical_run_app_base_url() {
 }
 
 BACKEND_URL="$(trim_value "$BACKEND_URL")"
+GA_MEASUREMENT_ID="$(trim_value "$GA_MEASUREMENT_ID")"
 TRUSTED_BFF_AUTH_HEADER_NAME="$(trim_value "$TRUSTED_BFF_AUTH_HEADER_NAME")"
 TRUSTED_BFF_SHARED_SECRET_SECRET="$(trim_value "$TRUSTED_BFF_SHARED_SECRET_SECRET")"
 SKIP_ENABLE_APIS="$(trim_value "$SKIP_ENABLE_APIS")"
@@ -110,6 +112,7 @@ echo -e "${GREEN}--------------------------------------------------${NC}"
 echo -e "${GREEN}🚀 Starting FRONTEND BFF deploy for ${SERVICE_NAME}...${NC}"
 echo -e "📍 Region: ${YELLOW}${REGION}${NC}"
 echo -e "🔗 Backend URL: ${YELLOW}${BACKEND_URL}${NC}"
+echo -e "📊 GA Measurement ID: ${YELLOW}${GA_MEASUREMENT_ID:-<not-set>}${NC}"
 echo -e "${GREEN}--------------------------------------------------${NC}"
 
 require_command gcloud
@@ -208,7 +211,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --max-instances 5 \
   --cpu 1 \
   --memory 512Mi \
-  --set-env-vars "BACKEND_URL=${BACKEND_URL},TRUSTED_BFF_AUTH_HEADER_NAME=${TRUSTED_BFF_AUTH_HEADER_NAME}" \
+  --set-env-vars "BACKEND_URL=${BACKEND_URL},TRUSTED_BFF_AUTH_HEADER_NAME=${TRUSTED_BFF_AUTH_HEADER_NAME},GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID}" \
   --set-secrets "TRUSTED_BFF_SHARED_SECRET=${TRUSTED_BFF_SHARED_SECRET_SECRET}:latest"
 
 echo -e "${GREEN}✅ Frontend BFF deploy completed for ${SERVICE_NAME}.${NC}"

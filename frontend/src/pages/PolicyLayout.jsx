@@ -2,7 +2,7 @@ import React from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
-export default function PolicyLayout({ title, subtitle, sections }) {
+export default function PolicyLayout({ title, subtitle, sections, updatedAt, children }) {
   return (
     <div className="page-shell">
       <Navbar />
@@ -18,6 +18,11 @@ export default function PolicyLayout({ title, subtitle, sections }) {
           <p className="mt-4 max-w-3xl text-sm leading-7 text-[#6F6F6F] sm:text-[15px]">
             {subtitle}
           </p>
+          {updatedAt ? (
+            <p className="mt-3 text-xs font-medium uppercase tracking-[0.12em] text-[#9C846A]">
+              ปรับปรุงล่าสุด: {updatedAt}
+            </p>
+          ) : null}
 
           <div className="mt-8 space-y-8">
             {sections.map((section) => (
@@ -37,6 +42,8 @@ export default function PolicyLayout({ title, subtitle, sections }) {
                 ) : null}
               </section>
             ))}
+
+            {children}
           </div>
         </div>
       </main>

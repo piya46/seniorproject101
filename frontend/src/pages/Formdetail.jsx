@@ -5,6 +5,7 @@ import Navbar from './Navbar'
 import Footer from './Footer'
 import { encryptAndKeepKey, decryptResponse } from './crypto' 
 import { ensureAuthenticatedOrRedirect } from '../lib/auth'
+import { trackAnalyticsEvent } from '../lib/analytics'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -328,6 +329,12 @@ export default function Formdetail() {
     setValidationStage('checking');
     setShowValidationDelayHint(false);
     setValidationPreparationJobs([]);
+    trackAnalyticsEvent('validation_started', {
+      form_code: formData?.form_code || id,
+      degree_level: degreeLevel,
+      sub_type: subType || 'default',
+      required_document_count: Array.isArray(formData?.required_documents) ? formData.required_documents.length : 0
+    }).catch(() => {});
     try {
       if (!publicKey) throw new Error("Public Key is missing. Please refresh.");
       const validatePayload = {
@@ -379,6 +386,13 @@ export default function Formdetail() {
       const { responseData, actualData, partialFailed } = await submitValidationRequest(true);
 
       if (partialFailed) {
+        trackAnalyticsEvent('validation_failed', {
+          form_code: formData?.form_code || id,
+          degree_level: degreeLevel,
+          sub_type: subType || 'default',
+          required_document_count: Array.isArray(formData?.required_documents) ? formData.required_documents.length : 0,
+          failure_stage: 'preparation_partial'
+        }).catch(() => {});
         return;
       }
 
@@ -388,12 +402,25 @@ export default function Formdetail() {
           successResults[doc.key] = { status: 'valid', reason: 'ตรวจสอบสำเร็จ' };
         });
         setValidationResults(successResults);
+        trackAnalyticsEvent('validation_succeeded', {
+          form_code: formData?.form_code || id,
+          degree_level: degreeLevel,
+          sub_type: subType || 'default',
+          required_document_count: Array.isArray(formData?.required_documents) ? formData.required_documents.length : 0
+        }).catch(() => {});
       } else {
         const docKeys = formData.required_documents.map(d => d.key);
         const isDetailedError = typeof actualData === 'object' && actualData !== null && Object.keys(actualData).some(key => docKeys.includes(key));
         
         if (isDetailedError) {
           setValidationResults(actualData);
+          trackAnalyticsEvent('validation_failed', {
+            form_code: formData?.form_code || id,
+            degree_level: degreeLevel,
+            sub_type: subType || 'default',
+            required_document_count: Array.isArray(formData?.required_documents) ? formData.required_documents.length : 0,
+            failure_stage: 'validation_rules'
+          }).catch(() => {});
         } else {
           const fallbackErrors = {};
           let errorMsg = 'ตรวจสอบไม่ผ่าน (เซิร์ฟเวอร์ไม่ตอบสนองรูปแบบที่ถูกต้อง)';
@@ -408,6 +435,13 @@ export default function Formdetail() {
             fallbackErrors[doc.key] = { status: 'error', reason: `[API Error]: ${errorMsg}` };
           });
           setValidationResults(fallbackErrors);
+          trackAnalyticsEvent('validation_failed', {
+            form_code: formData?.form_code || id,
+            degree_level: degreeLevel,
+            sub_type: subType || 'default',
+            required_document_count: Array.isArray(formData?.required_documents) ? formData.required_documents.length : 0,
+            failure_stage: 'api_error'
+          }).catch(() => {});
         }
       }
       
@@ -427,6 +461,13 @@ export default function Formdetail() {
       });
       setValidationResults(fallbackErrors);
       setIsStep2Validated(true);
+      trackAnalyticsEvent('validation_failed', {
+        form_code: formData?.form_code || id,
+        degree_level: degreeLevel,
+        sub_type: subType || 'default',
+        required_document_count: Array.isArray(formData?.required_documents) ? formData.required_documents.length : 0,
+        failure_stage: 'network_error'
+      }).catch(() => {});
     } finally {
       setValidationStage(null);
       setValidationPreparationJobs([]);
@@ -559,6 +600,11 @@ export default function Formdetail() {
     setIsMerging(true);
     setMergeError(null); 
     setMergeResult(null); 
+    trackAnalyticsEvent('merge_started', {
+      form_code: formData?.form_code || id,
+      degree_level: degreeLevel,
+      sub_type: subType || 'default'
+    }).catch(() => {});
     try {
       if (!publicKey) throw new Error("Public Key is missing.");
 
@@ -595,6 +641,13 @@ export default function Formdetail() {
 
       if (res.status === 200 && responseData?.status !== 'error' && !mergeData?.error) {
         setMergeResult(mergeData);
+        trackAnalyticsEvent('merge_succeeded', {
+          form_code: formData?.form_code || id,
+          degree_level: degreeLevel,
+          sub_type: subType || 'default',
+          has_download_url: Boolean(mergeData?.download_url),
+          has_directory_fallback: mergeData?.instruction?.target_email === 'ไม่มีข้อมูลภาควิชา'
+        }).catch(() => {});
         return;
       }
       
@@ -633,6 +686,13 @@ export default function Formdetail() {
         ...(mergeJob.result || {}),
         ...downloadData
       });
+      trackAnalyticsEvent('merge_succeeded', {
+        form_code: formData?.form_code || id,
+        degree_level: degreeLevel,
+        sub_type: subType || 'default',
+        has_download_url: Boolean(downloadData?.download_url),
+        has_directory_fallback: downloadData?.instruction?.target_email === 'ไม่มีข้อมูลภาควิชา'
+      }).catch(() => {});
 
     } catch (err) {
       console.error("Merge API Error:", err.response?.data || err.message);
@@ -643,6 +703,11 @@ export default function Formdetail() {
         errMsg = errData.user_message || errData.message || errData.error || errData.reason || (typeof errData === 'string' ? errData : errMsg);
       }
       setMergeError(errMsg); 
+      trackAnalyticsEvent('merge_failed', {
+        form_code: formData?.form_code || id,
+        degree_level: degreeLevel,
+        sub_type: subType || 'default'
+      }).catch(() => {});
 
     } finally {
       setIsMerging(false);
@@ -673,6 +738,19 @@ export default function Formdetail() {
 
   const validationQueueSummary = getValidationQueueSummary();
   const shouldShowDepartmentDirectory = mergeResult?.instruction?.target_email === 'ไม่มีข้อมูลภาควิชา';
+
+  useEffect(() => {
+    if (!formData?.form_code) {
+      return;
+    }
+
+    trackAnalyticsEvent('form_step_viewed', {
+      form_code: formData.form_code || id,
+      degree_level: degreeLevel,
+      sub_type: subType || 'default',
+      step: currentStep
+    }).catch(() => {});
+  }, [currentStep, formData?.form_code, degreeLevel, subType, id]);
 
   useEffect(() => {
     if (!showDepartmentDirectory || !shouldShowDepartmentDirectory || departments.length > 0) {

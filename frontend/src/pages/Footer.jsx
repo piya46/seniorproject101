@@ -2,6 +2,10 @@ import React from "react"
 import { Link } from 'react-router-dom';
 
 function Footer() {
+    const openCookieSettings = () => {
+        window.dispatchEvent(new CustomEvent('open-cookie-settings'));
+    };
+
     return(
         <footer className='mt-16 flex w-full flex-col bg-[#7B542F] px-4 py-8 text-white sm:mt-20 sm:px-8 sm:py-10'>
             <div className='mx-auto flex w-full max-w-7xl flex-col gap-6'>
@@ -25,6 +29,13 @@ function Footer() {
                         <Link to="/cookies" className='transition-colors hover:text-[#FFD9A3]'>
                             นโยบายการใช้คุกกี้
                         </Link>
+                        <button
+                            type="button"
+                            onClick={openCookieSettings}
+                            className='text-left transition-colors hover:text-[#FFD9A3] sm:text-right'
+                        >
+                            ตั้งค่าคุกกี้
+                        </button>
                     </div>
                 </div>
 

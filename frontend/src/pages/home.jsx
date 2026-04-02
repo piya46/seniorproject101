@@ -6,6 +6,7 @@ import Footer from './Footer'
 import axios from 'axios'
 import { encryptPayload, encryptAndKeepKey, decryptResponse } from './crypto' 
 import { ensureAuthenticatedOrRedirect } from '../lib/auth'
+import { trackAnalyticsEvent } from '../lib/analytics'
 
 export default function Home() {
   const chatUsageCacheKey = 'chat_usage_summary';
@@ -142,6 +143,9 @@ export default function Home() {
     setDegree(nextDegree);
     setSelectedForm(null); 
     sessionStorage.removeItem('last_selected_form'); 
+    trackAnalyticsEvent('degree_selected', {
+      degree_level: nextDegree
+    }).catch(() => {});
   };
 
   const handleInputChange = (e) => {
@@ -150,6 +154,12 @@ export default function Home() {
     sessionStorage.setItem('last_search', text);
   };
   const handleFormClick = (form) => {
+    trackAnalyticsEvent('form_selected', {
+      form_code: form.form_code,
+      degree_level: degree,
+      has_sub_types: Boolean(form.has_sub_types)
+    }).catch(() => {});
+
     if (form.has_sub_types && form.sub_categories) {
       setSelectedForm(form);
       sessionStorage.setItem('last_selected_form', JSON.stringify(form)); 
@@ -164,6 +174,12 @@ export default function Home() {
   };
 
   const handleSubCategoryClick = (subCat) => {
+    trackAnalyticsEvent('form_subtype_selected', {
+      form_code: selectedForm.form_code,
+      degree_level: degree,
+      sub_type: subCat.value
+    }).catch(() => {});
+
     navigate(`/form/${selectedForm.form_code}`, { 
       state: { 
         name_th: `${selectedForm.name_th} (${subCat.label})`, 
@@ -178,6 +194,17 @@ export default function Home() {
     if (!chatInput.trim()) return;
 
     const userMessage = chatInput;
+    const trimmedMessage = userMessage.trim();
+    const messageLengthBucket = trimmedMessage.length <= 40
+      ? 'short'
+      : trimmedMessage.length <= 120
+        ? 'medium'
+        : 'long';
+
+    trackAnalyticsEvent('chat_message_sent', {
+      message_length_bucket: messageLengthBucket
+    }).catch(() => {});
+
     setChatMessages(prev => [...prev, { sender: 'user', text: userMessage }]);
     setChatInput('');
     setIsChatLoading(true);
@@ -424,7 +451,15 @@ export default function Home() {
       <Footer/>
 
       <button 
-        onClick={() => setIsChatOpen(!isChatOpen)} 
+        onClick={() => {
+          const nextState = !isChatOpen;
+          setIsChatOpen(nextState);
+          if (nextState) {
+            trackAnalyticsEvent('chat_opened', {
+              has_cached_usage: Boolean(chatUsage)
+            }).catch(() => {});
+          }
+        }} 
         className="fixed bottom-4 right-4 z-50 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-[#FF9D00] shadow-lg transition-transform hover:scale-105 sm:bottom-8 sm:right-8 sm:h-16 sm:w-16"
       >
         <img 

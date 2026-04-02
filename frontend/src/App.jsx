@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios'; // 💡 เพิ่ม Import Axios
 
 import './App.css'
@@ -13,6 +13,8 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
 import CookiePolicy from './pages/CookiePolicy';
 import { getAuthenticatedUser, installSessionExpiryInterceptor } from './lib/auth';
+import CookieConsentManager from './components/CookieConsentManager';
+import { trackPageView } from './lib/analytics';
 
 // 💡 บังคับให้ Axios ส่ง Cookie (Session) ไปกับทุก API อัตโนมัติ
 axios.defaults.withCredentials = true;
@@ -49,6 +51,18 @@ const ProtectedRoute = ({ authResolved, isAuthenticated, children }) => {
     return <Navigate to="/login" replace />;
   }
   return children;
+};
+
+const AnalyticsPageTracker = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    trackPageView(`${location.pathname}${location.search}`).catch((error) => {
+      console.error('Analytics page view failed:', error);
+    });
+  }, [location.pathname, location.search]);
+
+  return null;
 };
 
 function App() {
@@ -108,6 +122,8 @@ function App() {
 
   return (
     <BrowserRouter>
+      <AnalyticsPageTracker />
+      <CookieConsentManager />
       <Routes>
         <Route 
           path="/login" 

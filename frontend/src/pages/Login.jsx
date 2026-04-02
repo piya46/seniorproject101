@@ -1,11 +1,15 @@
 import React from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
+import { trackAnalyticsEvent } from '../lib/analytics';
 
 export default function Login() {
   const [searchParams] = useSearchParams();
   const authError = searchParams.get('auth_error');
 
   const handleGoogleLogin = () => {
+    trackAnalyticsEvent('login_started', {
+      provider: 'google'
+    }).catch(() => {});
     const returnTo = encodeURIComponent(window.location.origin);
     window.location.href = `/auth/login?return_to=${returnTo}`;
   };
