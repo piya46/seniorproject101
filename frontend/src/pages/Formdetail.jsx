@@ -89,6 +89,7 @@ export default function Formdetail() {
   const formNameTh = location.state?.name_th || '';
   const degreeLevel = location.state?.degree_level || 'bachelor';
   const subType = location.state?.sub_type; 
+  const uploadedFilesCacheKey = `uploaded_files_${id}_${degreeLevel}_${subType || 'default'}`;
   const [formData, setFormData] = useState(null);
   const [publicKey, setPublicKey] = useState(null); 
   const [currentStep, setCurrentStep] = useState(1);
@@ -103,11 +104,13 @@ export default function Formdetail() {
   const [isMerging, setIsMerging] = useState(false);
   const [mergeResult, setMergeResult] = useState(null);
   const [mergeError, setMergeError] = useState(null); 
+  const [departments, setDepartments] = useState([]);
+  const [showDepartmentDirectory, setShowDepartmentDirectory] = useState(false);
 
   const reqConfig = { headers: { 'Content-Type': 'application/json' } };
 
   const [uploadedFiles, setUploadedFiles] = useState(() => {
-    const savedFiles = sessionStorage.getItem(`uploaded_files_${id}`);
+    const savedFiles = sessionStorage.getItem(uploadedFilesCacheKey);
     if (savedFiles) {
       const parsed = JSON.parse(savedFiles);
       const initialStatuses = {};
@@ -148,7 +151,7 @@ export default function Formdetail() {
       }
     };
     fetchDetailAndKey();
-  }, [id, degreeLevel, subType]);
+  }, [id, degreeLevel, subType, uploadedFilesCacheKey]);
 
   useEffect(() => {
     if (!isValidating) {
@@ -230,7 +233,7 @@ export default function Formdetail() {
           };
 
           const cacheData = buildCachedUploadedFiles(updated);
-          sessionStorage.setItem(`uploaded_files_${id}`, JSON.stringify(cacheData));
+          sessionStorage.setItem(uploadedFilesCacheKey, JSON.stringify(cacheData));
 
           return updated;
         });
@@ -286,7 +289,7 @@ export default function Formdetail() {
         };
 
         const cacheData = buildCachedUploadedFiles(updated);
-        sessionStorage.setItem(`uploaded_files_${id}`, JSON.stringify(cacheData));
+        sessionStorage.setItem(uploadedFilesCacheKey, JSON.stringify(cacheData));
 
         return updated;
       });
@@ -303,7 +306,7 @@ export default function Formdetail() {
       const newFiles = { ...prev };
       delete newFiles[index];
       const cacheData = buildCachedUploadedFiles(newFiles);
-      sessionStorage.setItem(`uploaded_files_${id}`, JSON.stringify(cacheData));
+      sessionStorage.setItem(uploadedFilesCacheKey, JSON.stringify(cacheData));
       return newFiles;
     });
     setUploadStatuses(prev => {
@@ -669,6 +672,24 @@ export default function Formdetail() {
     });
 
   const validationQueueSummary = getValidationQueueSummary();
+  const shouldShowDepartmentDirectory = mergeResult?.instruction?.target_email === 'ไม่มีข้อมูลภาควิชา';
+
+  useEffect(() => {
+    if (!showDepartmentDirectory || !shouldShowDepartmentDirectory || departments.length > 0) {
+      return;
+    }
+
+    const fetchDepartments = async () => {
+      try {
+        const res = await axios.get('/api/v1/departments', { withCredentials: true });
+        setDepartments(Array.isArray(res.data?.data) ? res.data.data : []);
+      } catch (err) {
+        console.error('Departments API Error:', err);
+      }
+    };
+
+    fetchDepartments();
+  }, [showDepartmentDirectory, shouldShowDepartmentDirectory, departments.length]);
 
   return (
     <div className="page-shell font-sans">
@@ -937,6 +958,40 @@ export default function Formdetail() {
                            <>
                              <p className="mt-2">ส่งอีเมลไปที่: {mergeResult.instruction.target_email}</p>
                              <p className="mt-2">หัวข้ออีเมล: {mergeResult.instruction.email_subject}</p>
+                             {shouldShowDepartmentDirectory && (
+                               <div className="mt-4 rounded-lg border border-[#E7D8C8] bg-[#FFF8F1] p-4">
+                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                   <div>
+                                     <p className="font-semibold text-[#7B542F]">ยังไม่มีข้อมูลภาควิชาของคุณในระบบ</p>
+                                     <p className="mt-1 text-sm text-[#7B542F]">คุณสามารถตรวจสอบอีเมลภาควิชาทั้งหมดด้านล่างเพื่อเลือกติดต่อด้วยตนเองได้</p>
+                                   </div>
+                                   <button
+                                     type="button"
+                                     onClick={() => setShowDepartmentDirectory((prev) => !prev)}
+                                     className="rounded-md border border-[#D9B58A] px-4 py-2 text-sm font-semibold text-[#7B542F] transition-colors hover:bg-[#F8E7D2]"
+                                   >
+                                     {showDepartmentDirectory ? 'ซ่อนรายชื่อภาควิชา' : 'ดูรายชื่อภาควิชาทั้งหมด'}
+                                   </button>
+                                 </div>
+
+                                 {showDepartmentDirectory && (
+                                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                     {departments.length > 0 ? (
+                                       departments.map((department) => (
+                                         <div key={department.id} className="rounded-md border border-[#F0E0CF] bg-white px-4 py-3">
+                                           <p className="font-medium text-black">{department.name_th}</p>
+                                           <p className="mt-1 text-sm text-[#7B542F]">
+                                             {department.email || 'ไม่มีอีเมลติดต่อ'}
+                                           </p>
+                                         </div>
+                                       ))
+                                     ) : (
+                                       <p className="text-sm text-[#7B542F]">ยังไม่พบข้อมูลรายชื่อภาควิชา</p>
+                                     )}
+                                   </div>
+                                 )}
+                               </div>
+                             )}
                            </>
                         )}
                       </div>

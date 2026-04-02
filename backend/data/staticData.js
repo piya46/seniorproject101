@@ -556,6 +556,30 @@ exports.forms = [
   { form_code: "CF", name_th: "คำร้องขอ CF (Course Withdrawal with CF)", category: "Academic", degree_level: ["bachelor", "graduate"] }
 ];
 
+exports.getFormDisplayName = (formCode) => {
+  if (!formCode) {
+    return null;
+  }
+
+  return exports.forms.find((form) => form.form_code === formCode)?.name_th || null;
+};
+
+exports.resolveSubmissionContactLabel = (formConfig) => {
+  const departmentId = formConfig?.department_id || null;
+  const departmentEmail = exports.departments.find((department) => department.id === departmentId)?.email || null;
+
+  if (departmentEmail) {
+    return departmentEmail;
+  }
+
+  const submissionLocation = String(formConfig?.submission_location || '').trim();
+  if (submissionLocation.includes('ภาควิชา')) {
+    return 'ไม่มีข้อมูลภาควิชา';
+  }
+
+  return 'ติดต่อคณะฯ';
+};
+
 // 3. Logic การตรวจสอบเอกสาร (Validation Criteria)
 exports.getFormConfig = (formCode, degreeLevel, subType) => {
   

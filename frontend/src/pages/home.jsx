@@ -149,9 +149,6 @@ export default function Home() {
     setSearchTerm(text);
     sessionStorage.setItem('last_search', text);
   };
-  
-  const handleSearch = () => {console.log("กำลังค้นหาคำว่า:", searchTerm);};
-
   const handleFormClick = (form) => {
     if (form.has_sub_types && form.sub_categories) {
       setSelectedForm(form);
@@ -365,11 +362,10 @@ export default function Home() {
                   type="text"
                   value={searchTerm}
                   onChange={handleInputChange} 
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="ค้นหาชื่อเอกสารยื่นคำร้อง"
                   className="w-full rounded-xl border border-[#D9D9D9] p-3 pl-5 pr-12 text-base shadow-sm outline-none transition-all duration-200 placeholder:text-[#999999] focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] sm:pl-6 sm:text-lg"
                 />
-                <button onClick={handleSearch} className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer pr-2">
+                <button type="button" aria-label="ค้นหาเอกสาร" className="absolute right-4 top-1/2 -translate-y-1/2 cursor-default pr-2">
                     <svg className="h-6 w-6 text-[#999999] hover:text-[#EA580C] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>

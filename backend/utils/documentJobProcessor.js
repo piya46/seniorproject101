@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const { deleteFileRecord, getDecryptedSessionFiles, updateFileRecord } = require('./dbUtils');
 const { findFilesByKeyAndForm, sortFilesByUploadedAtDesc, filterFilesForForm, selectLatestFilesByKey } = require('./fileSelection');
-const { departments, getFormConfig } = require('../data/staticData');
+const { getFormConfig, getFormDisplayName, resolveSubmissionContactLabel } = require('../data/staticData');
 const { getMaxPdfSourceBytes } = require('./uploadSecurity');
 const { getMergedDownloadUrlTtlMs, getMergeTotalSourceBytesLimit } = require('./documentMergeSecurity');
 const { getDocumentAvScanMode } = require('./documentAvConfig');
@@ -428,7 +428,7 @@ const processMergeDocumentsJob = async (job) => {
     const mergedFile = bucket.file(mergedFileName);
     await mergedFile.save(mergedPdfBytes, { contentType: 'application/pdf', resumable: false });
 
-    const dept = departments.find((d) => d.id === formConfig.department_id) || {};
+    const formDisplayName = formConfig.name_th || getFormDisplayName(formCode);
 
     return {
         merged_file_name: mergedFileName,
@@ -436,8 +436,8 @@ const processMergeDocumentsJob = async (job) => {
         total_source_bytes: totalSourceBytes,
         merged_download_url_ttl_ms: getMergedDownloadUrlTtlMs(),
         instruction: {
-            target_email: dept.email || 'ติดต่อคณะฯ',
-            email_subject: `ยื่นคำร้อง ${formConfig.name_th}`
+            target_email: resolveSubmissionContactLabel(formConfig),
+            email_subject: formDisplayName ? `ยื่นคำร้อง ${formDisplayName}` : 'ยื่นคำร้อง'
         }
     };
 };

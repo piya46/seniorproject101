@@ -5,7 +5,7 @@ const { Storage } = require('@google-cloud/storage');
 const authMiddleware = require('../middlewares/authMiddleware');
 const { validate } = require('../middlewares/validationMiddleware');
 const { docMergeSchema } = require('../validators/schemas');
-const { departments, getFormConfig } = require('../data/staticData');
+const { getFormConfig, getFormDisplayName, resolveSubmissionContactLabel } = require('../data/staticData');
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
 const { getMergedDownloadUrlTtlMs } = require('../utils/documentMergeSecurity');
@@ -158,14 +158,14 @@ router.get('/jobs/:jobId/download', authMiddleware, async (req, res) => {
     job.payload?.degree_level || 'bachelor',
     job.payload?.sub_type ?? null
   );
-  const dept = departments.find((d) => d.id === formConfig?.department_id) || {};
+  const formDisplayName = formConfig?.name_th || getFormDisplayName(job.payload?.form_code);
 
   return res.status(200).json({
     status: 'success',
     download_url: downloadUrl,
     instruction: job.result?.instruction || {
-      target_email: dept.email || 'ติดต่อคณะฯ',
-      email_subject: formConfig ? `ยื่นคำร้อง ${formConfig.name_th}` : null
+      target_email: resolveSubmissionContactLabel(formConfig),
+      email_subject: formDisplayName ? `ยื่นคำร้อง ${formDisplayName}` : 'ยื่นคำร้อง'
     }
   });
 });
