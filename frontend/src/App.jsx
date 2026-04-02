@@ -9,6 +9,9 @@ import FormDetail from './pages/Formdetail';
 import Contactus from './pages/Contactus';
 import Login from './pages/Login';
 import Unauthorized from './pages/Unauthorized';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfUse from './pages/TermsOfUse';
+import CookiePolicy from './pages/CookiePolicy';
 import { getAuthenticatedUser, installSessionExpiryInterceptor } from './lib/auth';
 
 // 💡 บังคับให้ Axios ส่ง Cookie (Session) ไปกับทุก API อัตโนมัติ
@@ -126,6 +129,9 @@ function App() {
                 : <Unauthorized />
           }
         />
+        <Route path="/privacy" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><PrivacyPolicy /></ProtectedRoute>} />
+        <Route path="/terms" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><TermsOfUse /></ProtectedRoute>} />
+        <Route path="/cookies" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><CookiePolicy /></ProtectedRoute>} />
         <Route path="/" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><HomePage /></ProtectedRoute>} />
         <Route path="/form/:id" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><FormDetail /></ProtectedRoute>} />
         <Route path='/aboutus' element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><Aboutus /></ProtectedRoute>} />
