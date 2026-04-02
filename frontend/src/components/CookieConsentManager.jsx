@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getCookieConsent,
   hasCookieConsentDecision,
@@ -9,15 +10,18 @@ import {
 function CookieSettingsModal({ consent, onClose, onSave, onToggleAnalytics }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-[560px] rounded-[28px] bg-white p-6 shadow-2xl sm:p-8">
+      <div className="w-full max-w-[600px] rounded-[28px] border border-[#E7D7C5] bg-white p-6 shadow-2xl sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
-              Cookie Settings
+              Cookie Preferences
             </p>
             <h2 className="mt-2 text-[24px] font-extrabold text-[#7B542F]">
               การตั้งค่าคุกกี้
             </h2>
+            <p className="mt-2 max-w-[420px] text-sm leading-7 text-[#6F6F6F]">
+              คุณสามารถเลือกได้ว่าจะอนุญาตให้ระบบใช้คุกกี้เพื่อการวิเคราะห์หรือไม่ โดยคุกกี้ที่จำเป็นต่อการทำงานและความปลอดภัยของระบบจะเปิดใช้งานอยู่เสมอ
+            </p>
           </div>
           <button
             type="button"
@@ -32,26 +36,29 @@ function CookieSettingsModal({ consent, onClose, onSave, onToggleAnalytics }) {
         </div>
 
         <div className="mt-6 space-y-4">
-          <div className="rounded-2xl border border-[#E7D7C5] bg-[#FFF9F3] px-4 py-4">
-            <div className="flex items-center justify-between gap-4">
+          <div className="rounded-2xl border border-[#E7D7C5] bg-[#FFF9F3] px-5 py-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="font-bold text-[#7B542F]">คุกกี้ที่จำเป็น</p>
+                <p className="font-bold text-[#7B542F]">คุกกี้ที่จำเป็นต่อการทำงาน</p>
                 <p className="mt-1 text-sm leading-6 text-[#6F6F6F]">
-                  ใช้เพื่อให้ระบบทำงานได้อย่างถูกต้องและปลอดภัย คุกกี้ประเภทนี้ไม่สามารถปิดได้
+                  ใช้เพื่อให้ระบบทำงานได้อย่างถูกต้อง เช่น การรักษาสถานะการเข้าสู่ระบบ การป้องกันคำขอที่ไม่พึงประสงค์ และความปลอดภัยของการใช้งาน คุกกี้ประเภทนี้ไม่สามารถปิดได้
                 </p>
               </div>
-              <span className="rounded-full bg-[#E2F5E5] px-3 py-1 text-xs font-semibold text-[#2E7D32]">
+              <span className="inline-flex w-fit rounded-full bg-[#E2F5E5] px-3 py-1 text-xs font-semibold text-[#2E7D32]">
                 เปิดเสมอ
               </span>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#E7D7C5] bg-white px-4 py-4">
+          <div className="rounded-2xl border border-[#E7D7C5] bg-white px-5 py-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-bold text-[#7B542F]">คุกกี้เพื่อการวิเคราะห์</p>
                 <p className="mt-1 text-sm leading-6 text-[#6F6F6F]">
-                  ใช้เพื่อช่วยให้ระบบเข้าใจภาพรวมการใช้งาน เช่น หน้าที่มีการใช้งานสูง หรือจุดที่ผู้ใช้ออกจาก flow เพื่อปรับปรุงประสบการณ์ใช้งานในอนาคต
+                  ใช้เพื่อช่วยให้ระบบเข้าใจภาพรวมการใช้งาน เช่น หน้าที่มีการใช้งานสูง เส้นทางการใช้งาน และจุดที่ผู้ใช้ออกจากขั้นตอนสำคัญ เพื่อปรับปรุงประสบการณ์ใช้งานของระบบในอนาคต โดยจะเริ่มทำงานเมื่อคุณให้ความยินยอมเท่านั้น
+                </p>
+                <p className="mt-2 text-xs leading-6 text-[#8D6A4A]">
+                  คุณสามารถเปลี่ยนแปลงการตั้งค่านี้ได้ภายหลังจากเมนูตั้งค่าคุกกี้ที่ส่วนท้ายของเว็บไซต์
                 </p>
               </div>
 
@@ -72,6 +79,21 @@ function CookieSettingsModal({ consent, onClose, onSave, onToggleAnalytics }) {
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl bg-[#FAF7F3] px-4 py-4 text-sm leading-7 text-[#6F6F6F]">
+          โปรดอ่านรายละเอียดเพิ่มเติมได้ที่{' '}
+          <Link to="/privacy" onClick={onClose} className="font-semibold text-[#7B542F] underline underline-offset-2">
+            นโยบายความเป็นส่วนตัว
+          </Link>{' '}
+          ,{' '}
+          <Link to="/cookies" onClick={onClose} className="font-semibold text-[#7B542F] underline underline-offset-2">
+            นโยบายการใช้คุกกี้
+          </Link>{' '}
+          และ{' '}
+          <Link to="/terms" onClick={onClose} className="font-semibold text-[#7B542F] underline underline-offset-2">
+            ข้อกำหนดการใช้งาน
+          </Link>
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -169,21 +191,24 @@ export default function CookieConsentManager() {
     <>
       {showBanner ? (
         <div className="fixed bottom-4 left-4 right-4 z-[110] flex justify-center">
-          <div className="w-full max-w-4xl rounded-[28px] border border-[#E7D7C5] bg-white px-5 py-5 shadow-2xl sm:px-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
+          <div className="w-full max-w-5xl rounded-[28px] border border-[#E7D7C5] bg-white px-5 py-5 shadow-2xl sm:px-6 sm:py-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-3xl">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
                   Cookie Notice
                 </p>
                 <h2 className="mt-2 text-[22px] font-extrabold text-[#7B542F]">
-                  เราใช้คุกกี้ที่จำเป็น และคุกกี้เพื่อการวิเคราะห์
+                  ระบบใช้คุกกี้ที่จำเป็น และอาจใช้คุกกี้เพื่อการวิเคราะห์เมื่อได้รับความยินยอม
                 </h2>
                 <p className="mt-2 text-sm leading-7 text-[#6F6F6F]">
-                  คุกกี้ที่จำเป็นช่วยให้ระบบทำงานได้อย่างถูกต้อง ส่วนคุกกี้เพื่อการวิเคราะห์จะถูกใช้เพื่อช่วยให้เราเข้าใจภาพรวมการใช้งานและปรับปรุงประสบการณ์ของผู้ใช้เมื่อคุณให้ความยินยอม
+                  คุกกี้ที่จำเป็นช่วยให้ระบบทำงานได้อย่างถูกต้องและปลอดภัย ส่วนคุกกี้เพื่อการวิเคราะห์จะใช้เพื่อช่วยให้เราเข้าใจภาพรวมการใช้งานและปรับปรุงประสบการณ์ของผู้ใช้ โดยจะเปิดใช้งานก็ต่อเมื่อคุณให้ความยินยอม
+                </p>
+                <p className="mt-2 text-xs leading-6 text-[#8D6A4A]">
+                  การเลือกของคุณจะไม่กระทบต่อสิทธิในการใช้งานส่วนที่จำเป็นของระบบ และคุณสามารถเปลี่ยนแปลงการตั้งค่าได้ในภายหลัง
                 </p>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
                 <button
                   type="button"
                   onClick={() => {
@@ -209,6 +234,21 @@ export default function CookieConsentManager() {
                   ยอมรับทั้งหมด
                 </button>
               </div>
+            </div>
+
+            <div className="mt-4 border-t border-[#F1E6DA] pt-4 text-xs leading-6 text-[#8D6A4A]">
+              ดูรายละเอียดเพิ่มเติมได้ที่{' '}
+              <Link to="/privacy" className="font-semibold text-[#7B542F] underline underline-offset-2">
+                นโยบายความเป็นส่วนตัว
+              </Link>{' '}
+              ,{' '}
+              <Link to="/cookies" className="font-semibold text-[#7B542F] underline underline-offset-2">
+                นโยบายการใช้คุกกี้
+              </Link>{' '}
+              และ{' '}
+              <Link to="/terms" className="font-semibold text-[#7B542F] underline underline-offset-2">
+                ข้อกำหนดการใช้งาน
+              </Link>
             </div>
           </div>
         </div>
