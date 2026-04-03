@@ -54,9 +54,16 @@ app.use(helmet({
         },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: false
+    },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     frameguard: { action: 'deny' },
     noSniff: true,
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+    originAgentCluster: true,
     permissionsPolicy: {
         features: {
             camera: [],

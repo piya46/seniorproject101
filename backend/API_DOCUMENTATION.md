@@ -465,6 +465,12 @@ status code ที่ client ควรรองรับ:
 - retention กำหนดผ่าน env `AI_USAGE_RETENTION_DAYS`
 - TTL field ที่ใช้คือ `expire_at`
 
+## Logout And Session Cache Behavior
+
+- `POST /api/v1/oidc/logout` จะ revoke session record และลบ `sci_session_token`
+- logout response ส่ง `Clear-Site-Data: "cache", "cookies", "storage"` เพื่อให้ browser-side cache/storage ถูกล้างเพิ่มอีกชั้นใน browser ที่รองรับ
+- response ที่ผ่าน authenticated middleware จะถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate` เพื่อหลีกเลี่ยงการ cache ข้อมูลหลังบ้านเกินจำเป็น
+
 ## Notes
 
 - การเอา IAP ออกทำให้ชั้น outer access gate หายไป แต่ app-layer auth, domain enforcement, session policy, validation, encryption, และ rate limiting ยังอยู่

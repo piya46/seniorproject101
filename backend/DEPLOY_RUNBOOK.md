@@ -1,6 +1,6 @@
 # Deploy Runbook
 
-Last updated: `2026-03-30`
+Last updated: `2026-04-03`
 
 runbook นี้อธิบายการ deploy backend ในโหมด Google OIDC แบบไม่ใช้ IAP/LB auth gate โดยรองรับทั้ง backend แบบ public ชั่วคราวและ backend แบบ private หลัง frontend BFF
 
@@ -64,6 +64,10 @@ runbook นี้อธิบายการ deploy backend ในโหมด G
 - app และ cleanup service account ถูกลด bucket role ลงมาเป็น `roles/storage.objectUser` ซึ่งยังพอสำหรับ read/write/delete object ตาม flow ปัจจุบัน
 - app service account มี self `roles/iam.serviceAccountTokenCreator` เพื่อรองรับ `getSignedUrl()` ผ่าน `signBlob`
 - หลัง deploy ควรตั้ง log-based alerts ใน Cloud Monitoring สำหรับ event อย่าง `payload_replay_blocked`, `csrf_validation_failed`, `unencrypted_request_blocked`, `document_job_queue_info_failed`, `temp_cleanup_failed`, และ `document_intake_cleanup_failed` เพื่อให้ทีมเห็น attack spikes หรือ cleanup failures โดยไม่ต้องรอ user report
+- ถ้าต้องการเตรียม metrics สำหรับ alerts แบบทำซ้ำได้ ให้ใช้ [scripts/createSecurityLogMetrics.sh](./scripts/createSecurityLogMetrics.sh)
+- ถ้าต้องการสร้าง alert policies ให้ต่อจาก metrics แบบกึ่ง one-click ให้ใช้ [scripts/createSecurityAlertPolicies.sh](./scripts/createSecurityAlertPolicies.sh)
+- ถ้าจะเปิด Edge WAF/abuse protection ให้ดู [CLOUD_ARMOR_STANDARD.md](./CLOUD_ARMOR_STANDARD.md) ก่อน เพราะ Cloud Armor ต้องอยู่หลัง external load balancer/serverless NEG ไม่ใช่ `run.app` ตรง ๆ
+- ถ้าจะจัดการ notification channels ผ่าน CLI ใน environment นี้ ให้ใช้ `gcloud beta monitoring channels ...`
 
 ## Manual OAuth Provider Setup
 
@@ -198,6 +202,17 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 | `MAX_PDF_SOURCE_BYTES` | `5242880` | เพดาน PDF ที่ backend ยอม sanitize อย่างปลอดภัย (5MB) |
 | `DOCUMENT_JOB_RETENTION_DAYS` | `7` | ระยะเวลาที่เก็บ job records/result metadata ใน Firestore |
 | `DOCUMENT_JOB_PROCESSING_TIMEOUT_MS` | `600000` | timeout เชิงตรรกะสำหรับ job ที่ถูก claim ไปประมวลผล |
+| `CLOUD_RUN_EXECUTION_ENVIRONMENT` | `gen2` | บังคับ execution environment ของ Cloud Run สำหรับ backend/worker/cleanup/AV scanner |
+| `ENABLE_SECURITY_LOG_METRICS` | `true` | ให้ `deploy.sh` สร้างหรืออัปเดต log-based metrics สำหรับ security events อัตโนมัติหลัง deploy |
+| `ENABLE_SECURITY_ALERT_POLICIES` | `false` | ให้ `deploy.sh` สร้างหรืออัปเดต alert policies ต่อจาก metrics อัตโนมัติหลัง deploy |
+| `SECURITY_ALERT_POLICY_PREFIX` | `Sci Request` | prefix ของชื่อ alert policies ที่สคริปต์ observability จะสร้าง |
+| `SECURITY_ALERT_NOTIFICATION_CHANNELS` | `` | รายการ notification channel resource names คั่นด้วย comma สำหรับผูกกับ alert policies |
+| `AUTO_CREATE_SECURITY_NOTIFICATION_CHANNELS` | `false` | เมื่อเป็น `true` และมี `SECURITY_ALERT_NOTIFICATION_EMAILS` สคริปต์จะหา channel email เดิมหรือสร้างใหม่ให้อัตโนมัติก่อนผูก alert policies |
+| `SECURITY_ALERT_NOTIFICATION_EMAILS` | `` | รายการอีเมลคั่นด้วย comma สำหรับสร้าง/reuse email notification channels อัตโนมัติ |
+| `BACKEND_TMPDIR` | `/tmp` | path ของ temp storage ฝั่ง backend (ต้องเป็น absolute path) |
+| `DOCUMENT_JOB_WORKER_TMPDIR` | `/tmp` | path ของ temp storage ฝั่ง document worker (ต้องเป็น absolute path) |
+| `DOCUMENT_AV_SCANNER_TMPDIR` | `/tmp` | path ของ temp storage ฝั่ง document AV scanner (ต้องเป็น absolute path) |
+| `CLEANUP_SERVICE_TMPDIR` | `/tmp` | path ของ temp storage ฝั่ง cleanup service (ต้องเป็น absolute path) |
 | `DOCUMENT_JOB_WORKER_ARTIFACT_REPOSITORY` | `${APP_NAME}-workers` | Artifact Registry repository สำหรับ image ของ document worker |
 | `DOCUMENT_JOB_WORKER_IMAGE_TAG` | `latest` | tag ของ image ที่ใช้ deploy document worker |
 | `DOCUMENT_JOB_WORKER_MEMORY` | `2Gi` | memory limit ของ Cloud Run document worker |
@@ -245,6 +260,49 @@ export TRUSTED_BFF_SHARED_SECRET_VALUE="your-bff-shared-secret"
 - ถ้าใช้ BFF production flow ต้องเพิ่ม frontend callback เช่น `https://ai-formcheck-frontend-<project-number>.asia-southeast3.run.app/auth/callback`
 - ถ้ายังต้องการรองรับ legacy/direct mode ค่อยเพิ่ม backend callback `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback` แยกอีกตัว
 - ถ้าจะเปิด `TRUSTED_BFF_AUTH_ENABLED=true` ควรสร้าง shared secret แบบสุ่มยาวและเก็บเฉพาะใน Secret Manager เท่านั้น
+
+## Security Observability Automation
+
+หลัง deploy รอบล่าสุด `deploy.sh` สามารถทำงานสาย observability ต่อให้อัตโนมัติได้ 2 ชั้น:
+
+1. สร้าง/อัปเดต log-based metrics จาก security events
+2. สร้าง/อัปเดต alert policies ต่อจาก metrics เหล่านั้น
+
+ตัวอย่างขั้นต่ำ:
+
+```bash
+cd /Users/pst./senior/backend
+./deploy.sh
+```
+
+ตัวอย่างเปิด metrics + alert policies:
+
+```bash
+cd /Users/pst./senior/backend
+ENABLE_SECURITY_ALERT_POLICIES=true \
+SECURITY_ALERT_NOTIFICATION_CHANNELS="projects/ai-formcheck/notificationChannels/1234567890" \
+./deploy.sh
+```
+
+ตัวอย่างให้สคริปต์พยายามหา/reuse หรือสร้าง email notification channel ให้อัตโนมัติ:
+
+```bash
+cd /Users/pst./senior/backend
+ENABLE_SECURITY_ALERT_POLICIES=true \
+AUTO_CREATE_SECURITY_NOTIFICATION_CHANNELS=true \
+SECURITY_ALERT_NOTIFICATION_EMAILS="ops@example.com" \
+./deploy.sh
+```
+
+ข้อควรทราบ:
+
+- ถ้า `AUTO_CREATE_SECURITY_NOTIFICATION_CHANNELS=true` แต่สคริปต์ไม่สามารถ resolve หรือสร้าง channel ได้จริง มันจะ fail ชัดเจน
+- การสร้าง email channel อาจยังต้องอาศัยสิทธิ์ Monitoring ที่เพียงพอ และบางกรณีต้องยืนยันปลายทางอีเมล
+- ถ้าต้องการดู channel ที่มีอยู่แล้ว ให้ใช้:
+
+```bash
+gcloud beta monitoring channels list --project ai-formcheck
+```
 
 ## Async Document Worker Model
 
