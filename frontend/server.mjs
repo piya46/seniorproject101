@@ -15,6 +15,67 @@ const TRUSTED_BFF_SHARED_SECRET = String(process.env.TRUSTED_BFF_SHARED_SECRET |
 const TRUSTED_BFF_AUTH_HEADER_NAME = String(process.env.TRUSTED_BFF_AUTH_HEADER_NAME || 'x-bff-auth').trim();
 const TRUSTED_BFF_IDENTITY_TOKEN_HEADER = String(process.env.TRUSTED_BFF_IDENTITY_TOKEN_HEADER || 'x-bff-identity-token').trim();
 const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const BACKEND_ORIGIN = (() => {
+  if (!BACKEND_URL) {
+    return '';
+  }
+
+  try {
+    return new URL(BACKEND_URL).origin;
+  } catch (_error) {
+    return '';
+  }
+})();
+
+const BASE_SECURITY_HEADERS = {
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin'
+};
+
+function buildContentSecurityPolicy() {
+  const scriptSrc = ["'self'"];
+  const connectSrc = ["'self'"];
+
+  if (GA_MEASUREMENT_ID) {
+    scriptSrc.push('https://www.googletagmanager.com');
+    connectSrc.push(
+      'https://www.google-analytics.com',
+      'https://region1.google-analytics.com',
+      'https://analytics.google.com'
+    );
+  }
+
+  if (BACKEND_ORIGIN) {
+    connectSrc.push(BACKEND_ORIGIN);
+  }
+
+  const directives = [
+    `default-src 'self'`,
+    `base-uri 'self'`,
+    `frame-ancestors 'none'`,
+    `object-src 'none'`,
+    `form-action 'self'`,
+    `script-src ${scriptSrc.join(' ')}`,
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+    `font-src 'self' https://fonts.gstatic.com data:`,
+    `img-src 'self' data: blob: https:`,
+    `connect-src ${connectSrc.join(' ')}`,
+    `frame-src 'self'`
+  ];
+
+  return directives.join('; ');
+}
+
+function buildSecurityHeaders() {
+  return {
+    ...BASE_SECURITY_HEADERS,
+    'Content-Security-Policy': buildContentSecurityPolicy()
+  };
+}
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -72,6 +133,7 @@ function deriveBrowserOrigin(req) {
 function sendJson(res, statusCode, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(statusCode, {
+    ...buildSecurityHeaders(),
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body)
   });
@@ -86,6 +148,7 @@ function sendPublicAppConfig(res) {
 
 function redirect(res, location, statusCode = 302) {
   res.writeHead(statusCode, {
+    ...buildSecurityHeaders(),
     Location: location
   });
   res.end();
@@ -93,6 +156,7 @@ function redirect(res, location, statusCode = 302) {
 
 function buildStaticHeaders(filePath) {
   return {
+    ...buildSecurityHeaders(),
     'Content-Type': MIME_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream',
     'Cache-Control': filePath === INDEX_FILE ? 'no-cache' : 'public, max-age=31536000, immutable'
   };

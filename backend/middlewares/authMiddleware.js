@@ -12,6 +12,10 @@ function isTrustedBffAuthEnabled() {
 }
 
 module.exports = async (req, res, next) => { // ✅ เปลี่ยนเป็น async
+  res.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+
   // 1. อ่าน Token จาก Cookie เป็นหลัก
   let token = req.cookies.sci_session_token;
   let trustedBffIdentity = null;

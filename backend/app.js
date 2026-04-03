@@ -48,9 +48,23 @@ app.use(helmet({
             defaultSrc: ["'self'"], 
             scriptSrc: ["'self'"], // ห้ามรัน Inline Script
             objectSrc: ["'none'"], // ปิดช่องโหว่ Flash/Plugin
+            baseUri: ["'self'"],
+            frameAncestors: ["'none'"],
+            formAction: ["'self'"]
         },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    frameguard: { action: 'deny' },
+    noSniff: true,
+    permissionsPolicy: {
+        features: {
+            camera: [],
+            microphone: [],
+            geolocation: [],
+            browsingTopics: []
+        }
+    }
 }));
 
 // CORS Setup
