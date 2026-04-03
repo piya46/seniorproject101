@@ -1,7 +1,7 @@
 # Postman Guide
 
-Version: `v1.9.7`
-Last updated: `2026-03-31`
+Version: `v1.9.8`
+Last updated: `2026-04-03`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
 
@@ -54,7 +54,10 @@ legacy/direct mode ที่ยังคงอยู่เพื่อ backward 
 - `GET` endpoints และ multipart upload ไม่ใช้ secure JSON wrapper
 - status endpoints ตอนนี้แยกเป็น `GET /system/status`, `GET /system/status/storage-signing`, และ `GET /system/status/details`
 - `GET /system/status/storage-signing` ตอนนี้เป็น authenticated probe แล้ว ไม่ใช่ public smoke probe
+- `GET /chat/usage` ใช้ดึง AI usage summary สำหรับ chat quota widget หรือ status indicator ฝั่ง frontend
 - BFF production flow ใช้ frontend callback `/auth/callback`; backend callback `/oidc/google/callback` เป็น legacy/direct mode เป็นหลัก
+- `POST /oidc/logout` ตอนนี้จะ revoke session record, ล้าง cookie และส่ง `Clear-Site-Data: "cache", "cookies", "storage"` ใน browser ที่รองรับ
+- response ที่ผ่าน authenticated middleware จะถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate` เพิ่มอีกชั้น จึงไม่ควรพึ่ง browser cache สำหรับ backend auth data
 - `POST /documents/merge` ตอบ `202 queued`; client ต้อง poll `/documents/jobs/:jobId` และค่อยเรียก `/documents/jobs/:jobId/download`
 - `POST /upload` ตอบ `200 success` เพื่อ stage ไฟล์ไว้ก่อน; ถ้า validation ต้องเตรียมเอกสารเพิ่ม client จะ poll `/upload/jobs/:jobId`
 - `POST /documents/merge` และ `POST /upload` ยังอาจตอบ `413` เมื่อชน policy ขนาดไฟล์/ขนาดรวม

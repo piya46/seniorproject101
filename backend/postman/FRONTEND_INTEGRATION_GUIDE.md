@@ -1,7 +1,7 @@
 # Frontend Integration Guide
 
-Version: `v1.9.7`
-Last updated: `2026-03-31`
+Version: `v1.9.8`
+Last updated: `2026-04-03`
 
 คู่มือนี้อธิบายสิ่งที่ frontend ต้องทำเพื่อเชื่อมต่อ backend ในโหมด Google OIDC + session cookie + secure JSON transport โดย direct backend browser flow ให้ถือเป็น legacy/direct mode และ production target ใหม่คือ frontend BFF + private backend
 
@@ -24,6 +24,7 @@ Last updated: `2026-03-31`
 9. endpoint ที่เปลี่ยน state ทุกตัวต้องส่ง header `x-csrf-token` ให้ตรงกับ token ปัจจุบัน
 10. ถ้าต้องอ่านข้อมูลส่วนตัวระดับเข้มขึ้น ให้ใช้ `POST /profile/details` ผ่าน secure JSON transport
 11. ถ้าเปิด `PFS_V2_ENABLED=true` ให้ frontend/BFF เริ่มด้วย `GET /api/v2/auth/handshake` แล้วค่อยส่ง protected JSON endpoints ด้วย envelope แบบ `v2`
+12. ถ้าต้องแสดงสถานะโควต้า AI ใน chat widget ให้เรียก `GET /chat/usage` หลัง session พร้อม แล้ว cache ฝั่ง UI ได้เฉพาะเพื่อ UX ไม่ใช่ source of truth
 
 ## Legacy/Direct Mode
 
@@ -55,6 +56,8 @@ cookie/security headers ที่เกี่ยวข้อง:
 - frontend ต้องแนบ header `x-csrf-token` ในทุก `POST`, `PUT`, `PATCH`, `DELETE` ที่ใช้ session cookie
 - แนะนำให้เก็บ token นี้ไว้ใน API client กลาง แล้ว refresh ผ่าน `GET /auth/csrf-token` หลัง login หรือเมื่อสร้าง session ใหม่
 - ใน production BFF mode frontend server ควร forward cookie และ `x-csrf-token` ให้ backend แทน browser
+- `POST /oidc/logout` จะส่ง `Clear-Site-Data: "cache", "cookies", "storage"` เพื่อให้ browser-side state ถูกล้างแรงขึ้นใน browser ที่รองรับ
+- response ที่อยู่หลัง authenticated middleware ถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate` จึงไม่ควรพึ่ง browser cache สำหรับข้อมูล auth/profile/usage
 
 ## Secure JSON
 
@@ -96,6 +99,7 @@ secure JSON endpoints:
 - ถ้าต้องการ tighten service identity เพิ่ม ให้เปิด `TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN=true`
 - frontend/BFF ต้องส่ง `x-bff-identity-token` ที่เป็น Google-signed identity token มาด้วย
 - ดู header contract เพิ่มเติมที่ [BFF_BACKEND_CONTRACT.md](/Users/pst./senior/backend/BFF_BACKEND_CONTRACT.md)
+- ถ้าต้องการใช้ chat quota indicator ให้เรียก `GET /chat/usage` แยกจาก `POST /chat/recommend` แทนการ parse จาก reply endpoint อย่างเดียว
 
 frontend ควรมี API client กลางที่รับผิดชอบ:
 

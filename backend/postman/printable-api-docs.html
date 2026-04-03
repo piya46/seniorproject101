@@ -128,7 +128,7 @@
       <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
     </section>
     <h1>API Documentation</h1>
-<p>Version: `v1.9.7` Last updated: `2026-03-31`</p>
+<p>Version: `v1.9.8` Last updated: `2026-04-03`</p>
 <p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
 <p>เอกสารที่เกี่ยวข้อง:</p>
 <ul>
@@ -373,6 +373,13 @@
 <td>ต้อง</td>
 <td>ไม่ต้อง</td>
 <td>รับ signed URL ของ merged output เมื่อ job สำเร็จ</td>
+</tr>
+<tr>
+<td>`/chat/usage`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>อ่าน AI usage summary สำหรับ chat quota/status UI</td>
 </tr>
 <tr>
 <td>`/chat/recommend`</td>
@@ -745,6 +752,34 @@
 <li>multipart browser requests ต้องมาจาก frontend origin ที่อยู่ใน allowlist</li>
 <li>ปลายทางอีเมลกำหนดจาก `TECH_SUPPORT_TARGET_EMAIL`</li>
 </ul>
+<h2>Chat Usage Endpoint</h2>
+<h3>`GET /chat/usage`</h3>
+<p>ใช้สำหรับดึง AI usage summary ของ scope แชต เพื่อแสดง quota indicator หรือสถานะการใช้งานใน frontend/chat widget โดยไม่ต้องรอ `POST /chat/recommend`</p>
+<p>response ตัวอย่าง:</p>
+<pre><code>
+{
+
+  &quot;ai_usage&quot;: {
+
+    &quot;daily_limit&quot;: 50000,
+
+    &quot;used_tokens&quot;: 19420,
+
+    &quot;remaining_tokens&quot;: 30580,
+
+    &quot;used_percent&quot;: 39
+
+  }
+
+}
+
+</code></pre>
+<p>หมายเหตุ:</p>
+<ul>
+<li>route นี้อยู่หลัง `authMiddleware`</li>
+<li>response นี้เป็น summary ของ scope `chat_recommend` เท่านั้น ไม่รวม validation scope</li>
+<li>เหมาะกับการ bind ลง UI หรือ cache ระยะสั้นฝั่ง frontend เพื่อ UX แต่ไม่ควรใช้แทน server-side source of truth</li>
+</ul>
 <h2>Error Model</h2>
 <p>รูปแบบกลาง:</p>
 <pre><code>
@@ -794,6 +829,12 @@
 <li>ใช้ข้อมูลนี้ทั้งสำหรับ daily token limit และ usage analytics</li>
 <li>retention กำหนดผ่าน env `AI_USAGE_RETENTION_DAYS`</li>
 <li>TTL field ที่ใช้คือ `expire_at`</li>
+</ul>
+<h2>Logout And Session Cache Behavior</h2>
+<ul>
+<li>`POST /api/v1/oidc/logout` จะ revoke session record และลบ `sci_session_token`</li>
+<li>logout response ส่ง `Clear-Site-Data: &quot;cache&quot;, &quot;cookies&quot;, &quot;storage&quot;` เพื่อให้ browser-side cache/storage ถูกล้างเพิ่มอีกชั้นใน browser ที่รองรับ</li>
+<li>response ที่ผ่าน authenticated middleware จะถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate` เพื่อหลีกเลี่ยงการ cache ข้อมูลหลังบ้านเกินจำเป็น</li>
 </ul>
 <h2>Notes</h2>
 <ul>

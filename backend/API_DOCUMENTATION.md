@@ -1,7 +1,7 @@
 # API Documentation
 
-Version: `v1.9.7`
-Last updated: `2026-03-31`
+Version: `v1.9.8`
+Last updated: `2026-04-03`
 
 เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client
 
@@ -111,6 +111,7 @@ legacy/direct mode ที่ยังมีอยู่เพื่อ backward 
 | `/documents/merge` | `POST` | ต้อง | ต้อง | enqueue merge job |
 | `/documents/jobs/:jobId` | `GET` | ต้อง | ไม่ต้อง | อ่านสถานะ merge job |
 | `/documents/jobs/:jobId/download` | `GET` | ต้อง | ไม่ต้อง | รับ signed URL ของ merged output เมื่อ job สำเร็จ |
+| `/chat/usage` | `GET` | ต้อง | ไม่ต้อง | อ่าน AI usage summary สำหรับ chat quota/status UI |
 | `/chat/recommend` | `POST` | ต้อง | ต้อง | แนะนำฟอร์ม/ตอบคำถาม |
 | `/support/technical-email` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | ส่งอีเมลแจ้งปัญหา |
 
@@ -435,6 +436,31 @@ response ตัวอย่าง:
 - backend รับ `multipart/form-data` เฉพาะ endpoint ที่ออกแบบไว้จริง เช่น `/upload` และ `/support/technical-email`
 - multipart browser requests ต้องมาจาก frontend origin ที่อยู่ใน allowlist
 - ปลายทางอีเมลกำหนดจาก `TECH_SUPPORT_TARGET_EMAIL`
+
+## Chat Usage Endpoint
+
+### `GET /chat/usage`
+
+ใช้สำหรับดึง AI usage summary ของ scope แชต เพื่อแสดง quota indicator หรือสถานะการใช้งานใน frontend/chat widget โดยไม่ต้องรอ `POST /chat/recommend`
+
+response ตัวอย่าง:
+
+```json
+{
+  "ai_usage": {
+    "daily_limit": 50000,
+    "used_tokens": 19420,
+    "remaining_tokens": 30580,
+    "used_percent": 39
+  }
+}
+```
+
+หมายเหตุ:
+
+- route นี้อยู่หลัง `authMiddleware`
+- response นี้เป็น summary ของ scope `chat_recommend` เท่านั้น ไม่รวม validation scope
+- เหมาะกับการ bind ลง UI หรือ cache ระยะสั้นฝั่ง frontend เพื่อ UX แต่ไม่ควรใช้แทน server-side source of truth
 
 ## Error Model
 

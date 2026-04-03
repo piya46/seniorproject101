@@ -1,7 +1,27 @@
 # Changelog Postman Docs
 
-Current version: `v1.9.7`
-Last updated: `2026-03-31`
+Current version: `v1.9.8`
+Last updated: `2026-04-03`
+
+## v1.9.8
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เพิ่มเอกสาร `GET /api/v1/chat/usage` สำหรับ usage summary ของ AI chat quota widget
+- sync `POST /api/v1/oidc/logout` ให้ตรงกับ runtime ล่าสุด รวมพฤติกรรม `Clear-Site-Data`
+- sync collection ให้มี `GET /api/v1/system/status/storage-signing` แบบ authenticated probe ตาม implementation จริง
+- อัปเดต guide/collection summary ว่า response หลัง authenticated middleware ถูกตั้ง `no-store/no-cache`
+- regenerate printable docs ให้ตรงกับ `API_DOCUMENTATION.md` เวอร์ชันล่าสุด
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็นการ sync docs/collection/examples ให้ตรงกับ behavior ปัจจุบันมากขึ้น
+
+ผลกระทบฝั่งทีม:
+
+- frontend สามารถเรียก `GET /api/v1/chat/usage` เพื่อแสดงสถานะโควต้า AI ได้โดยไม่ต้องรอ request แชตครั้งแรก
+- flow logout ควรคาดหวัง browser-side cache/storage clearing ใน browser ที่รองรับ และไม่ควร rely on cached authenticated responses
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.8`
 
 ## v1.9.7
 
