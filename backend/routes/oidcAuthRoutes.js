@@ -241,6 +241,7 @@ router.post('/logout', authMiddleware, async (req, res) => {
       expires: new Date(0)
     });
     clearCsrfCookie(res);
+    res.set('Clear-Site-Data', '"cache", "cookies", "storage"');
 
     return res.json({
       status: 'success',

@@ -1,17 +1,32 @@
+function wipeUint8Array(value) {
+  if (value instanceof Uint8Array) {
+    value.fill(0);
+  }
+}
+
+function wipeArrayBuffer(value) {
+  if (value instanceof ArrayBuffer) {
+    new Uint8Array(value).fill(0);
+  }
+}
+
 async function importPublicKey(pemKey) {
   const pemContents = pemKey
     .replace("-----BEGIN PUBLIC KEY-----", "")
     .replace("-----END PUBLIC KEY-----", "")
     .replace(/\s/g, "");
   const binaryDer = Uint8Array.from(window.atob(pemContents), c => c.charCodeAt(0));
-
-  return window.crypto.subtle.importKey(
-    "spki",
-    binaryDer.buffer,
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    true,
-    ["encrypt"]
-  );
+  try {
+    return await window.crypto.subtle.importKey(
+      "spki",
+      binaryDer.buffer,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["encrypt"]
+    );
+  } finally {
+    wipeUint8Array(binaryDer);
+  }
 }
 
 function arrayBufferToBase64(buffer) {
@@ -39,23 +54,32 @@ export async function encryptPayload(jsonData, serverPublicKeyPem) {
   
   const aesKeyRaw = window.crypto.getRandomValues(new Uint8Array(32));
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  let encodedData = null;
+  let encryptedContent = null;
 
-  const aesCryptoKey = await window.crypto.subtle.importKey("raw", aesKeyRaw, "AES-GCM", true, ["encrypt"]);
-  const encodedData = new TextEncoder().encode(JSON.stringify(securePayload));
-  const encryptedContent = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, aesCryptoKey, encodedData);
+  try {
+    const aesCryptoKey = await window.crypto.subtle.importKey("raw", aesKeyRaw, "AES-GCM", false, ["encrypt"]);
+    encodedData = new TextEncoder().encode(JSON.stringify(securePayload));
+    encryptedContent = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, aesCryptoKey, encodedData);
 
-  const tagLength = 16;
-  const payload = encryptedContent.slice(0, encryptedContent.byteLength - tagLength);
-  const tag = encryptedContent.slice(encryptedContent.byteLength - tagLength);
+    const tagLength = 16;
+    const payload = encryptedContent.slice(0, encryptedContent.byteLength - tagLength);
+    const tag = encryptedContent.slice(encryptedContent.byteLength - tagLength);
 
-  const encryptedAesKey = await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, aesKeyRaw);
+    const encryptedAesKey = await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, aesKeyRaw);
 
-  return {
-    encKey: arrayBufferToBase64(encryptedAesKey),
-    iv: arrayBufferToBase64(iv),
-    payload: arrayBufferToBase64(payload),
-    tag: arrayBufferToBase64(tag)
-  };
+    return {
+      encKey: arrayBufferToBase64(encryptedAesKey),
+      iv: arrayBufferToBase64(iv),
+      payload: arrayBufferToBase64(payload),
+      tag: arrayBufferToBase64(tag)
+    };
+  } finally {
+    wipeUint8Array(aesKeyRaw);
+    wipeUint8Array(iv);
+    wipeUint8Array(encodedData);
+    wipeArrayBuffer(encryptedContent);
+  }
 }
 
 //ฟังก์ชันใหม่พิเศษ (ใช้สำหรับหน้า FormDetail เพื่อจำกุญแจไว้ไขข้อความตอนตอบกลับ)
@@ -65,41 +89,53 @@ export async function encryptAndKeepKey(jsonData, serverPublicKeyPem) {
   
   const aesKeyRaw = window.crypto.getRandomValues(new Uint8Array(32));
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  let encodedData = null;
+  let encryptedContent = null;
 
-  const aesCryptoKey = await window.crypto.subtle.importKey("raw", aesKeyRaw, "AES-GCM", true, ["encrypt"]);
-  const encodedData = new TextEncoder().encode(JSON.stringify(securePayload));
-  const encryptedContent = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, aesCryptoKey, encodedData);
+  try {
+    const aesCryptoKey = await window.crypto.subtle.importKey("raw", aesKeyRaw, "AES-GCM", false, ["encrypt"]);
+    encodedData = new TextEncoder().encode(JSON.stringify(securePayload));
+    encryptedContent = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, aesCryptoKey, encodedData);
 
-  const tagLength = 16;
-  const payload = encryptedContent.slice(0, encryptedContent.byteLength - tagLength);
-  const tag = encryptedContent.slice(encryptedContent.byteLength - tagLength);
+    const tagLength = 16;
+    const payload = encryptedContent.slice(0, encryptedContent.byteLength - tagLength);
+    const tag = encryptedContent.slice(encryptedContent.byteLength - tagLength);
 
-  const encryptedAesKey = await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, aesKeyRaw);
+    const encryptedAesKey = await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, aesKeyRaw);
 
-  return {
-    requestPayload: {
-      encKey: arrayBufferToBase64(encryptedAesKey),
-      iv: arrayBufferToBase64(iv),
-      payload: arrayBufferToBase64(payload),
-      tag: arrayBufferToBase64(tag)
-    },
-    aesKeyRaw: aesKeyRaw // แอบคืนค่ากุญแจมาให้ด้วย!
-  };
+    return {
+      requestPayload: {
+        encKey: arrayBufferToBase64(encryptedAesKey),
+        iv: arrayBufferToBase64(iv),
+        payload: arrayBufferToBase64(payload),
+        tag: arrayBufferToBase64(tag)
+      },
+      aesKeyRaw
+    };
+  } finally {
+    wipeUint8Array(iv);
+    wipeUint8Array(encodedData);
+    wipeArrayBuffer(encryptedContent);
+  }
 }
 
 //ฟังก์ชันถอดรหัส (รับกุญแจที่แอบจำไว้มาใช้ไขข้อมูล)
 export async function decryptResponse(encryptedResponse, aesKeyRaw) {
+  let encryptedBytes = null;
+  let ivBytes = null;
+  let tagBytes = null;
+  let ciphertext = null;
   try {
-    const encryptedBytes = base64ToUint8Array(encryptedResponse.payload);
-    const ivBytes = base64ToUint8Array(encryptedResponse.iv);
-    const tagBytes = base64ToUint8Array(encryptedResponse.tag);
+    encryptedBytes = base64ToUint8Array(encryptedResponse.payload);
+    ivBytes = base64ToUint8Array(encryptedResponse.iv);
+    tagBytes = base64ToUint8Array(encryptedResponse.tag);
 
-    const ciphertext = new Uint8Array(encryptedBytes.length + tagBytes.length);
+    ciphertext = new Uint8Array(encryptedBytes.length + tagBytes.length);
     ciphertext.set(encryptedBytes, 0);
     ciphertext.set(tagBytes, encryptedBytes.length);
 
     const aesCryptoKey = await window.crypto.subtle.importKey(
-      "raw", aesKeyRaw, "AES-GCM", true, ["decrypt"]
+      "raw", aesKeyRaw, "AES-GCM", false, ["decrypt"]
     );
 
     const decryptedBytes = await window.crypto.subtle.decrypt(
@@ -115,5 +151,11 @@ export async function decryptResponse(encryptedResponse, aesKeyRaw) {
   } catch (error) {
     console.error("Decryption Failed:", error);
     throw new Error("Security Error: Unable to decrypt server response.");
+  } finally {
+    wipeUint8Array(aesKeyRaw);
+    wipeUint8Array(encryptedBytes);
+    wipeUint8Array(ivBytes);
+    wipeUint8Array(tagBytes);
+    wipeUint8Array(ciphertext);
   }
 }
