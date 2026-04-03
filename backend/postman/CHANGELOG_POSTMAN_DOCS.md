@@ -1,7 +1,27 @@
 # Changelog Postman Docs
 
-Current version: `v1.9.8`
+Current version: `v1.9.9`
 Last updated: `2026-04-03`
+
+## v1.9.9
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- ตรวจทานทั้งโฟลเดอร์ `backend/postman/` อีกรอบและ sync เอกสารกับ implementation ปัจจุบันให้ครบ
+- แก้ `production` Postman environment ให้ชี้ backend `run.app` ปัจจุบันของระบบ
+- เพิ่มตัวแปรช่วยใน environment files เช่น `backendBaseOrigin`, `frontendBaseOrigin`, `frontendAuthCallbackUrl`, `legacyOidcCallbackUrl`, และ `returnToUrl`
+- ลบตัวแปรซ้ำใน collection/environment และ sync example response ที่ยังอ้าง service metadata เก่า
+- อัปเดต `examples/api-client.ts` ให้มี `getChatUsage()` และ `logout()` ตาม endpoint/behavior ล่าสุด
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็น release เอกสารเพื่อเก็บ audit และ sync environment/examples ให้ตรงกับระบบจริง
+
+ผลกระทบฝั่งทีม:
+
+- ทีมที่ import environment ใหม่จะได้ `production baseUrl` ที่ตรงกับ backend ปัจจุบันทันที
+- ทีม frontend จะมีตัวแปร callback/origin สำหรับเทส OIDC ชัดขึ้น
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.9.9`
 
 ## v1.9.8
 

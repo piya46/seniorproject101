@@ -1,6 +1,6 @@
 # Postman Guide
 
-Version: `v1.9.8`
+Version: `v1.9.9`
 Last updated: `2026-04-03`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
