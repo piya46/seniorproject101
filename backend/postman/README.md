@@ -20,8 +20,21 @@ Last updated: `2026-04-03`
 ## Base URLs
 
 - Local: `http://localhost:8080/api/v1`
-- Production: `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1`
+- Production: `https://ai-formcheck-backend-499335698145.asia-southeast3.run.app/api/v1`
 - Canonical OAuth callback: `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback`
+
+Environment files ตอนนี้มีตัวแปรช่วยเพิ่ม:
+
+- `backendBaseOrigin`
+- `frontendBaseOrigin`
+- `frontendAuthCallbackUrl`
+- `legacyOidcCallbackUrl`
+- `returnToUrl`
+
+หมายเหตุ:
+
+- `Sci-Request-System.production.postman_environment.json` ถูกอัปเดตให้ชี้ production `run.app` ปัจจุบันแล้ว
+- `Sci-Request-System.staging.postman_environment.json` ยังเป็น placeholder ของทีม และต้องแก้ก่อนใช้งานจริงเสมอ
 
 ## Production Auth Flow
 

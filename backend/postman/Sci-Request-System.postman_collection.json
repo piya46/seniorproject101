@@ -262,10 +262,6 @@
       "value": "bachelor"
     },
     {
-      "key": "degreeLevel",
-      "value": "bachelor"
-    },
-    {
       "key": "subType",
       "value": ""
     },
@@ -440,7 +436,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"status\": \"ok\",\n  \"service\": \"sci-request-system\",\n  \"version\": \"1.2.0\",\n  \"checks\": {\n    \"configuration\": {\n      \"status\": \"ok\",\n      \"missing_required_env\": []\n    },\n    \"oidc\": {\n      \"status\": \"ok\"\n    },\n    \"crypto\": {\n      \"status\": \"ok\",\n      \"active_key_slot\": \"current\",\n      \"active_certificate_valid_to\": null,\n      \"rotation_enabled\": false\n    }\n  },\n  \"runtime\": {\n    \"node_env\": \"production\",\n    \"port\": 8080,\n    \"region\": \"asia-southeast3\",\n    \"revision\": \"sci-request-system-00081-kb4\",\n    \"uptime_seconds\": 140,\n    \"service_url\": \"https://sci-request-system-466086429766.asia-southeast3.run.app\"\n  },\n  \"auth\": {\n    \"oidc_enabled\": true,\n    \"allowed_origins\": [\n      \"https://pstpyst.com\",\n      \"http://localhost:5173\",\n      \"http://127.0.0.1:5500\"\n    ],\n    \"allowed_domains\": [\n      \"chula.ac.th\",\n      \"student.chula.ac.th\"\n    ],\n    \"hosted_domain_required\": true\n  },\n  \"crypto\": {\n    \"e2ee_enabled\": true,\n    \"active_key_slot\": \"current\",\n    \"key_rotation_enabled\": false,\n    \"active_certificate_valid_to\": null\n  },\n  \"integrations\": {\n    \"gcp_project_id\": \"seniorproject101\",\n    \"gcp_project_number\": \"466086429766\",\n    \"gcs_bucket_name\": \"sci-request-files-prod\",\n    \"ai_location\": \"us-central1\",\n    \"tech_support_target_email\": \"support@example.com\"\n  },\n  \"now\": \"2026-03-26T12:11:50.086Z\"\n}"
+              "body": "{\n  \"status\": \"ok\",\n  \"service\": \"ai-formcheck-backend\",\n  \"version\": \"1.2.0\",\n  \"checks\": {\n    \"configuration\": {\n      \"status\": \"ok\",\n      \"missing_required_env\": []\n    },\n    \"oidc\": {\n      \"status\": \"ok\"\n    },\n    \"crypto\": {\n      \"status\": \"ok\",\n      \"active_key_slot\": \"current\",\n      \"active_certificate_valid_to\": null,\n      \"rotation_enabled\": false\n    },\n    \"pfs_v2\": {\n      \"status\": \"disabled\"\n    }\n  },\n  \"runtime\": {\n    \"node_env\": \"production\",\n    \"port\": 8080,\n    \"region\": \"asia-southeast3\",\n    \"revision\": \"ai-formcheck-backend-00031-26n\",\n    \"uptime_seconds\": 140,\n    \"service_url\": \"https://ai-formcheck-backend-499335698145.asia-southeast3.run.app\"\n  },\n  \"auth\": {\n    \"oidc_enabled\": true,\n    \"allowed_origins\": [\n      \"https://ai-formcheck-frontend-499335698145.asia-southeast3.run.app\",\n      \"http://localhost:5173\",\n      \"http://127.0.0.1:5500\"\n    ],\n    \"allowed_domains\": [\n      \"chula.ac.th\",\n      \"student.chula.ac.th\"\n    ],\n    \"hosted_domain_required\": true\n  },\n  \"crypto\": {\n    \"e2ee_enabled\": true,\n    \"active_key_slot\": \"current\",\n    \"key_rotation_enabled\": false,\n    \"active_certificate_valid_to\": null\n  },\n  \"integrations\": {\n    \"gcp_project_id\": \"ai-formcheck\",\n    \"gcp_project_number\": \"499335698145\",\n    \"gcs_bucket_name\": \"ai-formcheck-backend-files\",\n    \"ai_location\": \"us-central1\",\n    \"tech_support_target_email\": \"piyaton56@gmail.com\"\n  },\n  \"now\": \"2026-04-03T08:00:00.000Z\"\n}"
             },
             {
               "name": "Unauthorized 401",

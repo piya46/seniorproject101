@@ -8,13 +8,14 @@
 2. ตรวจว่า version ใน collection, README และ changelog ตรงกัน
 3. รัน `cd backend && npm run docs:postman:validate`
 4. ตรวจว่า request/response examples ล่าสุดตรงกับ backend
-5. ตรวจว่า `CHANGELOG_POSTMAN_DOCS.md` มี section ของ version ที่จะปล่อยและแก้ข้อความ placeholder แล้ว
-6. ตรวจว่า GitHub Secrets สำหรับ Postman ถูกตั้งครบแล้ว
+5. ตรวจว่า environment files (`local`, `staging`, `production`) ชี้ `baseUrl`/callback/origin ถูกต้องและไม่มีตัวแปรซ้ำ
+6. ตรวจว่า `CHANGELOG_POSTMAN_DOCS.md` มี section ของ version ที่จะปล่อยและแก้ข้อความ placeholder แล้ว
+7. ตรวจว่า GitHub Secrets สำหรับ Postman ถูกตั้งครบแล้ว
 
 ## ตอนออก tag
 
 1. commit ไฟล์ docs ให้เรียบร้อย
-2. สร้าง tag เช่น `docs/v1.6.0`
+2. สร้าง tag เช่น `docs/v1.9.8`
 3. push tag ขึ้น remote
 
 ```bash

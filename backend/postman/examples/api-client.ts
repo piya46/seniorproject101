@@ -45,6 +45,13 @@ export type InitSessionResponse = {
   csrf_token?: string;
 };
 
+export type ChatUsageSummary = {
+  daily_limit: number;
+  used_tokens: number;
+  remaining_tokens: number;
+  used_percent: number;
+};
+
 export type FormCaseRule = {
   key: string;
   label: string;
@@ -190,6 +197,30 @@ export class SciRequestApiClient {
       message: params.message,
       degree_level: params.degreeLevel,
     });
+  }
+
+  async getChatUsage(): Promise<{ ai_usage: ChatUsageSummary }> {
+    return this.get<{ ai_usage: ChatUsageSummary }>("/chat/usage");
+  }
+
+  async logout(): Promise<JsonObject> {
+    const csrfToken = await this.ensureCsrfToken();
+    const response = await this.fetchImpl(`${this.baseUrl}/oidc/logout`, {
+      method: "POST",
+      headers: {
+        "x-csrf-token": csrfToken,
+      },
+      credentials: "include",
+    });
+
+    const parsedBody = await safeParseJson(response);
+
+    if (!response.ok) {
+      throw new ApiClientError(response.status, parsedBody);
+    }
+
+    this.csrfToken = null;
+    return (parsedBody ?? {}) as JsonObject;
   }
 
   async uploadEncryptedFile(params: UploadEncryptedFileParams): Promise<JsonObject> {
@@ -426,7 +457,7 @@ export async function importRsaPublicKey(pem: string): Promise<CryptoKey> {
     "spki",
     fromBase64(normalizedPem).buffer,
     { name: "RSA-OAEP", hash: "SHA-256" },
-    true,
+    false,
     ["encrypt"]
   );
 }
@@ -554,6 +585,12 @@ export async function exampleUsage(): Promise<void> {
     degreeLevel: "bachelor",
   });
   console.log("chat", chatResult);
+
+  const chatUsage = await client.getChatUsage();
+  console.log("chat usage", chatUsage);
+
+  const logoutResult = await client.logout();
+  console.log("logout", logoutResult);
 
   // ตัวอย่าง upload:
   // const fileInput = document.querySelector<HTMLInputElement>("#file");

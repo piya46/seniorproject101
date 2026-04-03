@@ -71,7 +71,12 @@
 2. เปิดแท็บ `Actions` บน GitHub
 3. ดู workflow `Postman API Docs`
 4. ตรวจว่า job `validate` ผ่าน
-5. สร้าง tag เช่น `docs/v1.6.0`
+5. สร้าง tag เช่น `docs/v1.9.8`
 6. push tag ขึ้น origin
 7. ถ้า version เปลี่ยนและ secrets ถูกต้อง job `publish` จะทำงานต่อ
 8. workflow จะสร้าง GitHub Release notes จาก changelog ให้อัตโนมัติ
+
+ก่อนออก tag ควรเช็กเพิ่ม:
+
+- `npm run docs:postman:validate` ผ่าน
+- environment files ทั้ง `local`, `staging`, `production` ไม่มี secret จริงและ `baseUrl` ถูกต้อง

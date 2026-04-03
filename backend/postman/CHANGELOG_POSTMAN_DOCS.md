@@ -11,6 +11,7 @@ Last updated: `2026-04-03`
 - sync `POST /api/v1/oidc/logout` ให้ตรงกับ runtime ล่าสุด รวมพฤติกรรม `Clear-Site-Data`
 - sync collection ให้มี `GET /api/v1/system/status/storage-signing` แบบ authenticated probe ตาม implementation จริง
 - อัปเดต guide/collection summary ว่า response หลัง authenticated middleware ถูกตั้ง `no-store/no-cache`
+- อัปเดต Postman environments โดยแก้ production `baseUrl` ให้ตรง backend `run.app` ปัจจุบัน, ลบตัวแปรซ้ำ, และเพิ่มตัวแปรช่วยเรื่อง frontend/backend origins กับ callback URLs
 - regenerate printable docs ให้ตรงกับ `API_DOCUMENTATION.md` เวอร์ชันล่าสุด
 
 Breaking change:

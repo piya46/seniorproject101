@@ -22,7 +22,9 @@
 หมายเหตุ:
 
 - `Staging` ยังต้องตรวจ `baseUrl` ให้เป็น URL จริงของทีมก่อนใช้งาน
+- `Production` ใน repo ตอนนี้ชี้ไป `https://ai-formcheck-backend-499335698145.asia-southeast3.run.app/api/v1` แล้ว
 - ถ้าพัฒนาในเครื่อง ให้เริ่มจาก `Local`
+- environment แต่ละไฟล์มีตัวแปรช่วยเรื่อง origin/callback เช่น `frontendBaseOrigin`, `frontendAuthCallbackUrl`, และ `legacyOidcCallbackUrl` ให้ใช้เป็นจุดอ้างอิงเวลาเทส OIDC
 
 ## 3. ลำดับที่ต้องยิงครั้งแรก
 
