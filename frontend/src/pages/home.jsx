@@ -30,7 +30,6 @@ export default function Home() {
   const [chatUsage, setChatUsage] = useState(null);
   const messagesEndRef = useRef(null);
   
-  // 💡 เพิ่ม ref สำหรับดักการรันเบิ้ลของ React Strict Mode
   const initRef = useRef(false);
 
   const scrollToBottom = () => {
@@ -42,7 +41,6 @@ export default function Home() {
 
   useEffect(() => {
     const initializeApp = async () => {
-      // 💡 ดักไว้ไม่ให้มันทำงาน 2 รอบตอนโหลดหน้าเว็บ
       if (initRef.current) return;
       initRef.current = true;
 
@@ -100,7 +98,7 @@ export default function Home() {
       }
     };
     initializeApp();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); 
 
   const fetchForms = async (degreeLevel) => {
     const cacheKey = `forms_cache_${degreeLevel}`;
@@ -111,7 +109,6 @@ export default function Home() {
         return;
       }
 
-      // 💡 หาก API get forms ต้องใช้ Cookie ด้วย แนะนำให้เติม withCredentials: true ในอนาคต
       const res = await axios.get(`/api/v1/forms`, { 
         params: { degree_level: degreeLevel },
         withCredentials: true 
@@ -149,6 +146,7 @@ export default function Home() {
     setSearchTerm(text);
     sessionStorage.setItem('last_search', text);
   };
+  
   const handleFormClick = (form) => {
     if (form.has_sub_types && form.sub_categories) {
       setSelectedForm(form);
@@ -192,7 +190,7 @@ export default function Home() {
       const chatPayload = { message: userMessage };
       const { requestPayload, aesKeyRaw } = await encryptAndKeepKey(chatPayload, publicKey);
       
-        const reqConfig = { headers: { 'Content-Type': 'application/json' }, withCredentials: true };
+      const reqConfig = { headers: { 'Content-Type': 'application/json' }, withCredentials: true };
       const res = await axios.post('/api/v1/chat/recommend', requestPayload, reqConfig);
       
       let responseData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
@@ -250,67 +248,34 @@ export default function Home() {
     const usedPercent = Number(chatUsage?.used_percent || 0);
 
     if (usedPercent >= 90) {
-      return {
-        chip: 'bg-[#FFF0E8] text-[#B55A1B]',
-        dot: 'bg-[#FF8A3D]',
-        color: '#FF8A3D'
-      };
+      return { chip: 'bg-[#FFF0E8] text-[#B55A1B]', dot: 'bg-[#FF8A3D]', color: '#FF8A3D' };
     }
 
     if (usedPercent >= 70) {
-      return {
-        chip: 'bg-[#FFF6E7] text-[#9A6300]',
-        dot: 'bg-[#FFB43B]',
-        color: '#FFB43B'
-      };
+      return { chip: 'bg-[#FFF6E7] text-[#9A6300]', dot: 'bg-[#FFB43B]', color: '#FFB43B' };
     }
 
-    return {
-      chip: 'bg-[#EEF7ED] text-[#2F7A38]',
-      dot: 'bg-[#4CAF50]',
-      color: '#4CAF50'
-    };
+    return { chip: 'bg-[#EEF7ED] text-[#2F7A38]', dot: 'bg-[#4CAF50]', color: '#4CAF50' };
   };
 
   const getChatUsageLabel = () => {
-    if (!chatUsage) {
-      return 'พร้อมช่วยตอบคำถาม';
-    }
-
+    if (!chatUsage) return 'พร้อมช่วยตอบคำถาม';
     const usedPercent = Number(chatUsage.used_percent || 0);
-    if (usedPercent >= 90) {
-      return 'โควต้า AI วันนี้ใกล้เต็ม';
-    }
-
-    if (usedPercent >= 70) {
-      return `เหลือประมาณ ${Math.max(0, 100 - usedPercent)}% วันนี้`;
-    }
-
+    if (usedPercent >= 90) return 'โควต้า AI วันนี้ใกล้เต็ม';
+    if (usedPercent >= 70) return `เหลือประมาณ ${Math.max(0, 100 - usedPercent)}% วันนี้`;
     return 'AI วันนี้คงเหลือเพียงพอ';
   };
 
   const getChatUsageEtaLabel = () => {
-    if (!chatUsage) {
-      return 'พร้อมใช้งาน';
-    }
-
+    if (!chatUsage) return 'พร้อมใช้งาน';
     const usedPercent = Number(chatUsage.used_percent || 0);
-    if (usedPercent >= 90) {
-      return 'ใกล้เต็ม';
-    }
-
-    if (usedPercent >= 70) {
-      return 'เหลือจำกัด';
-    }
-
+    if (usedPercent >= 90) return 'ใกล้เต็ม';
+    if (usedPercent >= 70) return 'เหลือจำกัด';
     return 'ปกติ';
   };
 
   const getChatUsageRemainingPercent = () => {
-    if (!chatUsage) {
-      return null;
-    }
-
+    if (!chatUsage) return null;
     return Math.max(0, 100 - Number(chatUsage.used_percent || 0));
   };
 
@@ -326,9 +291,12 @@ export default function Home() {
 
   return (
     <div className="page-shell font-sans">
-      <Navbar />
+      {/* ส่งข้อมูลระดับการศึกษาไปให้ Navbar สำหรับทำ Dropdown ในมือถือ */}
+      <Navbar degreeProps={{ selectedLabel, handleDegreeChange, levels }} />
+      
       <div className='page-gutter content-wide mt-6 flex flex-col gap-6 md:mt-10 lg:flex-row lg:gap-10 flex-grow'>
-        <div className='w-full rounded-md bg-white p-4 outline outline-[#D9D9D9] lg:basis-64 lg:sticky lg:top-10 lg:h-fit'>
+        {/* กล่องเลือกระดับการศึกษานี้จะถูกซ่อนในมือถือ (ด้วย hidden md:block) เพราะย้ายไปบน Navbar แล้ว */}
+        <div className='hidden md:block w-full rounded-md bg-white p-4 outline outline-[#D9D9D9] lg:basis-64 lg:sticky lg:top-10 lg:h-fit'>
           <p className='text-[#999999] text-[15px] pb-3 text-left'>ระดับการศึกษา</p>
           <div className='grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1 lg:gap-6'>
             {levels.map((level) => (
@@ -456,8 +424,9 @@ export default function Home() {
                 </div>
               </div>
               <p className="pl-5 text-xs text-white/85">
+                {/* 1. แสดงข้อความสถานะด้านบนตามที่คุณต้องการ */}
                 {chatUsage
-                  ? `คงเหลือ ${getChatUsageRemainingPercent()}% ของโควต้า AI วันนี้`
+                  ? `คงเหลือ ${getChatUsageRemainingPercent()}% ของโควต้า AI วันนี้ • สถานะ: ${getChatUsageEtaLabel()}`
                   : getChatUsageLabel()}
               </p>
             </div>
@@ -493,11 +462,7 @@ export default function Home() {
           </div>
 
           <div className="border-t border-[#D9D9D9] bg-white p-3">
-            {chatUsage && (
-              <p className="mb-2 text-xs text-[#9A7A56]">
-                คงเหลือ {getChatUsageRemainingPercent()}% ของโควต้า AI วันนี้ • สถานะ: {getChatUsageEtaLabel()}
-              </p>
-            )}
+            {/* นำข้อความสถานะโควต้าออกไปจากด้านล่างแล้ว */}
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <input 
                 type="text" 
