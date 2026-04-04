@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const path = require('node:path');
 const { Storage } = require('@google-cloud/storage');
 
 const authMiddleware = require('../middlewares/authMiddleware');
@@ -8,7 +9,6 @@ const { docMergeSchema } = require('../validators/schemas');
 const { getFormConfig, getFormDisplayName, resolveSubmissionContactLabel } = require('../data/staticData');
 const { getDecryptedSessionFiles } = require('../utils/dbUtils');
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
-const { getMergedDownloadUrlTtlMs } = require('../utils/documentMergeSecurity');
 const {
   buildDocumentJobResponse,
   DOCUMENT_JOB_TYPES,
@@ -23,6 +23,43 @@ const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 const MAX_JOB_WAIT_TIMEOUT_MS = 25000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getMergeJobOrRespond = async (req, res) => {
+  const job = await getDocumentJob(req.params.jobId);
+  if (!job || job.type !== DOCUMENT_JOB_TYPES.MERGE_DOCUMENTS) {
+    res.status(404).json({ error: 'Job not found.' });
+    return null;
+  }
+
+  if (!ensureDocumentJobAccess(job, req.user)) {
+    res.status(403).json({ error: 'Forbidden' });
+    return null;
+  }
+
+  if (job.status !== DOCUMENT_JOB_STATUSES.SUCCEEDED || !job.result?.merged_file_name) {
+    res.status(409).json({
+      error: 'Job not ready',
+      message: 'Merged document is not ready for download yet.'
+    });
+    return null;
+  }
+
+  return job;
+};
+
+const buildMergeInstruction = (job) => {
+  const formConfig = getFormConfig(
+    job.payload?.form_code,
+    job.payload?.degree_level || 'bachelor',
+    job.payload?.sub_type ?? null
+  );
+  const formDisplayName = formConfig?.name_th || getFormDisplayName(job.payload?.form_code);
+
+  return job.result?.instruction || {
+    target_email: resolveSubmissionContactLabel(formConfig),
+    email_subject: formDisplayName ? `ยื่นคำร้อง ${formDisplayName}` : 'ยื่นคำร้อง'
+  };
+};
 
 router.post('/merge', authMiddleware, validate(docMergeSchema), async (req, res) => {
   try {
@@ -122,20 +159,9 @@ router.get('/jobs/:jobId', authMiddleware, async (req, res) => {
 });
 
 router.get('/jobs/:jobId/download', authMiddleware, async (req, res) => {
-  const job = await getDocumentJob(req.params.jobId);
-  if (!job || job.type !== DOCUMENT_JOB_TYPES.MERGE_DOCUMENTS) {
-    return res.status(404).json({ error: 'Job not found.' });
-  }
-
-  if (!ensureDocumentJobAccess(job, req.user)) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
-  if (job.status !== DOCUMENT_JOB_STATUSES.SUCCEEDED || !job.result?.merged_file_name) {
-    return res.status(409).json({
-      error: 'Job not ready',
-      message: 'Merged document is not ready for download yet.'
-    });
+  const job = await getMergeJobOrRespond(req, res);
+  if (!job) {
+    return;
   }
 
   const mergedFile = bucket.file(job.result.merged_file_name);
@@ -147,27 +173,52 @@ router.get('/jobs/:jobId/download', authMiddleware, async (req, res) => {
     });
   }
 
-  const [downloadUrl] = await mergedFile.getSignedUrl({
-    version: 'v4',
-    action: 'read',
-    expires: Date.now() + getMergedDownloadUrlTtlMs()
-  });
-
-  const formConfig = getFormConfig(
-    job.payload?.form_code,
-    job.payload?.degree_level || 'bachelor',
-    job.payload?.sub_type ?? null
-  );
-  const formDisplayName = formConfig?.name_th || getFormDisplayName(job.payload?.form_code);
-
   return res.status(200).json({
     status: 'success',
-    download_url: downloadUrl,
-    instruction: job.result?.instruction || {
-      target_email: resolveSubmissionContactLabel(formConfig),
-      email_subject: formDisplayName ? `ยื่นคำร้อง ${formDisplayName}` : 'ยื่นคำร้อง'
-    }
+    download_path: `/api/v1/documents/jobs/${job.id}/file`,
+    instruction: buildMergeInstruction(job)
   });
+});
+
+router.get('/jobs/:jobId/file', authMiddleware, async (req, res) => {
+  const job = await getMergeJobOrRespond(req, res);
+  if (!job) {
+    return;
+  }
+
+  const mergedFile = bucket.file(job.result.merged_file_name);
+  const [exists] = await mergedFile.exists();
+  if (!exists) {
+    return res.status(404).json({
+      error: 'Merged file missing',
+      message: 'The merged document is no longer available.'
+    });
+  }
+
+  const fileName = path.basename(job.result.merged_file_name);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  const stream = mergedFile.createReadStream();
+  stream.on('error', (error) => {
+    req.log?.error('merged_document_stream_error', {
+      job_id: job.id,
+      message: error?.message || 'Unknown merged document stream error.'
+    });
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Download failed',
+        message: 'The merged document could not be streamed right now.'
+      });
+      return;
+    }
+
+    res.destroy(error);
+  });
+
+  stream.pipe(res);
 });
 
 module.exports = router;

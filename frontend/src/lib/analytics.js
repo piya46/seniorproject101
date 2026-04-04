@@ -12,7 +12,7 @@ const ANALYTICS_EVENT_SCHEMAS = {
   validation_succeeded: ['form_code', 'degree_level', 'sub_type', 'required_document_count'],
   validation_failed: ['form_code', 'degree_level', 'sub_type', 'required_document_count', 'failure_stage'],
   merge_started: ['form_code', 'degree_level', 'sub_type'],
-  merge_succeeded: ['form_code', 'degree_level', 'sub_type', 'has_download_url', 'has_directory_fallback'],
+  merge_succeeded: ['form_code', 'degree_level', 'sub_type', 'has_download_path', 'has_directory_fallback'],
   merge_failed: ['form_code', 'degree_level', 'sub_type'],
   login_started: ['provider'],
   unauthorized_viewed: []

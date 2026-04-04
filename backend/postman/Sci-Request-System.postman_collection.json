@@ -1,10 +1,10 @@
 {
   "info": {
     "_postman_id": "0f93eb4e-44fa-4f84-87be-cfbb5cf8ca23",
-    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.9.9",
+    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.10.0",
     "description": {
       "type": "text/markdown",
-      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.9.9\n**Last Updated:** 2026-04-03\n\n## Change Summary\n- เพิ่ม `GET /api/v1/chat/usage` สำหรับดึง AI usage summary ของ chat quota/status widget\n- sync `POST /api/v1/oidc/logout` ให้ตรงกับ runtime ล่าสุด รวม `Clear-Site-Data`\n- sync collection ให้มี `GET /api/v1/system/status/storage-signing` แบบ authenticated probe ตาม implementation จริง\n- อัปเดต security notes ว่า response หลัง authenticated middleware ถูกตั้ง `no-store/no-cache`\n- ยึด Cloud Run `run.app` แบบ regional เป็น canonical backend URL และชี้เอกสารใหม่เรื่อง observability/deploy hardening ให้ตรงกับของจริง\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- Public liveness, authenticated storage-signing probe, และ authenticated detailed status\n- Google OIDC login และ callback ใน legacy/direct mode\n- BFF bridge routes สำหรับ production private backend flow\n- การตรวจ session/auth state ปัจจุบัน\n- การอ่าน safe profile สำหรับ bind ลง UI\n- การอ่าน encrypted personal profile details\n- การดึง public key\n- การเริ่มต้น session หลัง OIDC หรือผ่าน BFF bridge\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การดึง AI usage summary สำหรับ chat widget\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- `GET /system/status` เป็น public liveness endpoint และตั้งใจให้ตอบข้อมูลน้อยที่สุด\n- `GET /system/status/storage-signing` เป็น authenticated privileged probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้\n- `GET /system/status/details` ต้องมี authenticated backend session ก่อนใช้งาน\n- `GET /profile/me` คืนเฉพาะ allowlisted profile fields และไม่เปิดเผย token, `session_id`, หรือ `google_sub`\n- `POST /profile/details` ใช้ secure JSON transport สำหรับข้อมูลส่วนตัวที่ต้องป้องกันเข้มขึ้น\n- secure JSON endpoints ยังใช้ encryption layer เดิม\n- response หลัง authenticated middleware ถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate`\n- production target คือ browser -> frontend BFF -> private backend ตาม `BFF_BACKEND_CONTRACT.md`\n- Google OIDC direct-to-backend flow ยังมีไว้สำหรับ legacy/direct mode เท่านั้น\n- production BFF flow ควรให้ Google redirect กลับ frontend `/auth/callback`\n- `POST /oidc/logout` จะ revoke session record, ล้าง cookie และส่ง `Clear-Site-Data: \"cache\", \"cookies\", \"storage\"` ใน browser ที่รองรับ\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n"
+      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.10.0\n**Last Updated:** 2026-04-04\n\n## Change Summary\n- เปลี่ยน flow ดาวน์โหลด merged document เป็น backend-streaming แบบ zero-trust\n- `GET /api/v1/documents/jobs/:jobId/download` ตอนนี้คืน `download_path` แทน signed URL\n- เพิ่ม route `GET /api/v1/documents/jobs/:jobId/file` สำหรับ stream merged PDF ผ่าน backend\n- sync ตัวอย่าง response และ job status ให้ไม่เผย `download_url` หรือ storage object path ภายใน\n- คง storage-signing probe, chat usage docs, และ logout hardening ให้ตรงกับ runtime ล่าสุด\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- Public liveness, authenticated storage-signing probe, และ authenticated detailed status\n- Google OIDC login และ callback ใน legacy/direct mode\n- BFF bridge routes สำหรับ production private backend flow\n- การตรวจ session/auth state ปัจจุบัน\n- การอ่าน safe profile สำหรับ bind ลง UI\n- การอ่าน encrypted personal profile details\n- การดึง public key\n- การเริ่มต้น session หลัง OIDC หรือผ่าน BFF bridge\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การดึง AI usage summary สำหรับ chat widget\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- `GET /system/status` เป็น public liveness endpoint และตั้งใจให้ตอบข้อมูลน้อยที่สุด\n- `GET /system/status/storage-signing` เป็น authenticated privileged probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้\n- `GET /system/status/details` ต้องมี authenticated backend session ก่อนใช้งาน\n- `GET /profile/me` คืนเฉพาะ allowlisted profile fields และไม่เปิดเผย token, `session_id`, หรือ `google_sub`\n- `POST /profile/details` ใช้ secure JSON transport สำหรับข้อมูลส่วนตัวที่ต้องป้องกันเข้มขึ้น\n- secure JSON endpoints ยังใช้ encryption layer เดิม\n- response หลัง authenticated middleware ถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate`\n- production target คือ browser -> frontend BFF -> private backend ตาม `BFF_BACKEND_CONTRACT.md`\n- Google OIDC direct-to-backend flow ยังมีไว้สำหรับ legacy/direct mode เท่านั้น\n- production BFF flow ควรให้ Google redirect กลับ frontend `/auth/callback`\n- merged document จะถูกดาวน์โหลดผ่าน backend route แทน signed storage URL เพื่อไม่เผย bucket path และ signed token ไปยัง client\n- `POST /oidc/logout` จะ revoke session record, ล้าง cookie และส่ง `Clear-Site-Data: \"cache\", \"cookies\", \"storage\"` ใน browser ที่รองรับ\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n"
     },
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -2944,7 +2944,7 @@
                   "status": "OK",
                   "code": 200,
                   "_postman_previewlanguage": "json",
-                  "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_456/merged/JT32_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"grad@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.32 คำร้องขอรักษาสถานภาพการเป็นนิสิต\"\n  }\n}"
+                  "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"grad@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.32 คำร้องขอรักษาสถานภาพการเป็นนิสิต\"\n  }\n}"
                 },
                 {
                   "name": "Response 400",
@@ -3681,7 +3681,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_late_reg/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -4085,7 +4085,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_change_section/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -4489,7 +4489,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_cross_faculty/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -4893,7 +4893,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_credit_limit/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -5297,7 +5297,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_keep_midterm_score/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -5701,7 +5701,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_missing_midterm/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -6105,7 +6105,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_sick_midterm/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -6509,7 +6509,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_postpone_final/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -6913,7 +6913,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_review_score/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -7317,7 +7317,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_tuition_installment/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -7721,7 +7721,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_transfer_course/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -8125,7 +8125,7 @@
                       "status": "OK",
                       "code": 200,
                       "_postman_previewlanguage": "json",
-                      "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_jt41_other/merged/JT41_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
+                      "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.41 คำร้องทั่วไป\"\n  }\n}"
                     },
                     {
                       "name": "Response 400",
@@ -8367,7 +8367,7 @@
                   "status": "OK",
                   "code": 200,
                   "_postman_previewlanguage": "json",
-                  "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_789/merged/JT43_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.43 คำร้องขอลงทะเบียนเรียนเพื่อขอผล S/U หรือ V/W\"\n  }\n}"
+                  "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.43 คำร้องขอลงทะเบียนเรียนเพื่อขอผล S/U หรือ V/W\"\n  }\n}"
                 },
                 {
                   "name": "Response 400",
@@ -8699,7 +8699,7 @@
                   "status": "OK",
                   "code": 200,
                   "_postman_previewlanguage": "json",
-                  "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_123/merged/JT44_OFFICIAL.pdf\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.44 คำร้องขอลาป่วย\"\n  }\n}"
+                  "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.44 คำร้องขอลาป่วย\"\n  }\n}"
                 },
                 {
                   "name": "Response 400",
@@ -8805,18 +8805,18 @@
                   "status": "OK",
                   "code": 200,
                   "_postman_previewlanguage": "json",
-                  "body": "{\n  \"job\": {\n    \"id\": \"job_merge_123\",\n    \"type\": \"merge_documents\",\n    \"status\": \"succeeded\",\n    \"result\": {\n      \"merged_file_name\": \"sess_123/merged/JT44_OFFICIAL.pdf\",\n      \"merged_page_count\": 3,\n      \"total_source_bytes\": 7340032,\n      \"merged_download_url_ttl_ms\": 900000,\n      \"instruction\": {\n        \"target_email\": \"department@example.com\",\n        \"email_subject\": \"ยื่นคำร้อง จท.44 คำร้องขอลาป่วย\"\n      }\n    }\n  }\n}"
+                  "body": "{\n  \"job\": {\n    \"id\": \"job_merge_123\",\n    \"type\": \"merge_documents\",\n    \"status\": \"succeeded\",\n    \"result\": {\n      \"download_available\": true,\n      \"merged_page_count\": 3,\n      \"total_source_bytes\": 7340032,\n      \"instruction\": {\n        \"target_email\": \"department@example.com\",\n        \"email_subject\": \"ยื่นคำร้อง จท.44 คำร้องขอลาป่วย\"\n      }\n    }\n  }\n}"
                 }
               ]
             },
             {
-              "name": "Get Merged Document Download URL",
+              "name": "Get Merged Document Download Metadata",
               "request": {
                 "method": "GET",
                 "header": [],
                 "description": {
                   "type": "text/markdown",
-                  "content": "ใช้รับ signed URL ของ merged document หลัง merge job สำเร็จแล้วเท่านั้น"
+                  "content": "ใช้รับ metadata และ download_path ของ merged document หลัง merge job สำเร็จแล้วเท่านั้น"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/documents/jobs/{{jobId}}/download",
@@ -8833,7 +8833,7 @@
               },
               "response": [
                 {
-                  "name": "Response 200 Download URL",
+                  "name": "Response 200 Download Metadata",
                   "originalRequest": {
                     "method": "GET",
                     "header": [],
@@ -8853,7 +8853,55 @@
                   "status": "OK",
                   "code": 200,
                   "_postman_previewlanguage": "json",
-                  "body": "{\n  \"status\": \"success\",\n  \"download_url\": \"https://storage.googleapis.com/bucket/sess_123/merged/JT44_OFFICIAL.pdf?...\",\n  \"expires_in_ms\": 900000\n}"
+                  "body": "{\n  \"status\": \"success\",\n  \"download_path\": \"/api/v1/documents/jobs/job_merge_123/file\",\n  \"instruction\": {\n    \"target_email\": \"department@example.com\",\n    \"email_subject\": \"ยื่นคำร้อง จท.44 คำร้องขอลาป่วย\"\n  }\n}"
+                }
+              ]
+            },
+            {
+              "name": "Stream Merged Document File",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "description": {
+                  "type": "text/markdown",
+                  "content": "ใช้ stream merged PDF ผ่าน backend โดยตรงหลังเรียก `GET /documents/jobs/:jobId/download` แล้วได้ `download_path` กลับมา"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/documents/jobs/{{jobId}}/file",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "documents",
+                    "jobs",
+                    "{{jobId}}",
+                    "file"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Response 200 PDF Stream",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/documents/jobs/{{jobId}}/file",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "documents",
+                        "jobs",
+                        "{{jobId}}",
+                        "file"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "text",
+                  "body": "%PDF-1.7\\n..."
                 }
               ]
             }

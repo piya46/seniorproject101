@@ -1,7 +1,7 @@
 # API Examples
 
-Version: `v1.9.7`
-Last updated: `2026-03-31`
+Version: `v1.10.0`
+Last updated: `2026-04-04`
 
 ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only โดย production target ใหม่คือ frontend BFF + private backend ส่วน direct backend browser flow ให้ถือเป็น legacy/direct mode
 
@@ -262,12 +262,14 @@ curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/ap
 ```bash
 curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/documents/jobs/<job-id>
 curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/documents/jobs/<job-id>/download
+curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/documents/jobs/<job-id>/file
 ```
 
 หมายเหตุ:
 
 - endpoint `/download` จะใช้ได้เมื่อ job อยู่ในสถานะ `succeeded`
-- signed URL มีอายุสั้นและควรใช้ทันที
+- endpoint `/download` จะคืน `download_path` ของ backend แทน signed URL
+- endpoint `/file` จะ stream ไฟล์ผ่าน backend โดยไม่เผย bucket path หรือ signed URL ไปยัง client
 
 ### JavaScript
 

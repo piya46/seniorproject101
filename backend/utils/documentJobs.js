@@ -95,6 +95,20 @@ const sanitizeDocumentJobForResponse = (job) => {
         return null;
     }
 
+    let sanitizedResult = job.result || null;
+    if (sanitizedResult && typeof sanitizedResult === 'object' && !Array.isArray(sanitizedResult)) {
+        sanitizedResult = { ...sanitizedResult };
+
+        if (Object.prototype.hasOwnProperty.call(sanitizedResult, 'merged_file_name')) {
+            delete sanitizedResult.merged_file_name;
+            sanitizedResult.download_available = true;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(sanitizedResult, 'merged_download_url_ttl_ms')) {
+            delete sanitizedResult.merged_download_url_ttl_ms;
+        }
+    }
+
     return {
         id: job.id,
         type: job.type,
@@ -105,7 +119,7 @@ const sanitizeDocumentJobForResponse = (job) => {
         started_at: job.started_at || null,
         completed_at: job.completed_at || null,
         error: job.error || null,
-        result: job.result || null,
+        result: sanitizedResult,
         metadata: job.metadata || null
     };
 };

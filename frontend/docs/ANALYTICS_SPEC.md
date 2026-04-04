@@ -32,7 +32,7 @@
 - `step`
 - `required_document_count`
 - `has_sub_types`
-- `has_download_url`
+- `has_download_path`
 - `has_directory_fallback`
 - `failure_stage`
 - `message_length_bucket`
@@ -93,7 +93,7 @@ consent state ถูกเก็บใน `localStorage` key:
 | `validation_succeeded` | ตรวจสอบเอกสารสำเร็จ | `form_code`, `degree_level`, `sub_type`, `required_document_count` |
 | `validation_failed` | ตรวจสอบเอกสารล้มเหลว | `form_code`, `degree_level`, `sub_type`, `required_document_count`, `failure_stage` |
 | `merge_started` | เริ่มรวมไฟล์ | `form_code`, `degree_level`, `sub_type` |
-| `merge_succeeded` | รวมไฟล์สำเร็จ | `form_code`, `degree_level`, `sub_type`, `has_download_url`, `has_directory_fallback` |
+| `merge_succeeded` | รวมไฟล์สำเร็จ | `form_code`, `degree_level`, `sub_type`, `has_download_path`, `has_directory_fallback` |
 | `merge_failed` | รวมไฟล์ล้มเหลว | `form_code`, `degree_level`, `sub_type` |
 
 ## ความหมายของค่าที่ใช้

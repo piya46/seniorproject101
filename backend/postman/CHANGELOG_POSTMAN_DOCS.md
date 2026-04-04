@@ -1,7 +1,28 @@
 # Changelog Postman Docs
 
-Current version: `v1.9.9`
-Last updated: `2026-04-03`
+Current version: `v1.10.0`
+Last updated: `2026-04-04`
+
+## v1.10.0
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- เปลี่ยน flow ดาวน์โหลด merged document เป็น backend-streaming แบบ zero-trust
+- `GET /documents/jobs/:jobId/download` ตอนนี้คืน `download_path` แทน signed URL
+- เพิ่มการอธิบาย `GET /documents/jobs/:jobId/file` สำหรับ stream merged PDF ผ่าน backend
+- ลบตัวอย่าง response ที่เผย `download_url`, `merged_file_name`, และ `merged_download_url_ttl_ms` ออกจากเอกสาร/collection
+- sync frontend integration guide และ API examples ให้ตรงกับ flow ใหม่
+
+Breaking change:
+
+- endpoint `/documents/jobs/:jobId/download` เปลี่ยน response contract จาก `download_url` เป็น `download_path`
+- client ที่ใช้ signed URL จาก storage โดยตรงต้องปรับมาเปิด backend download path แทน
+
+ผลกระทบฝั่งทีม:
+
+- frontend ต้องเปิด `download_path` จาก backend แทนการใช้ signed URL จาก storage
+- job status response จะไม่เปิดเผย storage object path ภายในอีกต่อไป
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.10.0`
 
 ## v1.9.9
 

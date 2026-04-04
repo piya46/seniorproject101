@@ -1,7 +1,7 @@
 # Frontend Integration Guide
 
-Version: `v1.9.8`
-Last updated: `2026-04-03`
+Version: `v1.10.0`
+Last updated: `2026-04-04`
 
 คู่มือนี้อธิบายสิ่งที่ frontend ต้องทำเพื่อเชื่อมต่อ backend ในโหมด Google OIDC + session cookie + secure JSON transport โดย direct backend browser flow ให้ถือเป็น legacy/direct mode และ production target ใหม่คือ frontend BFF + private backend
 
@@ -79,6 +79,8 @@ secure JSON endpoints:
 - route นี้จะตอบ `202 queued` พร้อม `job.id`
 - frontend ต้อง poll `GET /documents/jobs/:jobId`
 - เมื่อ job สำเร็จค่อยเรียก `GET /documents/jobs/:jobId/download`
+- route `/download` จะคืน `download_path` สำหรับ backend route `GET /documents/jobs/:jobId/file`
+- frontend ควรเปิด `download_path` นี้ตรง ๆ แทนการใช้ signed URL จาก storage
 - backend อาจตอบ `413` ถ้าขนาดรวมของไฟล์ต้นฉบับเกินเพดานที่ระบบยอมรับ
 
 และ multipart endpoints ที่ต้องแนบ CSRF เช่นกัน:

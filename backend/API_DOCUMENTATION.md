@@ -1,7 +1,7 @@
 # API Documentation
 
-Version: `v1.9.9`
-Last updated: `2026-04-03`
+Version: `v1.10.0`
+Last updated: `2026-04-04`
 
 เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client
 
@@ -110,7 +110,8 @@ legacy/direct mode ที่ยังมีอยู่เพื่อ backward 
 | `/validation/check-completeness` | `POST` | ต้อง | ต้อง | ตรวจเอกสาร และ enqueue batch preparation job เมื่อไฟล์ยังไม่พร้อม |
 | `/documents/merge` | `POST` | ต้อง | ต้อง | enqueue merge job |
 | `/documents/jobs/:jobId` | `GET` | ต้อง | ไม่ต้อง | อ่านสถานะ merge job |
-| `/documents/jobs/:jobId/download` | `GET` | ต้อง | ไม่ต้อง | รับ signed URL ของ merged output เมื่อ job สำเร็จ |
+| `/documents/jobs/:jobId/download` | `GET` | ต้อง | ไม่ต้อง | รับ metadata และ `download_path` ของ merged output เมื่อ job สำเร็จ |
+| `/documents/jobs/:jobId/file` | `GET` | ต้อง | ไม่ต้อง | stream merged PDF ผ่าน backend โดยไม่เผย signed URL หรือ GCS path |
 | `/chat/usage` | `GET` | ต้อง | ไม่ต้อง | อ่าน AI usage summary สำหรับ chat quota/status UI |
 | `/chat/recommend` | `POST` | ต้อง | ต้อง | แนะนำฟอร์ม/ตอบคำถาม |
 | `/support/technical-email` | `POST multipart/form-data` | ต้อง | ไม่ใช้ secure JSON wrapper | ส่งอีเมลแจ้งปัญหา |
@@ -141,6 +142,7 @@ flow ใหม่สำหรับงานหนัก:
 5. `POST /documents/merge` ตอบ `202 queued` พร้อม `job.id`
 6. client poll `GET /documents/jobs/:jobId`
 7. เมื่อ `status=succeeded` ให้เรียก `GET /documents/jobs/:jobId/download`
+8. ใช้ `download_path` ที่ตอบกลับมาเพื่อดาวน์โหลดผ่าน `GET /documents/jobs/:jobId/file`
 
 หมายเหตุด้าน operation:
 
@@ -404,7 +406,7 @@ response ตัวอย่าง:
 
 ข้อจำกัดและพฤติกรรมเพิ่มเติม:
 
-- signed URL สำหรับดาวน์โหลดไฟล์ที่ merge แล้วมีอายุสั้น โดย default คือ 15 นาที
+- backend จะคืน `download_path` และให้ client ดาวน์โหลดผ่าน route stream ของ backend แทนการรับ signed URL จาก storage โดยตรง
 - backend อาจตอบ `413` ถ้าขนาดรวมของไฟล์ต้นฉบับเกินเพดานที่กำหนดไว้สำหรับการ merge
 
 ## Upload Endpoint

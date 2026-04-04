@@ -645,7 +645,7 @@ export default function Formdetail() {
           form_code: formData?.form_code || id,
           degree_level: degreeLevel,
           sub_type: subType || 'default',
-          has_download_url: Boolean(mergeData?.download_url),
+          has_download_path: Boolean(mergeData?.download_path),
           has_directory_fallback: mergeData?.instruction?.target_email === 'ไม่มีข้อมูลภาควิชา'
         }).catch(() => {});
         return;
@@ -678,7 +678,7 @@ export default function Formdetail() {
       });
       const downloadData = parseApiResponse(downloadRes.data);
 
-      if (downloadRes.status !== 200 || downloadData?.status !== 'success' || !downloadData?.download_url) {
+      if (downloadRes.status !== 200 || downloadData?.status !== 'success' || !downloadData?.download_path) {
         throw new Error(downloadData?.message || downloadData?.error || 'Merged file is not ready for download');
       }
 
@@ -690,7 +690,7 @@ export default function Formdetail() {
         form_code: formData?.form_code || id,
         degree_level: degreeLevel,
         sub_type: subType || 'default',
-        has_download_url: Boolean(downloadData?.download_url),
+        has_download_path: Boolean(downloadData?.download_path),
         has_directory_fallback: downloadData?.instruction?.target_email === 'ไม่มีข้อมูลภาควิชา'
       }).catch(() => {});
 
@@ -1029,8 +1029,8 @@ export default function Formdetail() {
                     
                     {mergeResult && (
                       <div className="mt-4 text-black">
-                        {mergeResult.download_url && (
-                           <p>ลิงก์ดาวน์โหลด: <a href={mergeResult.download_url} target="_blank" rel="noopener noreferrer" className="text-[#EA580C] underline">คลิกที่นี่</a></p>
+                        {mergeResult.download_path && (
+                           <p>ลิงก์ดาวน์โหลด: <a href={mergeResult.download_path} target="_blank" rel="noopener noreferrer" className="text-[#EA580C] underline">คลิกที่นี่</a></p>
                         )}
                         {mergeResult.instruction && (
                            <>

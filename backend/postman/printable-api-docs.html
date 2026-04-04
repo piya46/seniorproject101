@@ -128,7 +128,7 @@
       <p>Printable HTML generated from backend/API_DOCUMENTATION.md. Open in a browser and use Print -> Save as PDF.</p>
     </section>
     <h1>API Documentation</h1>
-<p>Version: `v1.9.9` Last updated: `2026-04-03`</p>
+<p>Version: `v1.10.0` Last updated: `2026-04-04`</p>
 <p>เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client</p>
 <p>เอกสารที่เกี่ยวข้อง:</p>
 <ul>
@@ -372,7 +372,14 @@
 <td>`GET`</td>
 <td>ต้อง</td>
 <td>ไม่ต้อง</td>
-<td>รับ signed URL ของ merged output เมื่อ job สำเร็จ</td>
+<td>รับ metadata และ `download_path` ของ merged output เมื่อ job สำเร็จ</td>
+</tr>
+<tr>
+<td>`/documents/jobs/:jobId/file`</td>
+<td>`GET`</td>
+<td>ต้อง</td>
+<td>ไม่ต้อง</td>
+<td>stream merged PDF ผ่าน backend โดยไม่เผย signed URL หรือ GCS path</td>
 </tr>
 <tr>
 <td>`/chat/usage`</td>
@@ -409,7 +416,7 @@
 </ul>
 <h2>Async Document Jobs</h2>
 <p>flow ใหม่สำหรับงานหนัก:</p>
-<p>1. `POST /upload` ตอบ `200 success` พร้อม staged file metadata 2. ตอนกด `POST /validation/check-completeness` ถ้าไฟล์ยังไม่พร้อม backend จะตอบ `202 queued` พร้อม batch `job` 3. client poll `GET /upload/jobs/:jobId` จน `status=succeeded` หรือ `status=partial_failed` 4. เมื่อ prepare job สำเร็จ backend จะตรวจ validation ต่อ 5. `POST /documents/merge` ตอบ `202 queued` พร้อม `job.id` 6. client poll `GET /documents/jobs/:jobId` 7. เมื่อ `status=succeeded` ให้เรียก `GET /documents/jobs/:jobId/download`</p>
+<p>1. `POST /upload` ตอบ `200 success` พร้อม staged file metadata 2. ตอนกด `POST /validation/check-completeness` ถ้าไฟล์ยังไม่พร้อม backend จะตอบ `202 queued` พร้อม batch `job` 3. client poll `GET /upload/jobs/:jobId` จน `status=succeeded` หรือ `status=partial_failed` 4. เมื่อ prepare job สำเร็จ backend จะตรวจ validation ต่อ 5. `POST /documents/merge` ตอบ `202 queued` พร้อม `job.id` 6. client poll `GET /documents/jobs/:jobId` 7. เมื่อ `status=succeeded` ให้เรียก `GET /documents/jobs/:jobId/download` 8. ใช้ `download_path` ที่ตอบกลับมาเพื่อดาวน์โหลดผ่าน `GET /documents/jobs/:jobId/file`</p>
 <p>หมายเหตุด้าน operation:</p>
 <ul>
 <li>backend จะ stage upload ทันที และ enqueue job ตอน validation/merge เฉพาะส่วนที่ต้องประมวลผลหนัก</li>
@@ -723,7 +730,7 @@
 <h3>`POST /documents/merge`</h3>
 <p>ข้อจำกัดและพฤติกรรมเพิ่มเติม:</p>
 <ul>
-<li>signed URL สำหรับดาวน์โหลดไฟล์ที่ merge แล้วมีอายุสั้น โดย default คือ 15 นาที</li>
+<li>backend จะคืน `download_path` และให้ client ดาวน์โหลดผ่าน route stream ของ backend แทนการรับ signed URL จาก storage โดยตรง</li>
 <li>backend อาจตอบ `413` ถ้าขนาดรวมของไฟล์ต้นฉบับเกินเพดานที่กำหนดไว้สำหรับการ merge</li>
 </ul>
 <h2>Upload Endpoint</h2>
