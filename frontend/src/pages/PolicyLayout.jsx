@@ -1,11 +1,54 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import { getAuthenticatedUser } from '../lib/auth';
 
 export default function PolicyLayout({ title, subtitle, sections, updatedAt, children }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCurrentUser = async () => {
+      const authenticatedUser = await getAuthenticatedUser();
+      if (!isMounted) {
+        return;
+      }
+      setIsAuthenticated(Boolean(authenticatedUser));
+    };
+
+    loadCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
-    <div className="page-shell">
-      <Navbar />
+    <div className="page-shell bg-[#FCF8F3]">
+      {isAuthenticated ? (
+        <Navbar />
+      ) : (
+        <header className="border-b border-[#E7D7C5] bg-white/90 backdrop-blur">
+          <div className="page-gutter content-reading flex items-center gap-3 py-4">
+            <img
+              src="/icon.svg"
+              alt="Form Check"
+              className="h-11 w-11 rounded-xl object-contain"
+              data-protect-ui="true"
+              draggable={false}
+            />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
+                Form Check
+              </p>
+              <p className="text-sm text-[#6F6F6F]">
+                Public policy page
+              </p>
+            </div>
+          </div>
+        </header>
+      )}
 
       <main className="page-gutter content-reading flex-1 py-8 sm:py-12">
         <div className="rounded-[28px] border border-[#E7D7C5] bg-white px-6 py-8 shadow-sm sm:px-10 sm:py-10">

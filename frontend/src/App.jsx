@@ -145,10 +145,17 @@ function App() {
                 : <Unauthorized />
           }
         />
-        <Route path="/privacy" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><PrivacyPolicy /></ProtectedRoute>} />
-        <Route path="/terms" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><TermsOfUse /></ProtectedRoute>} />
-        <Route path="/cookies" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><CookiePolicy /></ProtectedRoute>} />
-        <Route path="/" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><HomePage /></ProtectedRoute>} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfUse />} />
+        <Route path="/cookies" element={<CookiePolicy />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/form/:id" element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><FormDetail /></ProtectedRoute>} />
         <Route path='/aboutus' element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><Aboutus /></ProtectedRoute>} />
         <Route path='/contactus' element={<ProtectedRoute authResolved={authResolved} isAuthenticated={isAuthenticated}><Contactus /></ProtectedRoute>} />

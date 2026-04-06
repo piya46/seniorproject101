@@ -1,13 +1,19 @@
 import axios from 'axios';
 
+const PUBLIC_PATH_PREFIXES = ['/login', '/auth/login', '/privacy', '/terms', '/cookies', '/unauthorized'];
+
 function buildReturnToUrl() {
   return window.location.href;
 }
 
 let sessionRedirectInFlight = false;
 
+function isPublicPath(path) {
+  return PUBLIC_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 export function redirectToLogin(returnTo = buildReturnToUrl()) {
-  window.location.assign(`/auth/login?return_to=${encodeURIComponent(returnTo)}`);
+  window.location.assign(`/login?return_to=${encodeURIComponent(returnTo)}`);
 }
 
 export function clearClientSessionState() {
@@ -36,7 +42,7 @@ export function handleExpiredSessionRedirect() {
   }
 
   const currentPath = `${window.location.pathname}${window.location.search}`;
-  if (currentPath.startsWith('/login') || currentPath.startsWith('/auth/login')) {
+  if (isPublicPath(currentPath)) {
     return;
   }
 

@@ -11,7 +11,7 @@ function Footer() {
             <div className='mx-auto flex w-full max-w-7xl flex-col gap-6'>
                 <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
                     <div className='max-w-xl'>
-                        <p className='text-lg font-bold'>AI Formcheck</p>
+                        <p className='text-lg font-bold'>Form Check</p>
                         <p className='mt-2 text-sm leading-7 text-[#F6EBDD]'>
                             ระบบช่วยจัดเตรียมเอกสารและคำร้องสำหรับการใช้งานภายในขอบเขตที่ระบบรองรับ
                             โดยผู้ใช้ควรตรวจสอบข้อมูลก่อนนำไปใช้งานจริงทุกครั้ง
@@ -43,7 +43,7 @@ function Footer() {
 
                 <div className='flex flex-col gap-2 text-xs text-[#F6EBDD] sm:flex-row sm:items-center sm:justify-between'>
                     <p>เว็บไซต์นี้เป็นเครื่องมือช่วยเตรียมเอกสารเท่านั้น ไม่ใช่ช่องทางยื่นคำร้องอย่างเป็นทางการ</p>
-                    <p>© {new Date().getFullYear()} AI Formcheck</p>
+                    <p>© {new Date().getFullYear()} Form Check</p>
                 </div>
             </div>
         </footer>
