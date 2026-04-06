@@ -13,7 +13,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfUse from './pages/TermsOfUse';
 import CookiePolicy from './pages/CookiePolicy';
 import { getAuthenticatedUser, installSessionExpiryInterceptor } from './lib/auth';
-import CookieConsentManager from './components/CookieConsentManager';
+import { CookieConsentManager } from './components/CookieConsentManager';
 import { trackPageView } from './lib/analytics';
 
 // 💡 บังคับให้ Axios ส่ง Cookie (Session) ไปกับทุก API อัตโนมัติ
