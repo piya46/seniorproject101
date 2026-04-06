@@ -5,6 +5,16 @@ import axios from 'axios';
 import { useEffect } from 'react';
 import { ensureAuthenticatedOrRedirect } from '../lib/auth';
 
+const getFileIcon = (fileName) => {
+  if (!fileName) return '/file.png';
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.pdf')) return '/pdf.png';
+  if (lower.endsWith('.jpg')) return '/JPG.png';
+  if (lower.endsWith('.jpeg')) return '/JPEG.png';
+  if (lower.endsWith('.png')) return '/png.png';
+  return '/file.png';
+};
+
 function Contactus() {
   const [formData, setFormData] = useState({
     email: '',
@@ -126,7 +136,7 @@ function Contactus() {
               
               {/* Email */}
               <div className="flex flex-col gap-2">
-                <label className="font-bold text-sm">Email สำหรับติดต่อกลับ</label>
+                <label className="font-bold text-sm">Email สำหรับติดต่อกลับ<span className="text-red-500 ml-1">*</span></label>
                 <input 
                   type="email" 
                   name="email"
@@ -139,7 +149,7 @@ function Contactus() {
 
               {/* Radio Group: ประเภทปัญหา */}
               <div className="flex flex-col gap-3">
-                <label className="font-bold text-sm text-black decoration-2">ประเภทของปัญหา</label>
+                <label className="font-bold text-sm text-black decoration-2">ประเภทของปัญหา<span className="text-red-500 ml-1">*</span></label>
                 <div className="flex flex-col gap-3 ml-4 mt-1">
                   
                   {/* Option 1 */}
@@ -211,7 +221,7 @@ function Contactus() {
 
               {/* หัวข้อเรื่อง */}
               <div className="flex flex-col gap-2 mt-2">
-                <label className="font-bold text-sm">หัวข้อเรื่อง</label>
+                <label className="font-bold text-sm">หัวข้อเรื่อง<span className="text-red-500 ml-1">*</span></label>
                 <input 
                   type="text" 
                   name="subject"
@@ -224,7 +234,7 @@ function Contactus() {
 
               {/* รายละเอียด */}
               <div className="flex flex-col gap-2">
-                <label className="font-bold text-sm">รายละเอียด</label>
+                <label className="font-bold text-sm">รายละเอียด<span className="text-red-500 ml-1">*</span></label>
                 <textarea 
                   name="details"
                   value={formData.details}
@@ -264,7 +274,7 @@ function Contactus() {
                   <div className="flex flex-col items-center pointer-events-none">
                     {file ? (
                       <>
-                        <img src="/pdf.png" alt="File" className="w-10 h-10 mb-2 object-contain" data-protect-ui="true" draggable={false} onError={(e) => {e.target.src = '/file.png'}} />
+                        <img src={getFileIcon(file.name)} alt="File" className="w-10 h-10 mb-2 object-contain" data-protect-ui="true" draggable={false} onError={(e) => {e.target.src = '/file.png'}} />
                         <p className="text-[#7B542F] font-bold text-base truncate max-w-[200px]">{file.name}</p>
                         <p className="text-[#999999] text-xs mt-1">คลิกเพื่อเปลี่ยนไฟล์</p>
                       </>
@@ -272,7 +282,7 @@ function Contactus() {
                       <>
                         <img src="/upload.png" alt="Upload Icon" className="w-8 h-8 mb-3 object-contain" data-protect-ui="true" draggable={false} />
                         <p className="text-[#7B542F] font-bold text-base">Click here to upload</p>
-                        <p className="text-[#999999] text-xs mt-1">PDF, PNG, JPG, WEBP only (max 2 MB)</p>
+                        <p className="text-[#999999] text-xs mt-1">PDF or PNG or JPG or JPEG only (max 2 MB)</p>
                       </>
                     )}
                   </div>

@@ -15,8 +15,7 @@ export default function Unauthorized() {
 
   return (
     <div
-      className="relative flex min-h-screen items-center justify-center bg-cover bg-center px-4"
-      style={{ backgroundImage: "url('/chula.jpg')" }}
+      className="relative flex min-h-screen items-center justify-center bg-[#7B542F] px-4"
     >
       <div className="absolute inset-0 bg-black/20"></div>
 
@@ -43,7 +42,7 @@ export default function Unauthorized() {
           <p className="text-sm font-semibold text-[#9A4E19]">สิ่งที่คุณทำต่อได้</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-[#7B542F]">
             <li>เปลี่ยนไปใช้บัญชีมหาวิทยาลัยที่มีสิทธิ์ใช้งาน</li>
-            <li>กลับไปหน้าแรกของระบบ</li>
+            <li>กลับไปหน้าเข้าสู่ระบบ</li>
             <li>หากคิดว่าเป็นความผิดพลาด ให้ติดต่อผู้ดูแลระบบหรือเจ้าหน้าที่ที่เกี่ยวข้อง</li>
           </ul>
         </div>
@@ -60,7 +59,7 @@ export default function Unauthorized() {
             to="/login"
             className="flex-1 rounded-full border border-[#E7D7C5] px-5 py-3 text-center text-base font-bold text-[#7B542F] transition-colors hover:bg-[#FFF9F3]"
           >
-            กลับหน้าเข้าสู่ระบบ
+            กลับไปหน้าเข้าสู่ระบบ
           </Link>
         </div>
       </div>

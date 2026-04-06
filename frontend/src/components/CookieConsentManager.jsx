@@ -9,8 +9,8 @@ import {
 
 function CookieSettingsModal({ consent, onClose, onSave, onToggleAnalytics }) {
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-[600px] rounded-[28px] border border-[#E7D7C5] bg-white p-6 shadow-2xl sm:p-8">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 px-4 py-4">
+      <div className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-[28px] border border-[#E7D7C5] bg-white p-6 shadow-2xl sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
@@ -117,7 +117,7 @@ function CookieSettingsModal({ consent, onClose, onSave, onToggleAnalytics }) {
   );
 }
 
-export default function CookieConsentManager() {
+export function CookieConsentManager() {
   const [consent, setConsent] = useState(() => getCookieConsent());
   const [showBanner, setShowBanner] = useState(() => !hasCookieConsentDecision());
   const [showSettings, setShowSettings] = useState(false);

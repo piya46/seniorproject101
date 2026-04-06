@@ -26,8 +26,7 @@ export default function Login() {
 
   return (
     <div 
-      className="relative flex min-h-screen items-center justify-center bg-cover bg-center px-4"
-      style={{ backgroundImage: "url('/chula.jpg')" }} 
+      className="relative flex min-h-screen items-center justify-center bg-[#7B542F] px-4"
     >
       {/* เพิ่ม Overlay สีดำจางๆ ให้รูปพื้นหลังดูไม่กลืนกับกล่อง (ถ้าไม่ชอบลบ div นี้ออกได้ครับ) */}
       <div className="absolute inset-0 bg-black/20"></div>
