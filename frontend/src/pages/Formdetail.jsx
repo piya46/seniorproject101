@@ -83,6 +83,31 @@ const pollUploadPreparationJobs = async (jobs, onUpdate) => {
   throw new Error('การเตรียมเอกสารใช้เวลานานเกินไป กรุณาลองอีกครั้ง');
 };
 
+const buildBatchPreparationErrors = (jobs = []) => {
+  const nextErrors = {};
+  jobs.forEach((job) => {
+    const fileResults = Array.isArray(job?.result?.files) ? job.result.files : [];
+    fileResults.forEach((fileResult) => {
+      if (fileResult?.status === 'failed' && fileResult?.file_key) {
+        nextErrors[fileResult.file_key] = {
+          status: 'error',
+          reason: fileResult.error_message || 'การเตรียมเอกสารล้มเหลว'
+        };
+      }
+    });
+  });
+  return nextErrors;
+};
+
+const getFileIcon = (fileName) => {
+  if (!fileName) return "/pdf.png";
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.png')) return "/png.png";
+  if (lower.endsWith('.jpeg')) return "/JPEG.png";
+  if (lower.endsWith('.jpg')) return "/JPG.png";
+  return "/pdf.png";
+};
+
 export default function Formdetail() {
   const { id } = useParams(); 
   const navigate = useNavigate();
@@ -608,7 +633,6 @@ export default function Formdetail() {
     try {
       if (!publicKey) throw new Error("Public Key is missing.");
 
-      // 💡 อัปเดตข้อมูล payload ให้ตรงกับตัวอย่างที่แจ้งมา
       const mergePayload = {
         form_code: formData.form_code || id,
         degree_level: degreeLevel,
@@ -892,7 +916,14 @@ export default function Formdetail() {
                       
                       {uploadedFiles[index] ? (
                         <div className={'relative group flex w-full items-center rounded-xl border border-black bg-white px-4 py-3 shadow-sm transition-colors hover:border-[#7B542F] sm:px-6'}>
-                          <img src="/pdf.png" alt="PDF" className="mr-3 h-10 w-10 object-contain sm:mr-4" data-protect-ui="true" draggable={false} />
+                          
+                          <img 
+                            src={getFileIcon(uploadedFiles[index]?.name)}
+                            alt="File Icon" 
+                            className="mr-3 h-10 w-10 min-w-[40px] flex-shrink-0 object-contain sm:mr-4" 
+                            data-protect-ui="true" 
+                            draggable={false} 
+                          />
 
                           <div className="flex flex-grow flex-col justify-center overflow-hidden">
                             {uploadStatuses[index]?.status === 'success' ? (
@@ -968,15 +999,16 @@ export default function Formdetail() {
                             )}
                           </div>
 
-                          <div className="z-10 ml-3 flex items-center gap-3 sm:ml-4 sm:gap-4">
+                          {/* 💡 ล็อกขนาดกล่องปุ่ม ลบ/โหลดใหม่ ด้วย min-width และ flex-shrink-0 */}
+                          <div className="z-10 ml-3 flex flex-shrink-0 items-center justify-end gap-3 sm:ml-4 sm:gap-4" style={{ minWidth: "max-content" }}>
                             {uploadStatuses[index]?.status === 'error' && (
-                              <button onClick={(e) => { e.preventDefault(); handleRetry(index); }} className="cursor-pointer hover:opacity-70 transition-opacity">
-                                 <img src="/reload.png" alt="Retry" className="w-8 h-8 object-contain" data-protect-ui="true" draggable={false} />
+                              <button onClick={(e) => { e.preventDefault(); handleRetry(index); }} className="flex h-8 w-8 flex-shrink-0 items-center justify-center cursor-pointer hover:opacity-70 transition-opacity">
+                                 <img src="/reload.png" alt="Retry" className="h-full w-full flex-shrink-0 object-contain" data-protect-ui="true" draggable={false} />
                               </button>
                             )}
 
-                            <button onClick={(e) => { e.preventDefault(); handleRemoveFile(index); }} className="cursor-pointer hover:opacity-70 transition-opacity" title="ลบไฟล์">
-                               <img src="/close.png" alt="Close" className="w-6 h-6 object-contain" data-protect-ui="true" draggable={false} />
+                            <button onClick={(e) => { e.preventDefault(); handleRemoveFile(index); }} className="flex h-6 w-6 flex-shrink-0 items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" title="ลบไฟล์">
+                               <img src="/close.png" alt="Close" className="h-full w-full flex-shrink-0 object-contain" data-protect-ui="true" draggable={false} />
                             </button>
                           </div>
                         </div>
@@ -986,7 +1018,7 @@ export default function Formdetail() {
                           <div className="flex flex-col items-center pointer-events-none">
                             <img src="/upload.png" alt="Upload Icon" className="w-10 h-10 mb-2 object-contain" data-protect-ui="true" draggable={false} />
                             <p className="text-[#7B542F] font-bold text-lg">Click here to upload</p>
-                            <p className="text-[#999999] text-sm mt-1">PDF or PNG or JPG only (max 5 MB)</p>
+                            <p className="text-[#999999] text-sm mt-1">PDF or PNG or JPG or JPEG only (max 5 MB)</p>
                           </div>
                         </div>
                       )}
@@ -1020,7 +1052,6 @@ export default function Formdetail() {
                       {isMerging ? 'กำลังรวมไฟล์...' : 'รวมไฟล์และดูช่องทางการส่ง'}
                     </button>
                     
-                    {/* 💡 แสดงผล Error ที่เกิดขึ้นบน UI */}
                     {mergeError && (
                       <div className="mt-4 text-red-500 font-medium bg-red-50 p-3 rounded-md border border-red-200 w-fit">
                         <p>❌ {mergeError}</p>
@@ -1080,6 +1111,7 @@ export default function Formdetail() {
             )}
           </div>
         </div>
+        
         <div className="mt-8 flex justify-end px-0 pb-8 sm:px-4 lg:mt-10 lg:px-24 lg:pb-10">
           <div className="flex w-full flex-col items-end gap-3 sm:w-auto">
             <button 
@@ -1102,7 +1134,7 @@ export default function Formdetail() {
                 (currentStep === 2 && !isStep2Validated && (!isStep2Complete || isValidating)) ||
                 (currentStep === 2 && isStep2Validated && !isAllRequiredValid) 
               }
-              className={`flex w-full items-center justify-center gap-2 rounded-lg px-8 py-3 font-bold text-white shadow-md transition-colors sm:w-auto ${
+              className={`flex w-auto items-center justify-center gap-2 rounded-lg px-8 py-3 font-bold text-white shadow-md transition-colors ${
                 (currentStep === 1 && !isStep1Complete) || 
                 (currentStep === 2 && !isStep2Validated && (!isStep2Complete || isValidating)) ||
                 (currentStep === 2 && isStep2Validated && !isAllRequiredValid)
@@ -1151,18 +1183,3 @@ export default function Formdetail() {
     </div>
   );
 }
-  const buildBatchPreparationErrors = (jobs = []) => {
-    const nextErrors = {};
-    jobs.forEach((job) => {
-      const fileResults = Array.isArray(job?.result?.files) ? job.result.files : [];
-      fileResults.forEach((fileResult) => {
-        if (fileResult?.status === 'failed' && fileResult?.file_key) {
-          nextErrors[fileResult.file_key] = {
-            status: 'error',
-            reason: fileResult.error_message || 'การเตรียมเอกสารล้มเหลว'
-          };
-        }
-      });
-    });
-    return nextErrors;
-  };

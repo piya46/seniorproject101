@@ -279,7 +279,7 @@ function Navbar({ degreeProps }) {
       <div className="mx-4 my-4 flex items-start gap-4 rounded-md bg-[#FFCF71]/70 p-4 sm:mx-5 sm:my-5">
         <img src="/warning.png" alt="warning logo" className="mt-0.5 h-6 w-6 flex-shrink-0" data-protect-ui="true" draggable={false} />
         <p className="py-1 text-left text-[13px] leading-6 sm:text-[14px]">
-          เป็นเว็บไซต์ที่จัดทำโดยนิสิต โดยเป็นเพียงเครื่องมือที่ช่วยให้การจัดเตรียมเอกสารยื่นคำร้องทำได้ง่ายมากขึ้นสำหรับนิสิตคณะวิทยาศาตร์เท่านั้น ไม่สามารถยื่นคำร้องได้จริง
+          เว็บไซต์นี้เป็นเว็บไซต์ที่จัดทำโดยนิสิต โดยเป็นเพียงเครื่องมือที่ช่วยให้การจัดเตรียมเอกสารสำหรับการยื่นคำร้องให้ทำได้ง่ายมากขึ้นสำหรับนิสิตคณะวิทยาศาตร์เท่านั้น แต่ไม่สามารถยื่นคำร้องได้จริง และสามารถหาข้อมูลเพิ่มเติมหรือตรวจสอบข้อมูลได้ที่ https://www.reg.chula.ac.th/th/student/forms/
         </p>
       </div>
     </div>

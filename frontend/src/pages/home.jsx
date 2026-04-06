@@ -389,10 +389,8 @@ export default function Home() {
             <>
               <div className="mb-6 flex items-start gap-4 sm:items-center">
                 <button onClick={() => {setSelectedForm(null);
-                  sessionStorage.removeItem('last_selected_form');}} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#D9D9D9] bg-white text-[#999999] shadow-sm transition-colors hover:border-[#EA580C] hover:text-[#EA580C]">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  sessionStorage.removeItem('last_selected_form');}} className="cursor-pointer">
+                  <img src="/left-arrow.png" alt="ย้อนกลับ" className="h-9 w-9 object-contain sm:h-10 sm:w-10" data-protect-ui="true" draggable={false} />
                 </button>
                 <div className="flex flex-col">
                   <p className='text-left text-[20px] font-extrabold text-[#7B542F] sm:text-[22px]'>โปรดระบุประเภทของคำร้อง</p>
