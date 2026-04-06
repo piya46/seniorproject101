@@ -4,12 +4,6 @@ import { trackAnalyticsEvent } from '../lib/analytics';
 
 const APP_NAME = 'Form Check';
 
-const features = [
-  'ช่วยค้นหาแบบคำร้องที่เกี่ยวข้องกับเรื่องที่ต้องการดำเนินการ',
-  'ช่วยสรุปข้อมูลเบื้องต้นและรายละเอียดที่ควรตรวจสอบก่อนใช้งานจริง',
-  'มีผู้ช่วยแชตสำหรับตอบคำถามเบื้องต้นเกี่ยวกับการใช้งานระบบ'
-];
-
 export default function Login() {
   const [searchParams] = useSearchParams();
   const authError = searchParams.get('auth_error');
@@ -36,7 +30,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#FFF8F1_0%,#F7E7D2_48%,#FCF8F3_100%)] text-[#3C2A1C]">
       <header className="border-b border-[#E8D8C4] bg-white/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <img
               src="/icon.svg"
@@ -54,51 +48,12 @@ export default function Login() {
               </h1>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="hidden rounded-full bg-[#7B542F] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#684626] sm:inline-flex"
-          >
-            เข้าสู่ระบบ
-          </button>
         </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-        <section className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-stretch">
-          <div className="rounded-[32px] border border-[#E7D7C5] bg-white px-6 py-8 shadow-[0_20px_60px_rgba(123,84,47,0.08)] sm:px-8 sm:py-10">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#A36A35]">
-              Homepage
-            </p>
-            <h2 className="mt-3 text-[30px] font-extrabold leading-tight text-[#6F4722] sm:text-[42px]">
-              ระบบสำหรับช่วยอธิบายและเตรียมความพร้อมก่อนยื่นคำร้องของนิสิตคณะวิทยาศาสตร์
-            </h2>
-            <p className="mt-5 max-w-3xl text-base leading-8 text-[#62574B]">
-              {APP_NAME} เป็นเว็บแอปที่ช่วยให้นิสิตค้นหาแบบคำร้องที่เกี่ยวข้องกับงานทะเบียน
-              ทำความเข้าใจข้อมูลเบื้องต้นของแต่ละรายการ และเตรียมตัวก่อนนำข้อมูลไปใช้ในกระบวนการจริง
-              ระบบนี้มีเป้าหมายเพื่อลดความสับสนในการค้นหาเอกสารและช่วยให้เข้าถึงข้อมูลได้ง่ายขึ้น
-            </p>
-            <p className="mt-4 max-w-3xl text-base leading-8 text-[#62574B]">
-              ภายในระบบ ผู้ใช้สามารถดูข้อมูลแบบคำร้องที่ระบบรองรับ ค้นหาตามเรื่องที่ต้องการดำเนินการ
-              และใช้ผู้ช่วยแชตสำหรับคำถามเบื้องต้นเกี่ยวกับการใช้งานระบบได้ โดยยังควรตรวจสอบข้อมูลกับหน่วยงานหรือประกาศล่าสุดก่อนใช้งานจริงทุกครั้ง
-            </p>
-
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              {features.map((feature) => (
-                <div key={feature} className="rounded-3xl border border-[#EADBC9] bg-[#FFF9F3] p-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F4DEC2] text-sm font-extrabold text-[#7B542F]">
-                    AI
-                  </div>
-                  <p className="mt-3 text-sm leading-7 text-[#5C5146]">
-                    {feature}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[32px] border border-[#E7D7C5] bg-[#7B542F] px-6 py-8 text-white shadow-[0_20px_60px_rgba(123,84,47,0.12)] sm:px-8 sm:py-10">
+        <section className="mx-auto w-full max-w-3xl">
+          <div className="rounded-[28px] border border-[#6E4B2A] bg-[#7B542F] px-6 py-8 text-white shadow-sm sm:px-8 sm:py-10">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#F5D8B5]">
               Sign In
             </p>
@@ -106,7 +61,7 @@ export default function Login() {
               เข้าสู่ระบบเพื่อใช้งานแบบคำร้องและผู้ช่วยแนะนำ
             </h3>
             <p className="mt-4 text-sm leading-7 text-[#FFF0DE]">
-              หน้านี้เปิดให้เข้าชมสาธารณะเพื่ออธิบายวัตถุประสงค์ของแอป ส่วนการใช้งานภายในระบบต้องเข้าสู่ระบบด้วยบัญชี Google ของมหาวิทยาลัยที่ได้รับสิทธิ์
+              หน้านี้เปิดให้อ่านข้อมูลได้สาธารณะ ส่วนการใช้งานภายในระบบต้องเข้าสู่ระบบด้วยบัญชี Google ที่ได้รับสิทธิ์
             </p>
 
             {errorMessage ? (
@@ -120,9 +75,9 @@ export default function Login() {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              className="group mt-8 flex w-full items-center justify-center gap-3 rounded-full border border-white/30 bg-white px-5 py-3 text-base font-bold text-[#5E3D22] shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#FFF5EA] hover:shadow-lg"
+              className="mt-8 flex w-full items-center justify-center gap-3 rounded-full border border-white/30 bg-white px-5 py-3 text-base font-bold text-[#5E3D22] shadow-sm transition-colors hover:bg-[#FFF5EA]"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-[0_10px_24px_rgba(66,133,244,0.18)] transition-transform duration-300 group-hover:scale-105">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white">
                 <svg className="h-6 w-6" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.7 3.9-5.5 3.9-3.3 0-6-2.8-6-6.2s2.7-6.2 6-6.2c1.9 0 3.2.8 4 1.5l2.7-2.6C17 2.9 14.8 2 12 2 6.9 2 2.8 6.3 2.8 11.8S6.9 21.6 12 21.6c6.9 0 8.6-5 8.6-7.5 0-.5-.1-.9-.1-1.3H12Z" />
                   <path fill="#34A853" d="M2.8 11.8c0 1.8.6 3.5 1.7 4.9l3.1-2.4c-.4-.7-.7-1.6-.7-2.5s.2-1.7.7-2.5L4.5 6.9c-1.1 1.4-1.7 3.1-1.7 4.9Z" />
@@ -134,41 +89,19 @@ export default function Login() {
             </button>
 
             <p className="mt-4 text-xs leading-6 text-[#F8E7D4]">
-              การเข้าสู่ระบบจะพาคุณไปยังระบบยืนยันตัวตนของ Google และกลับมายังแอปนี้หลังจากยืนยันสำเร็จ
+              ระบบจะพาคุณไปยืนยันตัวตนกับ Google ก่อนกลับมายังแอปนี้
             </p>
           </div>
         </section>
 
-        <section className="grid gap-5 md:grid-cols-2">
-          <article className="rounded-[28px] border border-[#E7D7C5] bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
-              Purpose
-            </p>
-            <p className="mt-3 text-sm leading-8 text-[#5C5146]">
-              แอปนี้ถูกสร้างขึ้นเพื่อช่วยอธิบายขอบเขตการใช้งานของแบบคำร้องสำหรับงานทะเบียนนิสิต
-              และทำให้ผู้ใช้เข้าใจข้อมูลเบื้องต้นได้ง่ายขึ้นก่อนเริ่มดำเนินการจริง
-            </p>
-          </article>
-
-          <article className="rounded-[28px] border border-[#E7D7C5] bg-white p-6 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
-              Public Information
-            </p>
-            <p className="mt-3 text-sm leading-8 text-[#5C5146]">
-              หน้านี้เปิดให้ผู้ตรวจสอบและผู้ใช้งานทั่วไปอ่านข้อมูลเกี่ยวกับแอปได้โดยไม่ต้องเข้าสู่ระบบ
-              ส่วนฟังก์ชันภายในระบบจะเปิดใช้งานหลังจากผ่านการยืนยันตัวตนและตรวจสอบสิทธิ์แล้วเท่านั้น
-            </p>
-          </article>
-        </section>
-
-        <section className="rounded-[28px] border border-[#E7D7C5] bg-white px-6 py-6 shadow-sm">
+        <section className="rounded-[24px] border border-[#E7D7C5] bg-white px-6 py-6 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
                 Policies
               </p>
               <p className="mt-2 text-sm leading-7 text-[#5C5146]">
-                ตรวจสอบรายละเอียดเพิ่มเติมเกี่ยวกับการใช้งานข้อมูลและข้อกำหนดของระบบได้จากหน้าต่อไปนี้
+                รายละเอียดเพิ่มเติมเกี่ยวกับการใช้งานข้อมูลและข้อกำหนดของระบบ
               </p>
             </div>
             <div className="flex flex-col gap-2 text-sm sm:items-end">
