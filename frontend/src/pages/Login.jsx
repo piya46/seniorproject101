@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { trackAnalyticsEvent } from '../lib/analytics';
 
-const APP_NAME = 'Form Check';
+const APP_NAME = 'ระบบช่วยเหลือการยื่นคำร้องสำหรับนิสิต';
 
 export default function Login() {
   const [searchParams] = useSearchParams();
@@ -28,10 +28,10 @@ export default function Login() {
       : '';
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#FFF8F1_0%,#F7E7D2_48%,#FCF8F3_100%)] text-[#3C2A1C]">
-      <header className="border-b border-[#E8D8C4] bg-white/80 backdrop-blur">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(245,216,181,0.42),_transparent_34%),linear-gradient(180deg,#FFF9F2_0%,#F9ECDD_46%,#FCF8F3_100%)] text-[#3C2A1C]">
+      <header className="border-b border-[#E8D8C4]/80 bg-white/75 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 rounded-2xl bg-white/80 px-3 py-2 shadow-sm ring-1 ring-[#F0E0CF]">
             <img
               src="/icon.svg"
               alt={APP_NAME}
@@ -40,9 +40,6 @@ export default function Login() {
               draggable={false}
             />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
-                Science Faculty Student Registry
-              </p>
               <h1 className="text-sm font-extrabold text-[#7B542F] sm:text-base">
                 {APP_NAME}
               </h1>
@@ -51,17 +48,41 @@ export default function Login() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-10 sm:px-6 sm:py-14">
-        <section className="mx-auto w-full max-w-3xl">
-          <div className="rounded-[28px] border border-[#6E4B2A] bg-[#7B542F] px-6 py-8 text-white shadow-sm sm:px-8 sm:py-10">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#F5D8B5]">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
+        <section className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <article className="rounded-[30px] border border-[#E7D7C5] bg-white/92 px-6 py-8 shadow-[0_24px_60px_rgba(123,84,47,0.08)] sm:px-8 sm:py-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A36A35]">
+              Welcome
+            </p>
+            <h2 className="mt-3 max-w-xl text-[28px] font-extrabold leading-tight text-[#6F4722] sm:text-[40px]">
+              ระบบช่วยเหลือการยื่นคำร้องสำหรับนิสิต
+            </h2>
+            <p className="mt-4 max-w-xl text-[15px] leading-8 text-[#62574B] sm:text-base">
+              ใช้สำหรับช่วยค้นหาแบบคำร้องที่เกี่ยวข้อง ดูข้อมูลเบื้องต้น และเตรียมความพร้อมก่อนดำเนินการยื่นคำร้อง
+            </p>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-[#EADBC9] bg-[#FFF9F3] px-4 py-4 text-sm leading-7 text-[#5C5146]">
+                ค้นหาแบบคำร้องได้สะดวก
+              </div>
+              <div className="rounded-2xl border border-[#EADBC9] bg-[#FFF9F3] px-4 py-4 text-sm leading-7 text-[#5C5146]">
+                ดูข้อมูลก่อนเริ่มดำเนินการ
+              </div>
+              <div className="rounded-2xl border border-[#EADBC9] bg-[#FFF9F3] px-4 py-4 text-sm leading-7 text-[#5C5146]">
+                ใช้ผู้ช่วยแนะนำภายในระบบ
+              </div>
+            </div>
+          </article>
+
+          <div className="rounded-[30px] border border-[#6E4B2A] bg-[linear-gradient(180deg,#8A5D33_0%,#7B542F_100%)] px-6 py-8 text-white shadow-[0_24px_60px_rgba(91,57,26,0.18)] sm:px-8 sm:py-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#F5D8B5]">
               Sign In
             </p>
             <h3 className="mt-3 text-[28px] font-extrabold leading-tight">
-              เข้าสู่ระบบเพื่อใช้งานแบบคำร้องและผู้ช่วยแนะนำ
+              ลงชื่อเข้าใช้ด้วยบัญชีจุฬา
             </h3>
             <p className="mt-4 text-sm leading-7 text-[#FFF0DE]">
-              หน้านี้เปิดให้อ่านข้อมูลได้สาธารณะ ส่วนการใช้งานภายในระบบต้องเข้าสู่ระบบด้วยบัญชี Google ที่ได้รับสิทธิ์
+              หน้านี้เปิดให้ผู้ใช้ทั่วไปอ่านข้อมูลได้ สำหรับการใช้งานภายใน กรุณาลงชื่อเข้าใช้ด้วยบัญชีจุฬาที่ได้รับสิทธิ์
             </p>
 
             {errorMessage ? (
@@ -75,7 +96,7 @@ export default function Login() {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              className="mt-8 flex w-full items-center justify-center gap-3 rounded-full border border-white/30 bg-white px-5 py-3 text-base font-bold text-[#5E3D22] shadow-sm transition-colors hover:bg-[#FFF5EA]"
+              className="mt-8 flex w-full items-center justify-center gap-3 rounded-full border border-white/40 bg-white px-5 py-3 text-base font-bold text-[#5E3D22] shadow-sm transition-colors hover:bg-[#FFF5EA]"
             >
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white">
                 <svg className="h-6 w-6" viewBox="0 0 24 24" aria-hidden="true">
@@ -85,16 +106,16 @@ export default function Login() {
                   <path fill="#4285F4" d="M18.8 19.1c1.9-1.8 2.8-4.4 2.8-7.3 0-.5-.1-.9-.1-1.3H12v3.9h5.5c-.3 1.5-1.1 2.8-2.2 3.6l3.5 1.1Z" />
                 </svg>
               </span>
-              Sign in with Google
+              ลงชื่อเข้าใช้ด้วยบัญชีจุฬา
             </button>
 
-            <p className="mt-4 text-xs leading-6 text-[#F8E7D4]">
-              ระบบจะพาคุณไปยืนยันตัวตนกับ Google ก่อนกลับมายังแอปนี้
-            </p>
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/8 px-4 py-4 text-sm leading-7 text-[#FFF0DE]">
+              กรุณาลงชื่อเข้าใช้ด้วยบัญชีจุฬาฯ
+            </div>
           </div>
         </section>
 
-        <section className="rounded-[24px] border border-[#E7D7C5] bg-white px-6 py-6 shadow-sm">
+        <section className="mx-auto w-full max-w-5xl rounded-[24px] border border-[#E7D7C5] bg-white/90 px-6 py-6 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#A36A35]">
