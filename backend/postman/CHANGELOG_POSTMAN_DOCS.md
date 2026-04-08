@@ -1,7 +1,24 @@
 # Changelog Postman Docs
 
-Current version: `v1.10.1`
+Current version: `v1.10.2`
 Last updated: `2026-04-08`
+
+## v1.10.2
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- ขยับ release docs เป็น `v1.10.2` เพื่อเก็บรอบอัปเดตสถานะคิวและตัวอย่าง Postman ให้เป็นเวอร์ชันถัดไป
+- คงตัวอย่าง job status ที่ครอบคลุม `queued`, `processing`, `succeeded`, `partial_failed`, `failed` และกรณี `queue_info`
+- sync หมายเลขเวอร์ชันระหว่าง collection, API docs, guides, printable docs และ release checklist ให้ตรงกัน
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็นการออกเวอร์ชันเอกสารใหม่ให้สอดคล้องกันทั้งชุด
+
+ผลกระทบฝั่งทีม:
+
+- ทีมสามารถอ้างอิง `v1.10.2` เป็นชุดเอกสารล่าสุดได้ทันที
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.10.2`
 
 ## v1.10.1
 

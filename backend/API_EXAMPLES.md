@@ -1,6 +1,6 @@
 # API Examples
 
-Version: `v1.10.1`
+Version: `v1.10.2`
 Last updated: `2026-04-08`
 
 ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only โดย production target ใหม่คือ frontend BFF + private backend ส่วน direct backend browser flow ให้ถือเป็น legacy/direct mode
