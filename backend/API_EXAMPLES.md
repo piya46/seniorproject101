@@ -1,7 +1,7 @@
 # API Examples
 
-Version: `v1.10.0`
-Last updated: `2026-04-04`
+Version: `v1.10.1`
+Last updated: `2026-04-08`
 
 ตัวอย่างด้านล่างอธิบาย flow หลักของระบบในโหมด OIDC-only โดย production target ใหม่คือ frontend BFF + private backend ส่วน direct backend browser flow ให้ถือเป็น legacy/direct mode
 
@@ -251,6 +251,7 @@ curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/ap
 - `queued`
 - `processing`
 - `succeeded`
+- `partial_failed`
 - `failed`
 
 ## 7. Async Merge Status And Download
@@ -267,6 +268,7 @@ curl -i https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/ap
 
 หมายเหตุ:
 
+- endpoint job status ของทั้ง upload/prepare และ merge อาจคืน `queued`, `processing`, `succeeded`, `partial_failed`, หรือ `failed`
 - endpoint `/download` จะใช้ได้เมื่อ job อยู่ในสถานะ `succeeded`
 - endpoint `/download` จะคืน `download_path` ของ backend แทน signed URL
 - endpoint `/file` จะ stream ไฟล์ผ่าน backend โดยไม่เผย bucket path หรือ signed URL ไปยัง client

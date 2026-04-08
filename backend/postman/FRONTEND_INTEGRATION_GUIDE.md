@@ -1,7 +1,7 @@
 # Frontend Integration Guide
 
-Version: `v1.10.0`
-Last updated: `2026-04-04`
+Version: `v1.10.1`
+Last updated: `2026-04-08`
 
 คู่มือนี้อธิบายสิ่งที่ frontend ต้องทำเพื่อเชื่อมต่อ backend ในโหมด Google OIDC + session cookie + secure JSON transport โดย direct backend browser flow ให้ถือเป็น legacy/direct mode และ production target ใหม่คือ frontend BFF + private backend
 

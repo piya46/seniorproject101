@@ -1,7 +1,24 @@
 # Changelog Postman Docs
 
-Current version: `v1.10.0`
-Last updated: `2026-04-04`
+Current version: `v1.10.1`
+Last updated: `2026-04-08`
+
+## v1.10.1
+
+สรุปการเปลี่ยนแปลงหลักของชุด Postman docs รอบนี้:
+
+- อัปเดต API examples และ Postman collection ให้ระบุสถานะคิวของ document jobs ครบทั้ง `queued`, `processing`, `succeeded`, `partial_failed`, `failed`
+- เพิ่มตัวอย่าง response สำหรับ merge job status ในกรณี `queued` พร้อม `queue_info` และกรณี `partial_failed`
+- sync README และเอกสารประกอบให้ตรงกับพฤติกรรมจริงของ backend worker queue
+
+Breaking change:
+
+- ไม่มี breaking change ของ API runtime; เป็นการอัปเดตเอกสารและ examples ให้ตรงกับ implementation ปัจจุบัน
+
+ผลกระทบฝั่งทีม:
+
+- frontend/client สามารถอ้างอิง docs ชุดนี้เพื่อรองรับการแสดงผลสถานะคิวและข้อความรอคิวได้ครบขึ้น
+- ถ้าจะ publish/release docs รอบนี้ ให้ใช้ tag `docs/v1.10.1`
 
 ## v1.10.0
 

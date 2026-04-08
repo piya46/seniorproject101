@@ -1,7 +1,7 @@
 # API Documentation
 
-Version: `v1.10.0`
-Last updated: `2026-04-04`
+Version: `v1.10.1`
+Last updated: `2026-04-08`
 
 เอกสารนี้เป็น API contract กลางของ backend โดยอธิบาย endpoint, auth, encryption และ error model แบบไม่ผูกกับภาษา client
 

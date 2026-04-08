@@ -1,10 +1,10 @@
 {
   "info": {
     "_postman_id": "0f93eb4e-44fa-4f84-87be-cfbb5cf8ca23",
-    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.10.0",
+    "name": "เอกสาร API ระบบคำร้อง Sci-Request v1.10.1",
     "description": {
       "type": "text/markdown",
-      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.10.0\n**Last Updated:** 2026-04-04\n\n## Change Summary\n- เปลี่ยน flow ดาวน์โหลด merged document เป็น backend-streaming แบบ zero-trust\n- `GET /api/v1/documents/jobs/:jobId/download` ตอนนี้คืน `download_path` แทน signed URL\n- เพิ่ม route `GET /api/v1/documents/jobs/:jobId/file` สำหรับ stream merged PDF ผ่าน backend\n- sync ตัวอย่าง response และ job status ให้ไม่เผย `download_url` หรือ storage object path ภายใน\n- คง storage-signing probe, chat usage docs, และ logout hardening ให้ตรงกับ runtime ล่าสุด\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- Public liveness, authenticated storage-signing probe, และ authenticated detailed status\n- Google OIDC login และ callback ใน legacy/direct mode\n- BFF bridge routes สำหรับ production private backend flow\n- การตรวจ session/auth state ปัจจุบัน\n- การอ่าน safe profile สำหรับ bind ลง UI\n- การอ่าน encrypted personal profile details\n- การดึง public key\n- การเริ่มต้น session หลัง OIDC หรือผ่าน BFF bridge\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การดึง AI usage summary สำหรับ chat widget\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- `GET /system/status` เป็น public liveness endpoint และตั้งใจให้ตอบข้อมูลน้อยที่สุด\n- `GET /system/status/storage-signing` เป็น authenticated privileged probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้\n- `GET /system/status/details` ต้องมี authenticated backend session ก่อนใช้งาน\n- `GET /profile/me` คืนเฉพาะ allowlisted profile fields และไม่เปิดเผย token, `session_id`, หรือ `google_sub`\n- `POST /profile/details` ใช้ secure JSON transport สำหรับข้อมูลส่วนตัวที่ต้องป้องกันเข้มขึ้น\n- secure JSON endpoints ยังใช้ encryption layer เดิม\n- response หลัง authenticated middleware ถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate`\n- production target คือ browser -> frontend BFF -> private backend ตาม `BFF_BACKEND_CONTRACT.md`\n- Google OIDC direct-to-backend flow ยังมีไว้สำหรับ legacy/direct mode เท่านั้น\n- production BFF flow ควรให้ Google redirect กลับ frontend `/auth/callback`\n- merged document จะถูกดาวน์โหลดผ่าน backend route แทน signed storage URL เพื่อไม่เผย bucket path และ signed token ไปยัง client\n- `POST /oidc/logout` จะ revoke session record, ล้าง cookie และส่ง `Clear-Site-Data: \"cache\", \"cookies\", \"storage\"` ใน browser ที่รองรับ\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n"
+      "content": "# เอกสาร API ระบบคำร้อง Sci-Request\n\n**Version:** v1.10.1\n**Last Updated:** 2026-04-08\n\n## Change Summary\n- อัปเดต job-status docs ให้ระบุสถานะคิวครบทั้ง `queued`, `processing`, `succeeded`, `partial_failed`, `failed`\n- เพิ่มตัวอย่าง response ของ merge job ในกรณี `queued` พร้อม `queue_info` และกรณี `partial_failed`\n- sync API examples, README และ changelog ให้ตรงกับพฤติกรรมจริงของ backend worker queue\n\nชุด Collection นี้ถูกจัดทำเพื่อใช้เป็นทั้ง\n\n- ชุดทดสอบ API บน Postman\n- เอกสาร API สำหรับแชร์ภายในทีมผ่าน Postman Workspace\n\nโดยอ้างอิงพฤติกรรมจริงของ backend ภายใต้ `/api/v1`\n\n## ขอบเขตของระบบ\n\nCollection นี้ครอบคลุมความสามารถหลักของระบบดังต่อไปนี้\n\n- Public liveness, authenticated storage-signing probe, และ authenticated detailed status\n- Google OIDC login และ callback ใน legacy/direct mode\n- BFF bridge routes สำหรับ production private backend flow\n- การตรวจ session/auth state ปัจจุบัน\n- การอ่าน safe profile สำหรับ bind ลง UI\n- การอ่าน encrypted personal profile details\n- การดึง public key\n- การเริ่มต้น session หลัง OIDC หรือผ่าน BFF bridge\n- การดึงข้อมูลภาควิชา\n- การดึงรายการฟอร์มและรายละเอียดฟอร์ม\n- การอัปโหลดเอกสาร\n- การตรวจสอบความครบถ้วนของเอกสารด้วย AI\n- การรวมเอกสารเป็น PDF\n- การดึง AI usage summary สำหรับ chat widget\n- การแนะนำฟอร์มผ่านระบบแชต AI\n- การส่งอีเมลแจ้งปัญหาถึงทีมพัฒนาระบบ\n\n## หมายเหตุด้าน Security\n\n- `GET /system/status` เป็น public liveness endpoint และตั้งใจให้ตอบข้อมูลน้อยที่สุด\n- `GET /system/status/storage-signing` เป็น authenticated privileged probe สำหรับตรวจว่า runtime ยังสร้าง signed URL ได้\n- `GET /system/status/details` ต้องมี authenticated backend session ก่อนใช้งาน\n- `GET /profile/me` คืนเฉพาะ allowlisted profile fields และไม่เปิดเผย token, `session_id`, หรือ `google_sub`\n- `POST /profile/details` ใช้ secure JSON transport สำหรับข้อมูลส่วนตัวที่ต้องป้องกันเข้มขึ้น\n- secure JSON endpoints ยังใช้ encryption layer เดิม\n- response หลัง authenticated middleware ถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate`\n- production target คือ browser -> frontend BFF -> private backend ตาม `BFF_BACKEND_CONTRACT.md`\n- Google OIDC direct-to-backend flow ยังมีไว้สำหรับ legacy/direct mode เท่านั้น\n- production BFF flow ควรให้ Google redirect กลับ frontend `/auth/callback`\n- merged document จะถูกดาวน์โหลดผ่าน backend route แทน signed storage URL เพื่อไม่เผย bucket path และ signed token ไปยัง client\n- `POST /oidc/logout` จะ revoke session record, ล้าง cookie และส่ง `Clear-Site-Data: \"cache\", \"cookies\", \"storage\"` ใน browser ที่รองรับ\n- `POST /support/technical-email` ใช้ `multipart/form-data` จึงไม่ได้ใช้ secure JSON wrapper\n- support endpoint ถูก harden เพิ่มด้วย session auth, origin check, fixed server-side target email, file signature check และจำกัดไฟล์แนบ 1 ไฟล์ ไม่เกิน 2MB\n- browser upload request ที่ส่ง `Origin` หรือ `Referer` จะถูกตรวจ allowlist เช่นกัน\n"
     },
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -1765,7 +1765,7 @@
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
-              "body": "{\n  \"job\": {\n    \"id\": \"job_upload_123\",\n    \"type\": \"upload_sanitize\",\n    \"status\": \"succeeded\",\n    \"result\": {\n      \"file_key\": \"medical_cert\",\n      \"form_code\": \"JT44\",\n      \"mime_type\": \"application/pdf\"\n    }\n  }\n}"
+              "body": "{\n  \"status\": \"success\",\n  \"job\": {\n    \"id\": \"job_upload_123\",\n    \"type\": \"upload_sanitize\",\n    \"status\": \"succeeded\",\n    \"result\": {\n      \"file_key\": \"medical_cert\",\n      \"form_code\": \"JT44\",\n      \"mime_type\": \"application/pdf\"\n    }\n  }\n}"
             }
           ]
         }
@@ -8770,7 +8770,7 @@
                 "header": [],
                 "description": {
                   "type": "text/markdown",
-                  "content": "ใช้ poll สถานะของ merge job หลังจาก `POST /documents/merge` ตอบ `202 queued`"
+                  "content": "ใช้ poll สถานะของ merge job หลังจาก `POST /documents/merge` ตอบ `202 queued`\n\nสถานะที่อาจพบได้คือ `queued`, `processing`, `succeeded`, `partial_failed`, `failed`\n\nถ้า job ยังอยู่ในคิว response อาจมี `queue_info` เพื่อใช้แสดงจำนวนคิวก่อนหน้าแบบ bucket และข้อความแนะนำการรอ"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/documents/jobs/{{jobId}}",
@@ -8805,7 +8805,51 @@
                   "status": "OK",
                   "code": 200,
                   "_postman_previewlanguage": "json",
-                  "body": "{\n  \"job\": {\n    \"id\": \"job_merge_123\",\n    \"type\": \"merge_documents\",\n    \"status\": \"succeeded\",\n    \"result\": {\n      \"download_available\": true,\n      \"merged_page_count\": 3,\n      \"total_source_bytes\": 7340032,\n      \"instruction\": {\n        \"target_email\": \"department@example.com\",\n        \"email_subject\": \"ยื่นคำร้อง จท.44 คำร้องขอลาป่วย\"\n      }\n    }\n  }\n}"
+                  "body": "{\n  \"status\": \"success\",\n  \"job\": {\n    \"id\": \"job_merge_123\",\n    \"type\": \"merge_documents\",\n    \"status\": \"succeeded\",\n    \"result\": {\n      \"download_available\": true,\n      \"merged_page_count\": 3,\n      \"total_source_bytes\": 7340032,\n      \"instruction\": {\n        \"target_email\": \"department@example.com\",\n        \"email_subject\": \"ยื่นคำร้อง จท.44 คำร้องขอลาป่วย\"\n      }\n    }\n  }\n}"
+                },
+                {
+                  "name": "Response 200 Queued With Queue Info",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/documents/jobs/{{jobId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "documents",
+                        "jobs",
+                        "{{jobId}}"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "body": "{\n  \"status\": \"success\",\n  \"job\": {\n    \"id\": \"job_merge_123\",\n    \"type\": \"merge_documents\",\n    \"status\": \"queued\",\n    \"queue_info\": {\n      \"is_queued\": true,\n      \"ahead_count_bucket\": \"1-3\",\n      \"hint_message\": \"ระบบกำลังจัดเตรียมเอกสาร มีผู้รอก่อนหน้า 1-3 คิว\",\n      \"estimated_wait_tier\": \"short\"\n    }\n  }\n}"
+                },
+                {
+                  "name": "Response 200 Partial Failed",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/documents/jobs/{{jobId}}",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "documents",
+                        "jobs",
+                        "{{jobId}}"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "body": "{\n  \"status\": \"success\",\n  \"job\": {\n    \"id\": \"job_merge_123\",\n    \"type\": \"merge_documents\",\n    \"status\": \"partial_failed\",\n    \"error\": {\n      \"message\": \"Merged document completed with some source-file issues.\"\n    },\n    \"result\": {\n      \"download_available\": true,\n      \"merged_page_count\": 2,\n      \"total_source_bytes\": 5242880,\n      \"instruction\": {\n        \"target_email\": \"department@example.com\",\n        \"email_subject\": \"ยื่นคำร้อง จท.44 คำร้องขอลาป่วย\"\n      }\n    }\n  }\n}"
                 }
               ]
             },

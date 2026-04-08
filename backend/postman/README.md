@@ -1,7 +1,7 @@
 # Postman Guide
 
-Version: `v1.10.0`
-Last updated: `2026-04-04`
+Version: `v1.10.1`
+Last updated: `2026-04-08`
 
 โฟลเดอร์นี้เป็นชุดเอกสารและ collection สำหรับ backend ในโหมด Google OIDC แบบไม่ใช้ IAP
 
@@ -71,8 +71,8 @@ legacy/direct mode ที่ยังคงอยู่เพื่อ backward 
 - BFF production flow ใช้ frontend callback `/auth/callback`; backend callback `/oidc/google/callback` เป็น legacy/direct mode เป็นหลัก
 - `POST /oidc/logout` ตอนนี้จะ revoke session record, ล้าง cookie และส่ง `Clear-Site-Data: "cache", "cookies", "storage"` ใน browser ที่รองรับ
 - response ที่ผ่าน authenticated middleware จะถูกตั้ง `Cache-Control: private, no-store, max-age=0, must-revalidate` เพิ่มอีกชั้น จึงไม่ควรพึ่ง browser cache สำหรับ backend auth data
-- `POST /documents/merge` ตอบ `202 queued`; client ต้อง poll `/documents/jobs/:jobId`, เรียก `/documents/jobs/:jobId/download` เพื่อรับ `download_path`, แล้วค่อยเปิด `/documents/jobs/:jobId/file`
-- `POST /upload` ตอบ `200 success` เพื่อ stage ไฟล์ไว้ก่อน; ถ้า validation ต้องเตรียมเอกสารเพิ่ม client จะ poll `/upload/jobs/:jobId`
+- `POST /documents/merge` ตอบ `202 queued`; client ต้อง poll `/documents/jobs/:jobId` โดยรองรับสถานะ `queued`, `processing`, `succeeded`, `partial_failed`, `failed`, แล้วค่อยเรียก `/documents/jobs/:jobId/download` เมื่อสำเร็จ
+- `POST /upload` ตอบ `200 success` เพื่อ stage ไฟล์ไว้ก่อน; ถ้า validation ต้องเตรียมเอกสารเพิ่ม client จะ poll `/upload/jobs/:jobId` ซึ่งอาจคืน `queue_info` เมื่อ job ยังอยู่ในคิว
 - `POST /documents/merge` และ `POST /upload` ยังอาจตอบ `413` เมื่อชน policy ขนาดไฟล์/ขนาดรวม
 - trusted BFF flow ตอนนี้ harden เพิ่มได้ด้วย `TRUSTED_BFF_REQUIRE_IDENTITY_TOKEN=true` และ `x-bff-identity-token`
 
