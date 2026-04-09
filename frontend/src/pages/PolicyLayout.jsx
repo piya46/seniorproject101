@@ -30,11 +30,11 @@ export default function PolicyLayout({ title, subtitle, sections, updatedAt, chi
         <Navbar />
       ) : (
         <header className="border-b border-[#E7D7C5] bg-white/90 backdrop-blur">
-          <div className="page-gutter content-reading flex items-center gap-3 py-4">
+          <div className="page-gutter content-reading flex items-center gap-3 py-2">
             <img
-              src="/icon.svg"
+              src="/Logo.png"
               alt="Form Check"
-              className="h-11 w-11 rounded-xl object-contain"
+              className="h-24 w-24 rounded-xl object-contain"
               data-protect-ui="true"
               draggable={false}
             />

@@ -43,7 +43,7 @@ function Footer() {
 
                 <div className='flex flex-col gap-2 text-xs text-[#F6EBDD] sm:flex-row sm:items-center sm:justify-between'>
                     <p>เว็บไซต์นี้เป็นเครื่องมือช่วยเตรียมเอกสารเท่านั้น ไม่ใช่ช่องทางยื่นคำร้องอย่างเป็นทางการ</p>
-                    <p>© {new Date().getFullYear()} Form Check</p>
+                    <p>© {new Date().getFullYear()} Department of Mathematics and Computer Science. All rights reserved</p>
                 </div>
             </div>
         </footer>

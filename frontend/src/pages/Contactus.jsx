@@ -23,6 +23,8 @@ function Contactus() {
     details: '',
   });
   const [file, setFile] = useState(null);
+  const [fileUrl, setFileUrl] = useState(null); // เพิ่ม State สำหรับเก็บ URL ไว้พรีวิว
+  const [fileError, setFileError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // State สำหรับควบคุม Popup (Modal)
@@ -51,12 +53,33 @@ function Contactus() {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
+      const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
+      const fileExt = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+
+      // เคลียร์ ObjectURL เก่าหากมี เพื่อป้องกัน memory leak
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+        setFileUrl(null);
+      }
+
+      // ตรวจสอบนามสกุลไฟล์
+      if (!validExtensions.includes(fileExt)) {
+        setFile(selectedFile);
+        setFileError('invalid_type');
+        e.target.value = null; // เคลียร์ไฟล์ออก
+        return;
+      }
+
       // ตรวจสอบขนาดไฟล์เบื้องต้นว่าไม่เกิน 2MB ก่อนเก็บลง state
       if (selectedFile.size > 2 * 1024 * 1024) {
         showPopup('error', 'ขนาดไฟล์ต้องไม่เกิน 2MB');
         e.target.value = null; // เคลียร์ไฟล์ออก
         return;
       }
+      
+      const newFileUrl = URL.createObjectURL(selectedFile);
+      setFileUrl(newFileUrl);
+      setFileError(null);
       setFile(selectedFile);
     }
   };
@@ -64,12 +87,25 @@ function Contactus() {
   const handleRemoveFile = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (fileUrl) {
+      URL.revokeObjectURL(fileUrl);
+      setFileUrl(null);
+    }
     setFile(null);
+    setFileError(null);
     const fileInput = document.getElementById('support-file-input');
     if (fileInput) {
       fileInput.value = '';
     }
   };
+
+  // ตรวจสอบความครบถ้วนของข้อมูลที่จำเป็น เพื่อควบคุมสถานะการคลิกปุ่มตกลง
+  const isFormComplete = formData.email.trim() !== '' &&
+                         formData.issueType !== '' &&
+                         formData.subject.trim() !== '' &&
+                         formData.details.trim() !== '';
+
+  const isSubmitDisabled = isSubmitting || !isFormComplete || fileError === 'invalid_type';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -110,7 +146,12 @@ function Contactus() {
       
       // ล้างค่าฟอร์มหลังกดส่งสำเร็จ
       setFormData({ email: '', issueType: '', subject: '', details: '' });
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+        setFileUrl(null);
+      }
       setFile(null);
+      setFileError(null);
 
     } catch (err) {
       console.error("Support API Error:", err);
@@ -184,6 +225,7 @@ function Contactus() {
                         checked={formData.issueType === 'เว็บไซต์มีปัญหา'}
                         onChange={handleInputChange}
                         className="sr-only"
+                        
                       />
                       <div className={`w-5 h-5 border-2 rounded-full transition-all duration-200 
                         ${formData.issueType === 'เว็บไซต์มีปัญหา' ? 'border-[#FF9D00]' : 'border-[#999999]'}`}>
@@ -205,6 +247,7 @@ function Contactus() {
                         checked={formData.issueType === 'ข้อเสนอแนะ'}
                         onChange={handleInputChange}
                         className="sr-only"
+                        
                       />
                       <div className={`w-5 h-5 border-2 rounded-full transition-all duration-200 
                         ${formData.issueType === 'ข้อเสนอแนะ' ? 'border-[#FF9D00]' : 'border-[#999999]'}`}>
@@ -248,45 +291,71 @@ function Contactus() {
               {/* อัปโหลดเอกสาร */}
               <div className="flex flex-col gap-2">
                 <label className="font-bold text-sm">เอกสารประกอบ (Optional)</label>
-                <div className="relative border-2 border-dashed border-[#D9D9D9] rounded-xl py-8 mt-1 flex flex-col items-center justify-center cursor-pointer hover:border-[#7B542F] transition-colors bg-white">
-                  
-                  {/* เพิ่ม ID ให้ input file เพื่อให้เคลียร์ค่าได้ */}
-                  <input 
-                    type="file" 
-                    id="support-file-input"
-                    accept=".pdf,.png,.jpg,.jpeg,.webp" 
-                    onChange={handleFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
+                
+                {file ? (
+                  <div className="relative group flex w-full items-center rounded-xl border border-black bg-white px-4 py-3 mt-1 shadow-sm transition-colors hover:border-[#7B542F] sm:px-6">
+                    <img 
+                      src={fileError === 'invalid_type' ? "/warning.png" : getFileIcon(file.name)} 
+                      alt={fileError === 'invalid_type' ? "Warning Icon" : "File Icon"} 
+                      className="mr-3 h-10 w-10 min-w-[40px] flex-shrink-0 object-contain sm:mr-4" 
+                      data-protect-ui="true" 
+                      draggable={false} 
+                      onError={(e) => {if(fileError !== 'invalid_type') e.target.src = '/file.png'}}
+                    />
+                    
+                    <div className="flex flex-grow flex-col justify-center overflow-hidden">
+                      {fileError !== 'invalid_type' ? (
+                        <div className="flex items-center gap-2">
+                          {fileUrl ? (
+                            <a 
+                              href={fileUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-black font-medium truncate cursor-pointer hover:underline text-left"
+                              title="คลิกเพื่อดูเอกสาร"
+                            >
+                              {file.name}
+                            </a>
+                          ) : (
+                            <span className="text-black font-medium truncate text-left">
+                              {file.name}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-black font-semibold text-xl truncate w-full text-left">{file.name}</p>
+                      )}
 
-                  {/* 💡 ปุ่มลบไฟล์ที่จะแสดงก็ต่อเมื่อมีไฟล์แล้ว */}
-                  {file && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveFile}
-                      className="absolute top-3 right-3 z-10 p-1 cursor-pointer"
-                      title="ลบไฟล์"
-                    >
-                      <img src="/close.png" alt="Remove File" className="w-5 h-5 object-contain" data-protect-ui="true" draggable={false} />
-                    </button>
-                  )}
+                      {fileError === 'invalid_type' && (
+                        <p className="text-[#B91C1C] text-base mt-1 font-medium text-left">
+                          ประเภทไฟล์ไม่รองรับ รองรับเฉพาะไฟล์ PDF, PNG, JPG, JPEG หรือ WEBP
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="flex flex-col items-center pointer-events-none">
-                    {file ? (
-                      <>
-                        <img src={getFileIcon(file.name)} alt="File" className="w-10 h-10 mb-2 object-contain" data-protect-ui="true" draggable={false} onError={(e) => {e.target.src = '/file.png'}} />
-                        <p className="text-[#7B542F] font-bold text-base truncate max-w-[200px]">{file.name}</p>
-                        <p className="text-[#999999] text-xs mt-1">คลิกเพื่อเปลี่ยนไฟล์</p>
-                      </>
-                    ) : (
-                      <>
-                        <img src="/upload.png" alt="Upload Icon" className="w-8 h-8 mb-3 object-contain" data-protect-ui="true" draggable={false} />
-                        <p className="text-[#7B542F] font-bold text-base">Click here to upload</p>
-                        <p className="text-[#999999] text-xs mt-1">PDF or PNG or JPG or JPEG only (max 2 MB)</p>
-                      </>
-                    )}
+                    <div className="z-10 ml-3 flex flex-shrink-0 items-center justify-end gap-3 sm:ml-4 sm:gap-4" style={{ minWidth: "max-content" }}>
+                      <button onClick={handleRemoveFile} className="flex h-6 w-6 flex-shrink-0 items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" title="ลบไฟล์">
+                        <img src="/close.png" alt="Close" className="h-full w-full flex-shrink-0 object-contain" data-protect-ui="true" draggable={false} />
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="relative flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#D9D9D9] bg-white py-8 transition-colors hover:border-[#7B542F]">
+                    <input 
+                      type="file" 
+                      id="support-file-input"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp" 
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex flex-col items-center pointer-events-none">
+                      <img src="/upload.png" alt="Upload Icon" className="w-10 h-10 mb-2 object-contain" data-protect-ui="true" draggable={false} />
+                      <p className="text-[#7B542F] font-bold text-lg">Click here to upload</p>
+                      <p className="text-[#999999] text-sm mt-1">PDF or PNG or JPG or JPEG or WEBP only (max 2 MB)</p>
+                    </div>
+                  </div>
+                )}
+
               </div>
 
             </div>
@@ -294,8 +363,12 @@ function Contactus() {
             <div className="flex justify-end mt-8">
               <button 
                 type="submit" 
-                disabled={isSubmitting}
-                className={`flex items-center justify-center bg-[#7B542F] text-white px-12 py-3 rounded-md font-bold text-sm shadow-md transition-colors ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-orange-700'}`}
+                disabled={isSubmitDisabled}
+                className={`flex items-center justify-center px-12 py-3 rounded-md font-bold text-sm shadow-md transition-colors ${
+                  isSubmitDisabled
+                    ? 'bg-[#D9D9D9] text-white cursor-not-allowed'
+                    : 'bg-[#7B542F] text-white hover:bg-orange-700'
+                }`}
               >
                 {isSubmitting ? (
                   <>
