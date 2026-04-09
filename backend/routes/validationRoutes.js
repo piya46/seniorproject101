@@ -7,10 +7,11 @@ const { validate } = require('../middlewares/validationMiddleware');
 // ✅ เพิ่ม Rate Limiter ป้องกันการยิงถล่ม
 const { strictLimiter } = require('../middlewares/rateLimitMiddleware'); 
 const { getFormConfig } = require('../data/staticData'); 
+const { resolveAcademicCalendarContext } = require('../data/academicCalendar');
 const { getDecryptedSessionFiles, updateFileRecord } = require('../utils/dbUtils');
 const { AI_USAGE_SCOPES, assertAiWithinDailyLimit, recordAiUsage } = require('../utils/aiUsageUtils');
 const { filterFilesForForm, selectLatestFilesByKey } = require('../utils/fileSelection');
-const { validationCheckSchema } = require('../validators/schemas');
+const { validationCheckSchema, aiValidationResultSchema } = require('../validators/schemas');
 const {
   buildDocumentJobResponse,
   DOCUMENT_JOB_STATUSES,
@@ -115,12 +116,125 @@ const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req })
   return null;
 };
 
+const normalizeValidationEntry = (entry = {}) => ({
+  status: entry?.status === 'valid' ? 'valid' : 'invalid',
+  reason: typeof entry?.reason === 'string' && entry.reason.trim()
+    ? entry.reason.trim()
+    : 'เอกสารไม่ผ่านการตรวจสอบ กรุณาตรวจสอบและอัปโหลดใหม่อีกครั้ง',
+  confidence: ['high', 'medium', 'low'].includes(entry?.confidence) ? entry.confidence : 'medium'
+});
+
+const buildLegacyValidationResults = (parsedResult, expectedFileKeys = []) => {
+  const parsedEntries = parsedResult && typeof parsedResult === 'object' && !Array.isArray(parsedResult)
+    ? Object.entries(parsedResult)
+    : [];
+
+  return expectedFileKeys.reduce((accumulator, fileKey, index) => {
+    const directMatch = Object.prototype.hasOwnProperty.call(parsedResult || {}, fileKey)
+      ? parsedResult[fileKey]
+      : null;
+    const fallbackEntry = parsedEntries[index]?.[1] || {};
+    accumulator[fileKey] = normalizeValidationEntry(directMatch || fallbackEntry);
+    return accumulator;
+  }, {});
+};
+
+const buildStructuredValidationResult = ({
+  formCode,
+  subType,
+  legacyDocumentResults,
+  aiValidationContext,
+  submissionContext,
+  academicCalendarContext
+}) => {
+  const documentEntries = Object.entries(legacyDocumentResults || {});
+  const invalidEntries = documentEntries.filter(([, entry]) => entry?.status !== 'valid');
+  const decision = invalidEntries.length > 0 ? 'fail' : 'pass';
+  const summaryTh = invalidEntries.length > 0
+    ? `ตรวจพบเอกสารที่ต้องแก้ไข ${invalidEntries.length} รายการ`
+    : 'เอกสารที่ระบบตรวจสอบผ่านตามเกณฑ์ที่กำหนด';
+
+  const missingItems = invalidEntries.map(([fileKey]) => fileKey);
+  const timingRule = aiValidationContext?.timing_rule || null;
+  const timingMissingContext = timingRule?.enabled
+    ? (timingRule.required_runtime_fields || []).filter((field) => {
+        const value = submissionContext?.[field];
+        return value === undefined || value === null || value === '';
+      })
+    : [];
+
+  const timingCheck = timingRule?.enabled
+    ? {
+        status: timingMissingContext.length > 0 ? 'unknown' : 'needs_human_review',
+        reason_th: timingMissingContext.length > 0
+          ? `ยังประเมินเงื่อนไขเวลาไม่ได้ เนื่องจากขาดข้อมูล ${timingMissingContext.join(', ')}`
+          : 'มีข้อมูลกฎเวลาแล้ว แต่ผลการตรวจเอกสารรอบนี้ยังเน้นความครบถ้วนของไฟล์เป็นหลัก',
+        missing_context: timingMissingContext,
+        human_review_required: true
+      }
+    : {
+        status: 'not_applicable',
+        reason_th: 'ฟอร์มนี้ยังไม่มีเงื่อนไขเวลาที่ต้องใช้ประกอบการสรุปผลในรอบนี้',
+        missing_context: [],
+        human_review_required: false
+      };
+
+  const structuredResult = {
+    status: 'success',
+    validator_version: 'ai-doc-validator-v1',
+    form_code: formCode,
+    sub_type: subType || null,
+    overall_result: {
+      decision,
+      confidence: invalidEntries.length > 0 ? 0.82 : 0.9,
+      summary_th: summaryTh
+    },
+    checks: {
+      document_completeness: {
+        status: invalidEntries.length > 0 ? 'fail' : 'pass',
+        reason_th: invalidEntries.length > 0
+          ? `เอกสารที่ควรตรวจทานเพิ่มเติม: ${missingItems.join(', ')}`
+          : 'เอกสารที่อัปโหลดผ่านการตรวจสอบความครบถ้วนในรอบนี้',
+        missing_items: missingItems,
+        warnings: []
+      },
+      timing_eligibility: timingCheck
+    },
+    extracted_context: {
+      academic_year: submissionContext?.academic_year ?? null,
+      semester: submissionContext?.semester ?? null,
+      submission_date: submissionContext?.submission_date ?? null,
+      exam_date: submissionContext?.exam_date ?? null,
+      grade_announcement_date: submissionContext?.grade_announcement_date ?? null
+    },
+    missing_runtime_context: timingMissingContext,
+    recommendations: invalidEntries.length > 0
+      ? ['กรุณาตรวจสอบเอกสารที่ระบบระบุว่าไม่ผ่าน แล้วอัปโหลดใหม่อีกครั้ง']
+      : [],
+    raw_policy_refs: {
+      timing_rule_used: timingRule?.human_readable_rule || null,
+      required_documents_keys: Object.keys(legacyDocumentResults || {}),
+      academic_calendar_source: academicCalendarContext?.source || null
+    },
+    legacy_document_results: legacyDocumentResults
+  };
+
+  return aiValidationResultSchema.parse(structuredResult);
+};
+
 // ✅ เพิ่ม strictLimiter ใน Route
 router.post('/check-completeness', authMiddleware, strictLimiter, validate(validationCheckSchema), async (req, res) => {
   let usageRecorded = false;
 
   try {
-    const { form_code, degree_level, sub_type, case_key } = req.body;
+    const {
+      form_code,
+      degree_level,
+      sub_type,
+      case_key,
+      submission_context,
+      academic_calendar_context
+    } = req.body;
     const sessionId = req.user.session_id;
     await assertAiWithinDailyLimit(req.user, {
       scope: AI_USAGE_SCOPES.VALIDATION_CHECK_COMPLETENESS
@@ -222,6 +336,46 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     `
       : '';
 
+    const aiValidationContext = formConfig.ai_validation_context || null;
+    const resolvedAcademicCalendarContext = resolveAcademicCalendarContext({
+      academicYear: submission_context?.academic_year,
+      explicitCalendarContext: academic_calendar_context
+    });
+    const aiTimingRuleText = aiValidationContext?.timing_rule?.enabled
+      ? `
+    กฎเวลา/ช่วงภาคการศึกษาที่ AI ต้องใช้ประกอบการตรวจ:
+    - related_terms: ${JSON.stringify(aiValidationContext.timing_rule.related_terms || ['any'])}
+    - related_periods: ${JSON.stringify(aiValidationContext.timing_rule.related_periods || ['general'])}
+    - human_readable_rule: "${aiValidationContext.timing_rule.human_readable_rule || ''}"
+    - required_runtime_fields: ${JSON.stringify(aiValidationContext.timing_rule.required_runtime_fields || [])}
+    - เมื่อไม่มีข้อมูลเวลาเพียงพอ: "${aiValidationContext.timing_rule.when_context_missing || 'needs_human_review'}"
+    `
+      : '';
+
+    const aiValidationDimensionText = Array.isArray(aiValidationContext?.validation_dimensions) && aiValidationContext.validation_dimensions.length > 0
+      ? `
+    มิติที่ AI ควรตรวจสำหรับฟอร์มนี้:
+    ${aiValidationContext.validation_dimensions
+      .filter((dimension) => dimension && dimension.enabled)
+      .map((dimension) => `- ${dimension.key}: ${dimension.description}`)
+      .join('\n')}
+    `
+      : '';
+
+    const submissionContextText = submission_context
+      ? `
+    ข้อมูล runtime จากผู้ใช้/ระบบสำหรับตรวจเงื่อนไขเวลา:
+    ${JSON.stringify(submission_context, null, 2)}
+    `
+      : '';
+
+    const academicCalendarText = resolvedAcademicCalendarContext
+      ? `
+    ปฏิทินการศึกษาที่ระบบส่งมา:
+    ${JSON.stringify(resolvedAcademicCalendarContext, null, 2)}
+    `
+      : '';
+
     const project = process.env.GCP_PROJECT_ID || 'ai-formcheck';
     const location = process.env.AI_LOCATION || 'us-central1';
     const bucketName = process.env.GCS_BUCKET_NAME;
@@ -294,6 +448,10 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     ${approvalRequirementText}
     ${requiredFieldHintText}
     ${caseRuleText}
+    ${aiTimingRuleText}
+    ${aiValidationDimensionText}
+    ${submissionContextText}
+    ${academicCalendarText}
     
     🛑 ขั้นตอนการตรวจสอบ (Think Step-by-Step):
     
@@ -307,6 +465,11 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
        - **รหัสนิสิต:** ตัวเลขต้องตรงกันทุกจุด
        - **วันที่:** หากเป็นใบรับรองแพทย์ วันที่ต้องสอดคล้องกับวันที่ระบุขอลาป่วยในแบบฟอร์ม
        - **ความสมเหตุสมผล:** หากคำร้องระบุสาเหตุ A แต่หลักฐานระบุสาเหตุ B ถือว่าขัดแย้ง
+
+    2.1 **Timing Check (ตรวจช่วงเวลาและปฏิทินการศึกษา):**
+       - ถ้ามี `submission_context` หรือ `academic_calendar_context` ให้ใช้ข้อมูลดังกล่าวเป็นหลัก
+       - ห้ามอนุมานช่วงเวลาเพียงจากคำว่า "ปีการศึกษา" อย่างเดียว
+       - ถ้าข้อมูลเวลาไม่พอ ให้พิจารณาแบบระมัดระวังและสะท้อนข้อจำกัดไว้ในเหตุผลของไฟล์ที่เกี่ยวข้อง
 
     3. **ข้อกำหนดสำคัญของคีย์ในผลลัพธ์:**
        - ต้องใช้ "เอกสารรหัส" ตามที่ระบบให้ไว้เท่านั้น เช่น "request_form", "supporting_document"
@@ -380,24 +543,17 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
       ? Object.entries(parsedResult)
       : [];
 
-    const normalizeValidationEntry = (entry = {}) => ({
-      status: entry?.status === 'valid' ? 'valid' : 'invalid',
-      reason: typeof entry?.reason === 'string' && entry.reason.trim()
-        ? entry.reason.trim()
-        : 'เอกสารไม่ผ่านการตรวจสอบ กรุณาตรวจสอบและอัปโหลดใหม่อีกครั้ง',
-      confidence: ['high', 'medium', 'low'].includes(entry?.confidence) ? entry.confidence : 'medium'
+    const normalizedResult = buildLegacyValidationResults(parsedResult, expectedFileKeys);
+    const structuredResult = buildStructuredValidationResult({
+      formCode: form_code,
+      subType: sub_type,
+      legacyDocumentResults: normalizedResult,
+      aiValidationContext,
+      submissionContext: submission_context,
+      academicCalendarContext: resolvedAcademicCalendarContext
     });
 
-    const normalizedResult = expectedFileKeys.reduce((accumulator, fileKey, index) => {
-      const directMatch = Object.prototype.hasOwnProperty.call(parsedResult || {}, fileKey)
-        ? parsedResult[fileKey]
-        : null;
-      const fallbackEntry = parsedEntries[index]?.[1] || {};
-      accumulator[fileKey] = normalizeValidationEntry(directMatch || fallbackEntry);
-      return accumulator;
-    }, {});
-
-    res.json(normalizedResult);
+    res.json(structuredResult);
 
   } catch (error) {
     if (error.statusCode && error.payload) {

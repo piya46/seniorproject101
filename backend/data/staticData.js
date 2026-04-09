@@ -90,6 +90,57 @@ exports.resolveSubmissionContactLabel = (formConfig) => {
   return 'ติดต่อคณะฯ';
 };
 
+const createAiCheckDimension = (key, description, enabled = true) => ({
+  key,
+  enabled,
+  description
+});
+
+const createAiValidationContext = ({
+  timingRule = null,
+  requireAcademicCalendar = false,
+  requiredCalendarFields = [],
+  validationDimensions = [],
+  aiDisplayHints = {}
+} = {}) => ({
+  timing_rule: timingRule
+    ? {
+        enabled: true,
+        related_terms: Array.isArray(timingRule.related_terms) && timingRule.related_terms.length > 0
+          ? timingRule.related_terms
+          : ['any'],
+        related_periods: Array.isArray(timingRule.related_periods) && timingRule.related_periods.length > 0
+          ? timingRule.related_periods
+          : ['general'],
+        submission_window: timingRule.submission_window || null,
+        required_runtime_fields: Array.isArray(timingRule.required_runtime_fields)
+          ? timingRule.required_runtime_fields
+          : [],
+        when_context_missing: timingRule.when_context_missing || 'needs_human_review',
+        human_readable_rule: timingRule.human_readable_rule || ''
+      }
+    : {
+        enabled: false,
+        related_terms: ['any'],
+        related_periods: ['general'],
+        submission_window: null,
+        required_runtime_fields: [],
+        when_context_missing: 'needs_human_review',
+        human_readable_rule: ''
+      },
+  academic_context_requirement: {
+    require_academic_calendar: requireAcademicCalendar,
+    do_not_infer_from_academic_year_only: true,
+    required_calendar_fields: Array.isArray(requiredCalendarFields) ? requiredCalendarFields : []
+  },
+  validation_dimensions: validationDimensions,
+  ai_display_hints: {
+    show_timing_result_to_user: true,
+    show_missing_context_to_user: true,
+    ...aiDisplayHints
+  }
+});
+
 // 3. Logic การตรวจสอบเอกสาร (Validation Criteria)
 exports.getFormConfig = (formCode, degreeLevel, subType) => {
   
@@ -107,13 +158,19 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
           "4. นำส่งที่ทะเบียนภาควิชาที่สังกัด (ภาควิชาจะดำเนินการส่งต่อให้ทะเบียนคณะ นิสิตไม่ต้องไปส่งที่คณะเอง)"
       ],
       required_documents: [
-        { key: "main_form", label: "คำร้อง จท.31", required: true, validation_criteria: "ตรวจสอบว่าเป็นฟอร์ม จท.31 และมีการลงนามเรียบร้อย" },
-        { key: "back_doc", label: "เอกสารประกอบ จท.31 ด้านหลังของคณะ", required: true, validation_criteria: "เอกสารแนบด้านหลังต้องครบถ้วน" }
-      ]
+        { key: "main_form", label: "คำร้อง จท.31", required: true,url: "https://forms.gle/x8zPvDCDuA8SAyzLA", validation_criteria: "ตรวจสอบว่าเป็นฟอร์ม จท.31 และมีการลงนามเรียบร้อย" },
+        { key: "back_doc", label: "เอกสารประกอบ จท.31 ด้านหลังของคณะ", required: true, url:"https://www.acad.sc.chula.ac.th/userfiles/chulaacad/files/%E0%B8%97%E0%B8%B0%E0%B9%80%E0%B8%9A%E0%B8%B5%E0%B8%A2%E0%B8%99%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%A1%E0%B8%B4%E0%B8%99%E0%B8%9C%E0%B8%A5%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%A8%E0%B8%B6%E0%B8%81%E0%B8%A9%E0%B8%B2/%E0%B8%84%E0%B8%B3%E0%B8%A3%E0%B9%89%E0%B8%AD%E0%B8%87-%E0%B8%97%E0%B8%B0%E0%B9%80%E0%B8%9A%E0%B8%B5%E0%B8%A2%E0%B8%99%E0%B8%99%E0%B8%B4%E0%B8%AA%E0%B8%B4%E0%B8%95%20(%E0%B8%88%E0%B8%9799)/%E0%B8%88%E0%B8%9731%20(%E0%B8%9E%E0%B8%B4%E0%B8%A1%E0%B8%9E%E0%B9%8C%E0%B8%94%E0%B9%89%E0%B8%B2%E0%B8%99%E0%B8%AB%E0%B8%A5%E0%B8%B1%E0%B8%87)%20%E0%B8%99%E0%B8%B4%E0%B8%AA%E0%B8%B4%E0%B8%95%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%88%E0%B8%B0%E0%B8%A5%E0%B8%B2%E0%B8%AD%E0%B8%AD%E0%B8%81%E0%B8%95%E0%B9%89%E0%B8%AD%E0%B8%87%E0%B8%94%E0%B8%B3%E0%B9%80%E0%B8%99%E0%B8%B4%E0%B8%99%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%94%E0%B8%B1%E0%B8%87%E0%B8%95%E0%B9%88%E0%B8%AD%E0%B9%84%E0%B8%9B%E0%B8%99%E0%B8%B5%E0%B9%89.pdf.pdf", validation_criteria: "เอกสารแนบด้านหลังต้องครบถ้วน" }
+      ],
+      ai_validation_context: createAiValidationContext({
+        validationDimensions: [
+          createAiCheckDimension('document_completeness', 'ตรวจความครบถ้วนของคำร้อง เอกสารแนบ และลายเซ็นที่เกี่ยวข้อง'),
+          createAiCheckDimension('approval_path', 'ตรวจว่ามีผู้ลงนามที่จำเป็นครบหรือไม่')
+        ]
+      })
     };
     if (degreeLevel === 'bachelor') {
       config.required_documents.push(
-        { key: "parent_consent", label: "เอกสารยินยอมจากผู้ปกครอง", required: true, validation_criteria: "มีลายเซ็นผู้ปกครอง" },
+        { key: "parent_consent", label: "เอกสารยินยอมจากผู้ปกครอง", required: true, url: "https://web.reg.chula.ac.th/form/Consent%20Form%20Resignation.pdf", validation_criteria: "มีลายเซ็นผู้ปกครอง" },
         { key: "parent_id_card", label: "สำเนาบัตรประชาชนผู้ปกครอง", required: true, validation_criteria: "เห็นชื่อ-นามสกุลชัดเจน (พร้อมเซ็นรับรองสำเนาถูกต้อง)" }
       );
     }
@@ -136,7 +193,7 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
           "4. นำส่งที่ทะเบียนภาควิชาที่สังกัด (ภาควิชาจะดำเนินการส่งต่อให้ทะเบียนคณะต่อไป)"
       ],
       required_documents: [
-        { key: "main_form", label: "คำร้อง จท.32", required: true, validation_criteria: "ตรวจสอบฟอร์มและลายเซ็นนิสิตและอาจารย์ที่ปรึกษา" },
+        { key: "main_form", label: "คำร้อง จท.32", required: tru, url: "https://forms.gle/M1eby8a5AtyGQivC8", validation_criteria: "ตรวจสอบฟอร์มและลายเซ็นนิสิตและอาจารย์ที่ปรึกษา" },
         { key: "thesis_proof", label: "หลักฐานการส่งเล่มวิทยานิพนธ์", required: true, validation_criteria: "หลักฐานต้องระบุชัดเจนว่าได้ส่งเล่มวิทยานิพนธ์แล้ว" }
       ]
     };
@@ -193,8 +250,29 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
         "หากผลไม่เปลี่ยนแปลง ทะเบียนคณะแจ้งภาควิชาที่นิสิตสังกัด",
         "หากผลมีการเปลี่ยนแปลง จะนำเรื่องเข้าคณะกรรมการบริหารคณะเพื่อพิจารณาและดำเนินการส่งสำนักทะเบียน"
       ],
+      ai_validation_context: createAiValidationContext({
+        timingRule: {
+          related_terms: ['any'],
+          related_periods: ['post_grade_announcement'],
+          submission_window: {
+            type: 'within_days_after_event',
+            value: 30,
+            business_days: false,
+            anchor_event: 'grade_announcement_date',
+            anchor_period: null
+          },
+          required_runtime_fields: ['submission_date', 'grade_announcement_date'],
+          when_context_missing: 'needs_human_review',
+          human_readable_rule: 'ต้องยื่นภายใน 30 วันนับจากวันที่ประกาศผลการศึกษา และใช้เฉพาะการทักท้วงเกรดปลายภาค'
+        },
+        validationDimensions: [
+          createAiCheckDimension('document_completeness', 'ตรวจคำร้องหลักและความชัดเจนของข้อมูลรายวิชาที่ทักท้วง'),
+          createAiCheckDimension('timing_eligibility', 'ตรวจว่าการยื่นอยู่ภายใน 30 วันหลังประกาศผลการศึกษา'),
+          createAiCheckDimension('case_selection', 'ตรวจว่าเป็นการทักท้วงเกรดปลายภาค ไม่ใช่กรณีอื่น')
+        ]
+      }),
       required_documents: [
-        { key: "main_form", label: "คำร้อง จท.35", required: true, url: "#", validation_criteria: "ระบุรายวิชาและเกรดที่ต้องการทักท้วงให้ชัดเจน" }
+        { key: "main_form", label: "คำร้อง จท.35", required: true, url: "https://forms.gle/ufw54wZ22EuV3gCP6", validation_criteria: "ระบุรายวิชาและเกรดที่ต้องการทักท้วงให้ชัดเจน" }
       ]
     };
   }
@@ -218,19 +296,16 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
       ],
       approval_requirements: isGraduate ? [
         "อาจารย์ที่ปรึกษาให้ความเห็น",
-        "คณะกรรมการบริหารหลักสูตรหรือประธานหลักสูตรให้ความเห็นชอบ",
-        "ทะเบียนคณะเสนออนุมัติและลงนาม"
       ] : [
         "อาจารย์ที่ปรึกษาลงนาม",
         "อาจารย์ผู้สอนประจำวิชาลงนาม",
-        "ทะเบียนคณะเสนออนุมัติและลงนาม"
       ],
       post_submit_flow: [
         "ภาควิชาส่งคำร้องผ่านระบบ lesspaper มาที่ทะเบียนคณะ",
         "ทะเบียนคณะเสนออนุมัติและส่งออกคำร้องไปยังสำนักงานการทะเบียน"
       ],
       required_documents: [
-        { key: "main_form", label: "คำร้อง จท.43", required: true, validation_criteria: "ตรวจสอบความสมบูรณ์ของแบบฟอร์ม" },
+        { key: "main_form", label: "คำร้อง จท.43", required: true,url: "https://forms.gle/ADEwwbBmCPFQ4dQk9", validation_criteria: "ตรวจสอบความสมบูรณ์ของแบบฟอร์ม" },
         { key: "cr54", label: "CR54 (ผลการลงทะเบียนเรียน)", required: true, validation_criteria: "ต้องปรากฏรายวิชาที่ต้องการขอผล S/U หรือ V/W" },
         { key: "reason_doc", label: "ใบแนบเหตุผลประจำรายวิชา", required: true, validation_criteria: "ระบุเหตุผลความจำเป็นอย่างชัดเจน" }
       ]
@@ -256,11 +331,9 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
       approval_requirements: isGraduate ? [
         "อาจารย์ที่ปรึกษาให้ความเห็น",
         "ประธานคณะกรรมการบริหารหลักสูตรลงนาม",
-        "ทะเบียนคณะเสนออนุมัติและดำเนินการต่อ"
       ] : [
         "อาจารย์ที่ปรึกษาลงนาม",
         "อาจารย์ผู้สอนประจำวิชาลงนามเมื่อเป็นกรณีลาป่วยก่อนสอบ",
-        "ภาควิชาและทะเบียนคณะดำเนินการส่งคำร้องต่อ"
       ],
       case_rules: [
         {
@@ -287,6 +360,28 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
         "ทะเบียนคณะเสนอคำร้องและลงนาม",
         "ทะเบียนคณะส่งออกคำร้องไปยังสำนักงานการทะเบียนหรือภาควิชาที่เกี่ยวข้องตามกรณี"
       ],
+      ai_validation_context: createAiValidationContext({
+        timingRule: {
+          related_terms: ['any'],
+          related_periods: ['final'],
+          submission_window: {
+            type: 'within_days_after_event',
+            value: 5,
+            business_days: true,
+            anchor_event: 'exam_date',
+            anchor_period: null
+          },
+          required_runtime_fields: ['submission_date', 'exam_date'],
+          when_context_missing: 'needs_human_review',
+          human_readable_rule: 'ใช้สำหรับขาดสอบปลายภาค และต้องยื่นภายใน 5 วันทำการนับจากวันที่ขาดสอบ'
+        },
+        validationDimensions: [
+          createAiCheckDimension('document_completeness', 'ตรวจคำร้อง ตารางสอบ และใบรับรองแพทย์ว่าครบถ้วนและสอดคล้องกัน'),
+          createAiCheckDimension('timing_eligibility', 'ตรวจว่าการยื่นอยู่ภายใน 5 วันทำการหลังวันสอบที่ขาด'),
+          createAiCheckDimension('case_selection', 'ตรวจความสอดคล้องกับกรณีลาป่วยก่อนสอบหรือระหว่างสอบ'),
+          createAiCheckDimension('approval_path', 'ตรวจลายเซ็นตามระดับการศึกษาและกรณีย่อยที่เลือก')
+        ]
+      }),
       required_documents: [
         { key: "main_form", label: "คำร้อง จท.44", required: true, validation_criteria: "ฟอร์มถูกต้องและระบุวิชาที่ขาดสอบ" },
         { key: "schedule", label: "สำเนาตารางสอบรายบุคคล", required: true, validation_criteria: "ต้องไฮไลท์วิชาที่ขาดสอบ" },
@@ -325,6 +420,30 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
         "ทะเบียนคณะเสนอนายทะเบียนคณะและคณบดีลงนาม",
         "ทะเบียนคณะส่งออกคำร้องไปยังสำนักงานการทะเบียน"
       ],
+      ai_validation_context: createAiValidationContext({
+        timingRule: {
+          related_terms: ['any'],
+          related_periods: ['general'],
+          submission_window: {
+            type: 'custom',
+            value: null,
+            business_days: null,
+            anchor_event: null,
+            anchor_period: 'withdrawal_period_end_date'
+          },
+          required_runtime_fields: ['submission_date', 'academic_year', 'semester'],
+          when_context_missing: 'needs_human_review',
+          human_readable_rule: 'เป็นการถอนรายวิชาหลังกำหนด (ติด W) และควรตรวจเทียบกับช่วงถอนรายวิชาของภาคการศึกษาจริง'
+        },
+        requireAcademicCalendar: true,
+        requiredCalendarFields: ['withdrawal_period_end_date'],
+        validationDimensions: [
+          createAiCheckDimension('document_completeness', 'ตรวจคำร้องและเอกสารประกอบเหตุผลการถอน'),
+          createAiCheckDimension('timing_eligibility', 'ตรวจว่าพ้นช่วงถอนปกติของภาคการศึกษาแล้ว'),
+          createAiCheckDimension('reason_quality', 'ตรวจว่าเหตุผลการถอนหลังกำหนดมีความจำเป็นเพียงพอ'),
+          createAiCheckDimension('approval_path', 'ตรวจลายเซ็นอาจารย์ที่ปรึกษาและอาจารย์ประจำรายวิชา')
+        ]
+      }),
       required_documents: [
         { key: "main_form", label: "คำร้อง จท.48", required: true, validation_criteria: "ตรวจสอบฟอร์มและลายเซ็นให้ครบทั้ง 3 ส่วน" },
         { key: "reason", label: "เอกสารประกอบเหตุผลการถอน", required: true, validation_criteria: "อธิบายเหตุผลความจำเป็นที่ต้องถอนหลังกำหนด" }
@@ -352,6 +471,29 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
          "ภาควิชาส่งคำร้องผ่าน lesspaper มาที่ทะเบียนคณะ",
          "ทะเบียนคณะส่งออกคำร้องไปยังสำนักงานการทะเบียน"
        ],
+       ai_validation_context: createAiValidationContext({
+         timingRule: {
+           related_terms: ['any'],
+           related_periods: ['registration', 'final'],
+           submission_window: {
+             type: 'custom',
+             value: null,
+             business_days: null,
+             anchor_event: null,
+             anchor_period: null
+           },
+           required_runtime_fields: ['submission_date', 'is_registered_current_term'],
+           when_context_missing: 'needs_human_review',
+           human_readable_rule: 'หากยังไม่ลงทะเบียนต้องยื่นภายใน 2 สัปดาห์หลังเปิดภาคการศึกษา แต่หากลงทะเบียนแล้วต้องยื่นก่อนสอบปลายภาค'
+         },
+         requireAcademicCalendar: true,
+         requiredCalendarFields: ['term_start_date', 'final_exam_end_date'],
+         validationDimensions: [
+           createAiCheckDimension('document_completeness', 'ตรวจคำร้องและหลักฐานประกอบการลาพักการศึกษา'),
+           createAiCheckDimension('timing_eligibility', 'ตรวจกรอบเวลาตามกรณีลงทะเบียนแล้วหรือยังไม่ลงทะเบียน'),
+           createAiCheckDimension('reason_quality', 'ตรวจว่าเหตุผลเข้าข่ายที่สามารถพิจารณาได้')
+         ]
+       }),
        reason_examples: [
          "ถูกเกณฑ์ทหารหรือระดมเข้ารับราชการทหารกองประจำการ",
          "ได้รับทุนแลกเปลี่ยนหรือทุนศึกษาระหว่างประเทศ",
@@ -452,7 +594,13 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
         case_rules: [],
         attachment_template_required: false,
         attachment_template_label: null,
-        required_documents: []
+        required_documents: [],
+        ai_validation_context: createAiValidationContext({
+          validationDimensions: [
+            createAiCheckDimension('document_completeness', 'ตรวจคำร้องและเอกสารแนบตามประเภทย่อยของ จท.41'),
+            createAiCheckDimension('approval_path', 'ตรวจลำดับการลงนามและความเห็นที่จำเป็น')
+          ]
+        })
       };
       
       switch (subType) {
@@ -467,6 +615,29 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
               config.required_fields_hint = ["reason", "course_code", "course_name"];
               config.attachment_template_required = true;
               config.attachment_template_label = "เอกสารแนบการลงทะเบียนหลังกำหนด";
+              config.ai_validation_context = createAiValidationContext({
+                timingRule: {
+                  related_terms: ['any'],
+                  related_periods: ['registration'],
+                  submission_window: {
+                    type: 'within_weeks_after_term_start',
+                    value: 2,
+                    business_days: false,
+                    anchor_event: 'term_start_date',
+                    anchor_period: null
+                  },
+                  required_runtime_fields: ['submission_date', 'academic_year', 'semester'],
+                  when_context_missing: 'needs_human_review',
+                  human_readable_rule: 'ต้องส่งภายใน 2 สัปดาห์แรกของภาคการศึกษา'
+                },
+                requireAcademicCalendar: true,
+                requiredCalendarFields: ['term_start_date'],
+                validationDimensions: [
+                  createAiCheckDimension('document_completeness', 'ตรวจคำร้อง เอกสารแนบ และข้อมูลรายวิชาที่ขอลงทะเบียนหลังกำหนด'),
+                  createAiCheckDimension('timing_eligibility', 'ตรวจว่าคำร้องอยู่ในช่วง 2 สัปดาห์แรกของภาคการศึกษา'),
+                  createAiCheckDimension('approval_path', 'ตรวจลายเซ็นอาจารย์ที่ปรึกษา อาจารย์ประจำวิชา และหัวหน้าภาค')
+                ]
+              });
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอลงทะเบียนหลังกำหนด)", required: true, validation_criteria: "ระบุหัวข้อและรายวิชาให้ชัดเจน" },
                   { key: "faculty_doc", label: "เอกสารแนบจากคณะ", required: true, validation_criteria: "แนบใบคำร้องคณะที่เกี่ยวข้อง" },
@@ -657,6 +828,30 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
                 "ภาควิชาพิจารณาและส่งต่อทะเบียนคณะ"
               ];
               config.required_fields_hint = ["reason", "planned_payment_date"];
+              config.ai_validation_context = createAiValidationContext({
+                timingRule: {
+                  related_terms: ['any'],
+                  related_periods: ['registration'],
+                  submission_window: {
+                    type: 'within_weeks_after_term_start',
+                    value: 2,
+                    business_days: false,
+                    anchor_event: 'term_start_date',
+                    anchor_period: null
+                  },
+                  required_runtime_fields: ['submission_date', 'academic_year', 'semester', 'planned_payment_date'],
+                  when_context_missing: 'needs_human_review',
+                  human_readable_rule: 'ต้องส่งทะเบียนคณะไม่เกินสัปดาห์ที่ 2 ของภาคการศึกษา'
+                },
+                requireAcademicCalendar: true,
+                requiredCalendarFields: ['term_start_date'],
+                validationDimensions: [
+                  createAiCheckDimension('document_completeness', 'ตรวจคำร้องและรายละเอียดแผนการชำระเงิน'),
+                  createAiCheckDimension('timing_eligibility', 'ตรวจว่าคำร้องถูกยื่นภายใน 2 สัปดาห์แรกของภาคการศึกษา'),
+                  createAiCheckDimension('reason_quality', 'ตรวจความชัดเจนของเหตุผลและวันชำระเงินที่เสนอ'),
+                  createAiCheckDimension('approval_path', 'ตรวจการลงนามของอาจารย์ที่ปรึกษาและการพิจารณาภาควิชา')
+                ]
+              });
               config.required_documents.push(
                   { key: "main_form", label: "คำร้อง จท.41 (ขอผ่อนผันค่าเล่าเรียน)", required: true, validation_criteria: "ระบุหัวข้อชัดเจน" }
               );
@@ -681,4 +876,9 @@ exports.getFormConfig = (formCode, degreeLevel, subType) => {
   }
   
   return null;
+};
+
+exports.getAiValidationContext = (formCode, degreeLevel, subType) => {
+  const formConfig = exports.getFormConfig(formCode, degreeLevel, subType);
+  return formConfig?.ai_validation_context || createAiValidationContext();
 };
