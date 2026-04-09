@@ -30,8 +30,11 @@ export default function Home() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [chatUsage, setChatUsage] = useState(null);
   const messagesEndRef = useRef(null);
-  
   const initRef = useRef(false);
+
+  // State & Ref สำหรับจัดการ Dropdown เลือกระดับชั้นในฝั่ง Mobile
+  const [isDegreeOpen, setIsDegreeOpen] = useState(false);
+  const degreeMenuRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,6 +103,17 @@ export default function Home() {
     };
     initializeApp();
   }, []); 
+
+  // ปิด Dropdown เลือกระดับชั้นถ้ากดพื้นที่อื่น
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (degreeMenuRef.current && !degreeMenuRef.current.contains(event.target)) {
+        setIsDegreeOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchForms = async (degreeLevel) => {
     const cacheKey = `forms_cache_${degreeLevel}`;
@@ -318,11 +332,10 @@ export default function Home() {
 
   return (
     <div className="page-shell font-sans">
-      {/* ส่งข้อมูลระดับการศึกษาไปให้ Navbar สำหรับทำ Dropdown ในมือถือ */}
-      <Navbar degreeProps={{ selectedLabel, handleDegreeChange, levels }} />
+      <Navbar />
       
       <div className='page-gutter content-wide mt-6 flex flex-col gap-6 md:mt-10 lg:flex-row lg:gap-10 flex-grow'>
-        {/* กล่องเลือกระดับการศึกษานี้จะถูกซ่อนในมือถือ (ด้วย hidden md:block) เพราะย้ายไปบน Navbar แล้ว */}
+        {/* กล่องเลือกระดับการศึกษานี้จะถูกซ่อนในมือถือ (ด้วย hidden md:block) เพราะย้ายไปข้างๆ หัวข้อในมือถือแล้ว */}
         <div className='hidden md:block w-full rounded-md bg-white p-4 outline outline-[#D9D9D9] lg:basis-64 lg:sticky lg:top-10 lg:h-fit'>
           <p className='text-[#999999] text-[15px] pb-3 text-left'>ระดับการศึกษา</p>
           <div className='grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1 lg:gap-6'>
@@ -350,7 +363,43 @@ export default function Home() {
         <div className='min-w-0 flex-1'>
           {!selectedForm ? (
             <>
-              <p className='mb-4 text-left text-[22px] font-extrabold text-[#7B542F] sm:text-[25px]'>ค้นหาเอกสารยื่นคำร้อง</p>
+              {/* ปรับให้ส่วนหัวข้อและ Dropdown ใน Mobile อยู่บรรทัดเดียวกันด้วย flex */}
+              <div className="mb-4 flex items-center justify-between">
+                <p className='text-left text-[22px] font-extrabold text-[#7B542F] sm:text-[25px]'>ค้นหาเอกสารยื่นคำร้อง</p>
+                
+                {/* Dropdown ระดับชั้นฝั่ง Mobile */}
+                <div className="relative md:hidden" ref={degreeMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsDegreeOpen(!isDegreeOpen)}
+                    className="flex h-10 items-center justify-between gap-2 rounded-xl border border-[#E7D7C5] bg-[#FFF9F3] px-3 text-[#7B542F] text-[14px] font-bold shadow-sm transition-colors hover:bg-[#FFF1E1]"
+                  >
+                    <span>{selectedLabel}</span>
+                    <svg className={`h-4 w-4 transition-transform duration-200 ${isDegreeOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {isDegreeOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-32 rounded-xl border border-[#F0E0CF] bg-white py-2 shadow-xl z-50">
+                      {levels.map((level) => (
+                        <button
+                          key={level}
+                          onClick={() => {
+                            handleDegreeChange(level);
+                            setIsDegreeOpen(false);
+                          }}
+                          className={`block w-full px-4 py-2.5 text-left text-[14px] font-bold transition-colors ${
+                            selectedLabel === level ? 'bg-[#FFF7EE] text-[#EA580C]' : 'text-[#7B542F] hover:bg-gray-50'
+                          }`}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
               
               <div className="relative group mb-10">
                 <input
@@ -457,7 +506,6 @@ export default function Home() {
                 </div>
               </div>
               <p className="pl-5 text-xs text-white/85">
-                {/* 1. แสดงข้อความสถานะด้านบนตามที่คุณต้องการ */}
                 {chatUsage
                   ? `คงเหลือ ${getChatUsageRemainingPercent()}% ของโควต้า AI วันนี้ • สถานะ: ${getChatUsageEtaLabel()}`
                   : getChatUsageLabel()}
@@ -495,7 +543,6 @@ export default function Home() {
           </div>
 
           <div className="border-t border-[#D9D9D9] bg-white p-3">
-            {/* นำข้อความสถานะโควต้าออกไปจากด้านล่างแล้ว */}
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <input 
                 type="text" 

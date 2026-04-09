@@ -192,6 +192,13 @@ export default function Formdetail() {
     return () => window.clearTimeout(timeoutId);
   }, [isValidating]);
 
+  // เริ่มกระบวนการ Merge อัตโนมัติเมื่อเข้ามาที่ Step 3
+  useEffect(() => {
+    if (currentStep === 3 && !mergeResult && !isMerging && !mergeError) {
+      handleMergeDocuments();
+    }
+  }, [currentStep]);
+
   const handleCheck = (index) => {
     setCheckedDocs(prev => ({ ...prev, [index]: !prev[index] }));
   };
@@ -210,6 +217,24 @@ export default function Formdetail() {
   const handleFileChange = (index, e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const validExtensions = ['.pdf', '.png', '.jpg', '.jpeg'];
+    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    
+    if (!validExtensions.includes(fileExt)) {
+      resetValidationForIndex(index);
+      setUploadedFiles(prev => ({
+        ...prev,
+        [index]: { name: file.name, localUrl: null }
+      }));
+      setUploadStatuses(prev => ({
+        ...prev,
+        [index]: { status: 'invalid_type' }
+      }));
+      e.target.value = null; 
+      return;
+    }
+
     resetValidationForIndex(index);
     const localBlobUrl = URL.createObjectURL(file);
     setUploadedFiles(prev => ({
@@ -344,7 +369,7 @@ export default function Formdetail() {
 
   const handleRetry = (index) => {
     const file = uploadedFiles[index];
-    if (file && file.localUrl) {
+    if (file && (file.localUrl || uploadStatuses[index]?.status === 'invalid_type')) {
       handleRemoveFile(index);
     }
   };
@@ -710,6 +735,7 @@ export default function Formdetail() {
         ...(mergeJob.result || {}),
         ...downloadData
       });
+
       trackAnalyticsEvent('merge_succeeded', {
         form_code: formData?.form_code || id,
         degree_level: degreeLevel,
@@ -761,7 +787,6 @@ export default function Formdetail() {
     });
 
   const validationQueueSummary = getValidationQueueSummary();
-  const shouldShowDepartmentDirectory = mergeResult?.instruction?.target_email === 'ไม่มีข้อมูลภาควิชา';
 
   useEffect(() => {
     if (!formData?.form_code) {
@@ -777,7 +802,7 @@ export default function Formdetail() {
   }, [currentStep, formData?.form_code, degreeLevel, subType, id]);
 
   useEffect(() => {
-    if (!showDepartmentDirectory || !shouldShowDepartmentDirectory || departments.length > 0) {
+    if (currentStep !== 3 || departments.length > 0) {
       return;
     }
 
@@ -791,7 +816,7 @@ export default function Formdetail() {
     };
 
     fetchDepartments();
-  }, [showDepartmentDirectory, shouldShowDepartmentDirectory, departments.length]);
+  }, [currentStep, departments.length]);
 
   return (
     <div className="page-shell font-sans">
@@ -830,9 +855,43 @@ export default function Formdetail() {
 
         <div className="w-full px-0 sm:px-4 lg:px-10 xl:px-24">
           <div className="w-full rounded-xl border border-[#D9D9D9] bg-white p-5 shadow-sm sm:p-8 lg:p-10">
-            <h1 className="flex justify-start pb-4 text-xl font-bold text-black sm:ml-2 sm:text-2xl lg:ml-4">
-              {formNameTh || '(ไม่พบชื่อเอกสาร)'} 
-            </h1>
+            <div className="flex w-full items-start justify-between pb-4 sm:ml-2 lg:ml-4 pr-0 sm:pr-4">
+              <h1 className="text-xl font-bold text-black sm:text-2xl flex-1">
+                {formNameTh || '(ไม่พบชื่อเอกสาร)'} 
+              </h1>
+              {/* ปุ่มดาวน์โหลดพร้อมปรับสถานะ Loading */}
+              {currentStep === 3 && (
+                <div className="ml-4 flex flex-shrink-0 flex-col items-end mt-[-4px]">
+                  <button
+                    onClick={() => {
+                      if (mergeResult?.download_path) {
+                        window.location.href = mergeResult.download_path;
+                      }
+                    }}
+                    disabled={isMerging || !mergeResult?.download_path}
+                    className={`flex h-10 items-center justify-center rounded-full bg-[#7B542F] text-white shadow-sm transition-all hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 ${
+                      isMerging ? 'w-auto px-4 sm:px-5' : 'w-10 sm:w-12'
+                    }`}
+                    title="ดาวน์โหลดไฟล์"
+                  >
+                    {isMerging ? (
+                      <>
+                        <svg className="mr-2 h-5 w-5 flex-shrink-0 animate-spin text-white sm:h-6 sm:w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="whitespace-nowrap text-sm font-medium sm:text-base">กำลังรวมเอกสารให้สำหรับการดาวน์โหลด</span>
+                      </>
+                    ) : (
+                      <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Step 1 */}
             {currentStep === 1 && (
               <>
@@ -918,8 +977,8 @@ export default function Formdetail() {
                         <div className={'relative group flex w-full items-center rounded-xl border border-black bg-white px-4 py-3 shadow-sm transition-colors hover:border-[#7B542F] sm:px-6'}>
                           
                           <img 
-                            src={getFileIcon(uploadedFiles[index]?.name)}
-                            alt="File Icon" 
+                            src={uploadStatuses[index]?.status === 'invalid_type' ? "/warning.png" : getFileIcon(uploadedFiles[index]?.name)}
+                            alt={uploadStatuses[index]?.status === 'invalid_type' ? "Warning Icon" : "File Icon"}
                             className="mr-3 h-10 w-10 min-w-[40px] flex-shrink-0 object-contain sm:mr-4" 
                             data-protect-ui="true" 
                             draggable={false} 
@@ -982,6 +1041,13 @@ export default function Formdetail() {
                               </p>
                             )}
 
+                            {/* แสดงข้อความ Error สำหรับไฟล์ผิดประเภท */}
+                            {uploadStatuses[index]?.status === 'invalid_type' && (
+                              <p className="text-[#B91C1C] text-base mt-1 font-medium">
+                                ประเภทไฟล์ไม่รองรับ รองรับเฉพาะไฟล์ PDF, PNG, JPG หรือ JPEG
+                              </p>
+                            )}
+
                             {getPerFileQueueInfo(doc.key)?.hint_message && uploadStatuses[index]?.status === 'success' && (
                               <div className="mt-2 flex flex-col items-start gap-1">
                                 <div
@@ -999,14 +1065,7 @@ export default function Formdetail() {
                             )}
                           </div>
 
-                          {/* 💡 ล็อกขนาดกล่องปุ่ม ลบ/โหลดใหม่ ด้วย min-width และ flex-shrink-0 */}
                           <div className="z-10 ml-3 flex flex-shrink-0 items-center justify-end gap-3 sm:ml-4 sm:gap-4" style={{ minWidth: "max-content" }}>
-                            {uploadStatuses[index]?.status === 'error' && (
-                              <button onClick={(e) => { e.preventDefault(); handleRetry(index); }} className="flex h-8 w-8 flex-shrink-0 items-center justify-center cursor-pointer hover:opacity-70 transition-opacity">
-                                 <img src="/reload.png" alt="Retry" className="h-full w-full flex-shrink-0 object-contain" data-protect-ui="true" draggable={false} />
-                              </button>
-                            )}
-
                             <button onClick={(e) => { e.preventDefault(); handleRemoveFile(index); }} className="flex h-6 w-6 flex-shrink-0 items-center justify-center cursor-pointer hover:opacity-70 transition-opacity" title="ลบไฟล์">
                                <img src="/close.png" alt="Close" className="h-full w-full flex-shrink-0 object-contain" data-protect-ui="true" draggable={false} />
                             </button>
@@ -1032,80 +1091,60 @@ export default function Formdetail() {
               <>
                 <p className='flex justify-start pt-3 text-base font-semibold text-[#999999] sm:ml-4 sm:pl-4 lg:ml-7 lg:text-lg'>ช่องทางการยื่นคำร้อง</p>
                 <div className="min-h-[250px] pt-6 text-left sm:ml-4 sm:pl-8 lg:ml-7 lg:pl-12 lg:pt-8">
-                  <div className="mb-6">
-                    <ul className="list-disc pl-5 space-y-2 text-black">
-                      {formData?.submission_steps ? (
-                        formData.submission_steps.map((step, idx) => (
-                          <li key={idx}>{step}</li>
-                        ))
-                      ) : (
-                        <li>กำลังโหลดข้อมูลช่องทางการยื่นคำร้อง...</li>
+                  <div className="mb-6 text-black">
+                    {formData?.submission_steps && formData.submission_steps.length > 0 ? (
+                      <p>
+                        {/* ตัดตัวเลขและจุดที่นำหน้าข้อความออกด้วย Regex */}
+                        {formData.submission_steps[formData.submission_steps.length - 1].replace(/^\d+\.\s*/, '')} หรือส่งไปที่อีเมลภาควิชาที่นิสิตสังกัด
+                      </p>
+                    ) : (
+                      <p>กำลังโหลดข้อมูลช่องทางการยื่นคำร้อง...</p>
+                    )}
+                  </div>
+
+                  <div className="mt-6 text-black">
+                    <p className="mt-2">ส่งอีเมลไปที่: {formData?.instruction?.target_email || mergeResult?.instruction?.target_email || '(ไม่มีข้อมูล)'}</p>
+                    <p className="mt-2">หัวข้ออีเมล: {formData?.instruction?.email_subject || mergeResult?.instruction?.email_subject || '(ไม่มีข้อมูล)'}</p>
+                    
+                    <div className="mt-4 rounded-lg border border-[#E7D8C8] bg-[#FFF8F1] p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-[#7B542F]">รายชื่ออีเมลภาควิชา</p>
+                          <p className="mt-1 text-sm text-[#7B542F]">คุณสามารถตรวจสอบอีเมลภาควิชาทั้งหมดด้านล่างเพื่อเลือกติดต่อด้วยตนเองได้</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowDepartmentDirectory((prev) => !prev)}
+                          className="rounded-md border border-[#D9B58A] px-4 py-2 text-sm font-semibold text-[#7B542F] transition-colors hover:bg-[#F8E7D2]"
+                        >
+                          {showDepartmentDirectory ? 'ซ่อนรายชื่อภาควิชา' : 'ดูรายชื่อภาควิชาทั้งหมด'}
+                        </button>
+                      </div>
+
+                      {showDepartmentDirectory && (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          {departments.length > 0 ? (
+                            departments.map((department) => (
+                              <div key={department.id} className="rounded-md border border-[#F0E0CF] bg-white px-4 py-3">
+                                <p className="font-medium text-black">{department.name_th}</p>
+                                <p className="mt-1 text-sm text-[#7B542F]">
+                                  {department.email || 'ไม่มีอีเมลติดต่อ'}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-[#7B542F]">กำลังโหลดข้อมูลรายชื่อภาควิชา...</p>
+                          )}
+                        </div>
                       )}
-                    </ul>
+                    </div>
                   </div>
 
-                  <div className="mt-6">
-                    <button 
-                      onClick={handleMergeDocuments} 
-                      className="text-[#EA580C] font-semibold underline cursor-pointer"
-                    >
-                      {isMerging ? 'กำลังรวมไฟล์...' : 'รวมไฟล์และดูช่องทางการส่ง'}
-                    </button>
-                    
-                    {mergeError && (
-                      <div className="mt-4 text-red-500 font-medium bg-red-50 p-3 rounded-md border border-red-200 w-fit">
-                        <p>❌ {mergeError}</p>
-                      </div>
-                    )}
-                    
-                    {mergeResult && (
-                      <div className="mt-4 text-black">
-                        {mergeResult.download_path && (
-                           <p>ลิงก์ดาวน์โหลด: <a href={mergeResult.download_path} target="_blank" rel="noopener noreferrer" className="text-[#EA580C] underline">คลิกที่นี่</a></p>
-                        )}
-                        {mergeResult.instruction && (
-                           <>
-                             <p className="mt-2">ส่งอีเมลไปที่: {mergeResult.instruction.target_email}</p>
-                             <p className="mt-2">หัวข้ออีเมล: {mergeResult.instruction.email_subject}</p>
-                             {shouldShowDepartmentDirectory && (
-                               <div className="mt-4 rounded-lg border border-[#E7D8C8] bg-[#FFF8F1] p-4">
-                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                   <div>
-                                     <p className="font-semibold text-[#7B542F]">ยังไม่มีข้อมูลภาควิชาของคุณในระบบ</p>
-                                     <p className="mt-1 text-sm text-[#7B542F]">คุณสามารถตรวจสอบอีเมลภาควิชาทั้งหมดด้านล่างเพื่อเลือกติดต่อด้วยตนเองได้</p>
-                                   </div>
-                                   <button
-                                     type="button"
-                                     onClick={() => setShowDepartmentDirectory((prev) => !prev)}
-                                     className="rounded-md border border-[#D9B58A] px-4 py-2 text-sm font-semibold text-[#7B542F] transition-colors hover:bg-[#F8E7D2]"
-                                   >
-                                     {showDepartmentDirectory ? 'ซ่อนรายชื่อภาควิชา' : 'ดูรายชื่อภาควิชาทั้งหมด'}
-                                   </button>
-                                 </div>
-
-                                 {showDepartmentDirectory && (
-                                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                     {departments.length > 0 ? (
-                                       departments.map((department) => (
-                                         <div key={department.id} className="rounded-md border border-[#F0E0CF] bg-white px-4 py-3">
-                                           <p className="font-medium text-black">{department.name_th}</p>
-                                           <p className="mt-1 text-sm text-[#7B542F]">
-                                             {department.email || 'ไม่มีอีเมลติดต่อ'}
-                                           </p>
-                                         </div>
-                                       ))
-                                     ) : (
-                                       <p className="text-sm text-[#7B542F]">ยังไม่พบข้อมูลรายชื่อภาควิชา</p>
-                                     )}
-                                   </div>
-                                 )}
-                               </div>
-                             )}
-                           </>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  {mergeError && (
+                    <div className="mt-6 text-red-500 font-medium bg-red-50 p-3 rounded-md border border-red-200 w-fit">
+                      <p>❌ {mergeError}</p>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -1158,22 +1197,6 @@ export default function Formdetail() {
             {currentStep === 2 && !isStep2Validated && isValidating && (
               <div className="w-full text-right sm:w-auto">
                 <p className="text-sm font-medium text-[#7B542F]">{getValidationStatusLabel()}</p>
-                {validationQueueSummary?.hint_message && (
-                  <div className="mt-2 flex flex-col items-end gap-1">
-                    <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium bg-[#F9F7F3] text-[#7B542F]">
-                      <span
-                        className={`inline-block h-2 w-2 rounded-full animate-pulse ${getQueueTierClasses(validationQueueSummary?.estimated_wait_tier).dot}`}
-                      ></span>
-                      {validationQueueSummary.hint_message}
-                    </div>
-                    <p className="text-sm text-[#999999]">
-                      {getEstimatedWaitLabel(validationQueueSummary?.estimated_wait_tier, validationStage)}
-                    </p>
-                  </div>
-                )}
-                {showValidationDelayHint && (
-                  <p className="mt-1 text-sm text-[#999999]">ใช้เวลานานกว่าปกติเล็กน้อย กรุณารอสักครู่</p>
-                )}
               </div>
             )}
           </div>
