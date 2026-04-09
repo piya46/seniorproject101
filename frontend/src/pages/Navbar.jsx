@@ -2,21 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getAuthenticatedUser, logout } from '../lib/auth';
 
-function Navbar({ degreeProps }) {
+function Navbar() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [authMenuOpen, setAuthMenuOpen] = useState(false);
   
-  // State ควบคุม Dropdown เลือกระดับการศึกษาในมือถือ
-  const [isDegreeOpen, setIsDegreeOpen] = useState(false);
-  const degreeMenuRef = useRef(null);
-  
   const authMenuRef = useRef(null);
-
-  // ดึงค่า props ที่หน้า Home ส่งมาให้
-  const { selectedLabel, handleDegreeChange, levels } = degreeProps || {};
 
   const menuItems = [
     { title: 'หน้าแรก', path: '/' },
@@ -47,10 +40,6 @@ function Navbar({ degreeProps }) {
       // ปิดเมนู Profile
       if (authMenuRef.current && !authMenuRef.current.contains(event.target)) {
         setAuthMenuOpen(false);
-      }
-      // ปิดเมนูเลือกระดับการศึกษา (ฝั่งมือถือ)
-      if (degreeMenuRef.current && !degreeMenuRef.current.contains(event.target)) {
-        setIsDegreeOpen(false);
       }
     };
 
@@ -93,59 +82,21 @@ function Navbar({ degreeProps }) {
 
   return (
     <div>
-      <nav className="relative z-50 w-full bg-white px-4 py-4 shadow-md sm:px-5">
+      <nav className="relative z-50 w-full bg-white px-4 py-2 shadow-md sm:px-5">
         <div className="flex w-full flex-wrap items-center justify-between gap-4">
           <div className="flex items-center">
             <Link to="/" className="flex items-center" aria-label="ไปหน้าแรก">
               <img
-                src="/icon.svg"
+                src="/Logo.png"
                 alt="Ai Formcheck"
-                className="h-14 w-14 md:h-16 md:w-16 rounded-xl object-contain"
+                className="h-24 w-24 rounded-xl object-contain"
                 data-protect-ui="true"
                 draggable={false}
               />
             </Link>
           </div>
 
-          {/* =========================================
-              ส่วนของปุ่มฝั่ง Mobile (Dropdown ระดับชั้น + Hamburger) 
-          ============================================= */}
           <div className="flex items-center gap-2 md:hidden">
-            {/* หากมีการส่ง degreeProps มาให้ (อยู่หน้า Home) จะแสดง Dropdown ให้เลือกระดับ */}
-            {degreeProps && (
-              <div className="relative" ref={degreeMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsDegreeOpen(!isDegreeOpen)}
-                  className="flex h-11 items-center justify-between gap-2 rounded-xl border border-[#E7D7C5] bg-[#FFF9F3] px-3 text-[#7B542F] text-[15px] font-bold shadow-sm transition-colors hover:bg-[#FFF1E1]"
-                >
-                  <span>{selectedLabel}</span>
-                  <svg className={`h-4 w-4 transition-transform duration-200 ${isDegreeOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                
-                {isDegreeOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-32 rounded-xl border border-[#F0E0CF] bg-white py-2 shadow-xl z-50">
-                    {levels.map((level) => (
-                      <button
-                        key={level}
-                        onClick={() => {
-                          handleDegreeChange(level);
-                          setIsDegreeOpen(false);
-                        }}
-                        className={`block w-full px-4 py-2.5 text-left text-[15px] font-bold transition-colors ${
-                          selectedLabel === level ? 'bg-[#FFF7EE] text-[#EA580C]' : 'text-[#7B542F] hover:bg-gray-50'
-                        }`}
-                      >
-                        {level}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             <button
               type="button"
               onClick={() => setIsOpen(true)}
@@ -158,9 +109,6 @@ function Navbar({ degreeProps }) {
             </button>
           </div>
 
-          {/* =========================================
-              Desktop Menu (แสดงเฉพาะในจอคอม/แท็บเล็ต) 
-          ============================================= */}
           <div className="hidden w-full md:flex md:w-auto md:flex-row md:items-center gap-4">
             <ul className="flex w-full flex-col gap-2 font-bold md:w-auto md:flex-row md:items-center">
               {menuItems.map((item) => (
@@ -214,9 +162,6 @@ function Navbar({ degreeProps }) {
         </div>
       </nav>
 
-      {/* =========================================
-          Mobile Menu Drawer & Overlay (แสดงเมื่อกด Hamburger)
-      ============================================= */}
       {isOpen && (
         <div 
           className="fixed inset-0 z-[60] bg-black/50 transition-opacity md:hidden"

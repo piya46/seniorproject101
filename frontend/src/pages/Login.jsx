@@ -29,52 +29,25 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(245,216,181,0.42),_transparent_34%),linear-gradient(180deg,#FFF9F2_0%,#F9ECDD_46%,#FCF8F3_100%)] text-[#3C2A1C]">
-      <header className="border-b border-[#E8D8C4]/80 bg-white/75 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3 rounded-2xl bg-white/80 px-3 py-2 shadow-sm ring-1 ring-[#F0E0CF]">
-            <img
-              src="/icon.svg"
-              alt={APP_NAME}
-              className="h-12 w-12 rounded-xl object-contain"
-              data-protect-ui="true"
-              draggable={false}
-            />
-            <div>
-              <h1 className="text-sm font-extrabold text-[#7B542F] sm:text-base">
-                {APP_NAME}
-              </h1>
-            </div>
-          </div>
-        </div>
-      </header>
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 pt-20 pb-10 sm:px-6 sm:pt-24 sm:pb-14">
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14">
-        <section className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <article className="rounded-[30px] border border-[#E7D7C5] bg-white/92 px-6 py-8 shadow-[0_24px_60px_rgba(123,84,47,0.08)] sm:px-8 sm:py-10">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A36A35]">
-              Welcome
-            </p>
-            <h2 className="mt-3 max-w-xl text-[28px] font-extrabold leading-tight text-[#6F4722] sm:text-[40px]">
-              ระบบช่วยเหลือการยื่นคำร้องสำหรับนิสิต
-            </h2>
-            <p className="mt-4 max-w-xl text-[15px] leading-8 text-[#62574B] sm:text-base">
-              ใช้สำหรับช่วยค้นหาแบบคำร้องที่เกี่ยวข้อง ดูข้อมูลเบื้องต้น และเตรียมความพร้อมก่อนดำเนินการยื่นคำร้อง
-            </p>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[#EADBC9] bg-[#FFF9F3] px-4 py-4 text-sm leading-7 text-[#5C5146]">
-                ค้นหาแบบคำร้องได้สะดวก
-              </div>
-              <div className="rounded-2xl border border-[#EADBC9] bg-[#FFF9F3] px-4 py-4 text-sm leading-7 text-[#5C5146]">
-                ดูข้อมูลก่อนเริ่มดำเนินการ
-              </div>
-              <div className="rounded-2xl border border-[#EADBC9] bg-[#FFF9F3] px-4 py-4 text-sm leading-7 text-[#5C5146]">
-                ใช้ผู้ช่วยแนะนำภายในระบบ
+        <section className="mx-auto flex w-full max-w-lg justify-center">
+          <div className="w-full rounded-[30px] border border-[#6E4B2A] bg-[linear-gradient(180deg,#8A5D33_0%,#7B542F_100%)] px-6 pt-2 pb-8 text-white shadow-[0_24px_60px_rgba(91,57,26,0.18)] sm:px-8 sm:pt-4 sm:pb-10">
+            <div className="mb-8 flex flex-col items-center justify-center gap-2 text-center">
+              <img
+                src="/Logo.png"
+                alt={APP_NAME}
+                className="h-48 w-48 object-contain"
+                data-protect-ui="true"
+                draggable={false}
+              />
+              <div>
+                <h1 className="text-xl font-extrabold text-white sm:text-2xl">
+                  {APP_NAME}
+                </h1>
               </div>
             </div>
-          </article>
 
-          <div className="rounded-[30px] border border-[#6E4B2A] bg-[linear-gradient(180deg,#8A5D33_0%,#7B542F_100%)] px-6 py-8 text-white shadow-[0_24px_60px_rgba(91,57,26,0.18)] sm:px-8 sm:py-10">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#F5D8B5]">
               Sign In
             </p>
@@ -108,10 +81,6 @@ export default function Login() {
               </span>
               ลงชื่อเข้าใช้ด้วยบัญชีจุฬา
             </button>
-
-            <div className="mt-6 rounded-2xl border border-white/10 bg-white/8 px-4 py-4 text-sm leading-7 text-[#FFF0DE]">
-              กรุณาลงชื่อเข้าใช้ด้วยบัญชีจุฬาฯ
-            </div>
           </div>
         </section>
 
