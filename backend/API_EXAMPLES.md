@@ -24,6 +24,7 @@ Last updated: `2026-04-08`
 - `POST /upload` อาจตอบ `413` โดยเฉพาะกรณี PDF ที่เกินเพดาน sanitize ของ backend
 - `POST /upload` ตอนนี้ตอบ `200 success` เพื่อ stage ไฟล์ไว้ก่อน
 - `POST /validation/check-completeness` อาจตอบ `202 queued` ถ้า backend ต้องเตรียมเอกสารก่อนตรวจ
+- `POST /validation/check-completeness` ตอนนี้ตอบ `200` เป็น structured result และมี `legacy_document_results` เพื่อรองรับ client เดิม
 - `POST /documents/merge` ตอบ `202 queued` แล้ว client ต้อง poll job status ต่อ
 
 ## Base URL
@@ -239,6 +240,67 @@ curl -s https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/ap
 ## 6. Document Preparation Status
 
 หลัง `POST /validation/check-completeness` ถ้าไฟล์ยังไม่พร้อม backend จะตอบ `202` พร้อม `job.id`
+
+ตัวอย่าง request body สำหรับ validation ที่มีข้อมูลช่วงภาคการศึกษา:
+
+```json
+{
+  "form_code": "JT44",
+  "degree_level": "bachelor",
+  "submission_context": {
+    "submission_date": "2026-04-09",
+    "academic_year": 2568,
+    "semester": "semester_2",
+    "exam_date": "2026-04-07"
+  }
+}
+```
+
+ตัวอย่าง response `200` แบบ structured:
+
+```json
+{
+  "status": "success",
+  "validator_version": "ai-doc-validator-v1",
+  "form_code": "JT44",
+  "sub_type": null,
+  "overall_result": {
+    "decision": "fail",
+    "confidence": 0.82,
+    "summary_th": "ตรวจพบเอกสารที่ต้องแก้ไข 1 รายการ"
+  },
+  "checks": {
+    "document_completeness": {
+      "status": "fail",
+      "reason_th": "เอกสารที่ควรตรวจทานเพิ่มเติม: medical_cert",
+      "missing_items": ["medical_cert"],
+      "warnings": []
+    },
+    "timing_eligibility": {
+      "status": "needs_human_review",
+      "reason_th": "มีข้อมูลกฎเวลาแล้ว แต่ผลการตรวจเอกสารรอบนี้ยังเน้นความครบถ้วนของไฟล์เป็นหลัก",
+      "missing_context": [],
+      "human_review_required": true
+    }
+  },
+  "raw_policy_refs": {
+    "timing_rule_used": "ใช้สำหรับขาดสอบปลายภาค และต้องยื่นภายใน 5 วันทำการนับจากวันที่ขาดสอบ",
+    "required_documents_keys": ["main_form", "schedule", "medical_cert"]
+  },
+  "legacy_document_results": {
+    "main_form": {
+      "status": "valid",
+      "reason": "คำร้องมีรายละเอียดครบถ้วน",
+      "confidence": "high"
+    },
+    "medical_cert": {
+      "status": "invalid",
+      "reason": "ไม่พบข้อความที่ยืนยันช่วงเวลาพักรักษาตัวชัดเจน",
+      "confidence": "medium"
+    }
+  }
+}
+```
 
 ### cURL
 

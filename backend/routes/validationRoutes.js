@@ -116,6 +116,284 @@ const ensureFilesPreparedForValidation = async ({ files, sessionId, user, req })
   return null;
 };
 
+const parseIsoDate = (value) => {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const startOfDay = (date) => {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+};
+
+const diffInCalendarDays = (startDate, endDate) => {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const start = startOfDay(startDate);
+  const end = startOfDay(endDate);
+  return Math.floor((end.getTime() - start.getTime()) / msPerDay);
+};
+
+const getBangkokDateString = () => {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return `${year}-${month}-${day}`;
+};
+
+const addCalendarDays = (date, days) => {
+  const result = startOfDay(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
+const addBusinessDays = (date, days) => {
+  const result = startOfDay(date);
+  let remaining = days;
+
+  while (remaining > 0) {
+    result.setDate(result.getDate() + 1);
+    const day = result.getDay();
+    if (day !== 0 && day !== 6) {
+      remaining -= 1;
+    }
+  }
+
+  return result;
+};
+
+const getTermFromCalendar = (academicCalendarContext, semester) => {
+  if (!academicCalendarContext || !Array.isArray(academicCalendarContext.terms)) {
+    return null;
+  }
+
+  return academicCalendarContext.terms.find((term) => term.term_code === semester) || null;
+};
+
+const extractSubmissionContextFromMainForm = ({ files }) => {
+  const mainFormFile = Array.isArray(files)
+    ? files.find((file) => file?.file_key === 'main_form')
+    : null;
+
+  if (!mainFormFile) {
+    return {};
+  }
+
+  // Hook สำหรับต่อยอด OCR / field extraction จากไฟล์คำร้องหลักในรอบถัดไป
+  // ตอนนี้ยังไม่เดาค่าจากชื่อไฟล์หรือ metadata เพื่อหลีกเลี่ยง false positives
+  return {};
+};
+
+const buildEffectiveSubmissionContext = ({
+  submissionContext,
+  extractedSubmissionContext
+}) => {
+  const normalized = {
+    ...(extractedSubmissionContext || {}),
+    ...(submissionContext || {})
+  };
+
+  if (!normalized.submission_date) {
+    normalized.submission_date = getBangkokDateString();
+  }
+
+  return normalized;
+};
+
+const evaluateTimingRule = ({ timingRule, submissionContext, academicCalendarContext }) => {
+  if (!timingRule?.enabled) {
+    return {
+      status: 'not_applicable',
+      reason_th: 'ฟอร์มนี้ยังไม่มีเงื่อนไขเวลาที่ต้องใช้ประกอบการสรุปผลในรอบนี้',
+      missing_context: [],
+      human_review_required: false
+    };
+  }
+
+  const requiredRuntimeFields = Array.isArray(timingRule.required_runtime_fields)
+    ? timingRule.required_runtime_fields
+    : [];
+  const missingRuntimeContext = requiredRuntimeFields.filter((field) => {
+    const value = submissionContext?.[field];
+    return value === undefined || value === null || value === '';
+  });
+
+  if (missingRuntimeContext.length > 0) {
+    return {
+      status: 'unknown',
+      reason_th: `ยังประเมินเงื่อนไขเวลาไม่ได้ เนื่องจากขาดข้อมูล ${missingRuntimeContext.join(', ')}`,
+      missing_context: missingRuntimeContext,
+      human_review_required: true
+    };
+  }
+
+  const submissionDate = parseIsoDate(submissionContext?.submission_date);
+  if (!submissionDate) {
+    return {
+      status: 'unknown',
+      reason_th: 'ยังประเมินเงื่อนไขเวลาไม่ได้ เนื่องจาก submission_date ไม่ถูกต้องหรือไม่มีข้อมูล',
+      missing_context: ['submission_date'],
+      human_review_required: true
+    };
+  }
+
+  const { submission_window: submissionWindow } = timingRule;
+  if (!submissionWindow?.type) {
+    return {
+      status: 'needs_human_review',
+      reason_th: 'มีกฎเวลาแล้ว แต่ยังไม่มีรูปแบบการคำนวณที่แน่ชัด',
+      missing_context: [],
+      human_review_required: true
+    };
+  }
+
+  if (submissionWindow.type === 'within_days_after_event') {
+    const anchorDate = parseIsoDate(submissionContext?.[submissionWindow.anchor_event]);
+    if (!anchorDate) {
+      return {
+        status: 'unknown',
+        reason_th: `ยังประเมินเงื่อนไขเวลาไม่ได้ เนื่องจากไม่มี ${submissionWindow.anchor_event}`,
+        missing_context: [submissionWindow.anchor_event],
+        human_review_required: true
+      };
+    }
+
+    const deadline = submissionWindow.business_days
+      ? addBusinessDays(anchorDate, submissionWindow.value)
+      : addCalendarDays(anchorDate, submissionWindow.value);
+
+    return {
+      status: submissionDate <= deadline ? 'pass' : 'fail',
+      reason_th: submissionDate <= deadline
+        ? `ยื่นภายในระยะเวลาที่กำหนด โดยครบกำหนดวันที่ ${deadline.toISOString().slice(0, 10)}`
+        : `ยื่นเกินระยะเวลาที่กำหนด ซึ่งครบกำหนดวันที่ ${deadline.toISOString().slice(0, 10)}`,
+      missing_context: [],
+      human_review_required: false,
+      compared_fields: {
+        submission_date: submissionContext?.submission_date || null,
+        [submissionWindow.anchor_event]: submissionContext?.[submissionWindow.anchor_event] || null,
+        deadline_date: deadline.toISOString().slice(0, 10)
+      }
+    };
+  }
+
+  if (submissionWindow.type === 'within_weeks_after_term_start') {
+    const term = getTermFromCalendar(academicCalendarContext, submissionContext?.semester);
+    const termStartDate = parseIsoDate(term?.start_date);
+    if (!termStartDate) {
+      return {
+        status: 'unknown',
+        reason_th: 'ยังประเมินเงื่อนไขเวลาไม่ได้ เนื่องจากไม่มีวันเปิดภาคการศึกษาใน academic calendar',
+        missing_context: ['term_start_date'],
+        human_review_required: true
+      };
+    }
+
+    const deadline = addCalendarDays(termStartDate, (submissionWindow.value * 7) - 1);
+    return {
+      status: submissionDate <= deadline ? 'pass' : 'fail',
+      reason_th: submissionDate <= deadline
+        ? `ยื่นภายใน ${submissionWindow.value} สัปดาห์แรกของภาคการศึกษา`
+        : `ยื่นเกินช่วง ${submissionWindow.value} สัปดาห์แรกของภาคการศึกษา`,
+      missing_context: [],
+      human_review_required: false,
+      compared_fields: {
+        submission_date: submissionContext?.submission_date || null,
+        term_start_date: term?.start_date || null,
+        deadline_date: deadline.toISOString().slice(0, 10)
+      }
+    };
+  }
+
+  if (submissionWindow.type === 'custom') {
+    const term = getTermFromCalendar(academicCalendarContext, submissionContext?.semester);
+    const isRegisteredCurrentTerm = submissionContext?.is_registered_current_term;
+
+    if (isRegisteredCurrentTerm === false) {
+      const termStartDate = parseIsoDate(term?.start_date);
+      if (!termStartDate) {
+        return {
+          status: 'unknown',
+          reason_th: 'ไม่มีวันเปิดภาคการศึกษาสำหรับตรวจกรณียังไม่ลงทะเบียน',
+          missing_context: ['term_start_date'],
+          human_review_required: true
+        };
+      }
+
+      const deadline = addCalendarDays(termStartDate, 13);
+      return {
+        status: submissionDate <= deadline ? 'pass' : 'fail',
+        reason_th: submissionDate <= deadline
+          ? 'ยื่นอยู่ภายใน 2 สัปดาห์หลังเปิดภาคการศึกษาตามเกณฑ์'
+          : 'ยื่นเกิน 2 สัปดาห์หลังเปิดภาคการศึกษาตามเกณฑ์',
+        missing_context: [],
+        human_review_required: false,
+        compared_fields: {
+          submission_date: submissionContext?.submission_date || null,
+          term_start_date: term?.start_date || null,
+          deadline_date: deadline.toISOString().slice(0, 10)
+        }
+      };
+    }
+
+    if (isRegisteredCurrentTerm === true) {
+      const finalEndDate = parseIsoDate(term?.periods?.final?.end_date);
+      if (!finalEndDate) {
+        return {
+          status: 'unknown',
+          reason_th: 'ไม่มีวันสิ้นสุดสอบปลายภาคสำหรับตรวจกรณีลงทะเบียนแล้ว',
+          missing_context: ['final_exam_end_date'],
+          human_review_required: true
+        };
+      }
+
+      return {
+        status: submissionDate <= finalEndDate ? 'pass' : 'fail',
+        reason_th: submissionDate <= finalEndDate
+          ? 'ยื่นก่อนสิ้นสุดช่วงสอบปลายภาคตามเกณฑ์'
+          : 'ยื่นหลังช่วงสอบปลายภาคตามเกณฑ์',
+        missing_context: [],
+        human_review_required: false,
+        compared_fields: {
+          submission_date: submissionContext?.submission_date || null,
+          final_exam_end_date: term?.periods?.final?.end_date || null
+        }
+      };
+    }
+
+    return {
+      status: 'needs_human_review',
+      reason_th: 'กฎเวลาประเภทนี้ยังต้องอาศัยข้อมูลเพิ่มเติมหรือการพิจารณาโดยเจ้าหน้าที่',
+      missing_context: ['is_registered_current_term'],
+      human_review_required: true
+    };
+  }
+
+  return {
+    status: 'needs_human_review',
+    reason_th: 'รูปแบบกฎเวลานี้ยังไม่ได้รับการรองรับโดยตัวประเมินอัตโนมัติ',
+    missing_context: [],
+    human_review_required: true
+  };
+};
+
 const normalizeValidationEntry = (entry = {}) => ({
   status: entry?.status === 'valid' ? 'valid' : 'invalid',
   reason: typeof entry?.reason === 'string' && entry.reason.trim()
@@ -124,14 +402,45 @@ const normalizeValidationEntry = (entry = {}) => ({
   confidence: ['high', 'medium', 'low'].includes(entry?.confidence) ? entry.confidence : 'medium'
 });
 
+const normalizeExtractedSubmissionContext = (rawContext = {}) => {
+  const normalized = {};
+
+  if (!rawContext || typeof rawContext !== 'object' || Array.isArray(rawContext)) {
+    return normalized;
+  }
+
+  if (Number.isInteger(rawContext.academic_year)) {
+    normalized.academic_year = rawContext.academic_year;
+  }
+
+  if (['semester_1', 'semester_2', 'summer'].includes(rawContext.semester)) {
+    normalized.semester = rawContext.semester;
+  }
+
+  ['exam_date', 'grade_announcement_date', 'planned_payment_date'].forEach((field) => {
+    if (typeof rawContext[field] === 'string' && rawContext[field].trim()) {
+      normalized[field] = rawContext[field].trim();
+    }
+  });
+
+  if (typeof rawContext.is_registered_current_term === 'boolean') {
+    normalized.is_registered_current_term = rawContext.is_registered_current_term;
+  }
+
+  return normalized;
+};
+
 const buildLegacyValidationResults = (parsedResult, expectedFileKeys = []) => {
-  const parsedEntries = parsedResult && typeof parsedResult === 'object' && !Array.isArray(parsedResult)
-    ? Object.entries(parsedResult)
+  const documentResults = parsedResult?.document_results && typeof parsedResult.document_results === 'object'
+    ? parsedResult.document_results
+    : parsedResult;
+  const parsedEntries = documentResults && typeof documentResults === 'object' && !Array.isArray(documentResults)
+    ? Object.entries(documentResults)
     : [];
 
   return expectedFileKeys.reduce((accumulator, fileKey, index) => {
-    const directMatch = Object.prototype.hasOwnProperty.call(parsedResult || {}, fileKey)
-      ? parsedResult[fileKey]
+    const directMatch = Object.prototype.hasOwnProperty.call(documentResults || {}, fileKey)
+      ? documentResults[fileKey]
       : null;
     const fallbackEntry = parsedEntries[index]?.[1] || {};
     accumulator[fileKey] = normalizeValidationEntry(directMatch || fallbackEntry);
@@ -149,35 +458,25 @@ const buildStructuredValidationResult = ({
 }) => {
   const documentEntries = Object.entries(legacyDocumentResults || {});
   const invalidEntries = documentEntries.filter(([, entry]) => entry?.status !== 'valid');
-  const decision = invalidEntries.length > 0 ? 'fail' : 'pass';
-  const summaryTh = invalidEntries.length > 0
+  const timingRule = aiValidationContext?.timing_rule || null;
+  const timingCheck = evaluateTimingRule({
+    timingRule,
+    submissionContext,
+    academicCalendarContext
+  });
+  const hasDocumentIssues = invalidEntries.length > 0;
+  const hasTimingFailure = timingCheck?.status === 'fail';
+  const decision = hasDocumentIssues || hasTimingFailure ? 'fail' : 'pass';
+  const summaryTh = hasDocumentIssues
     ? `ตรวจพบเอกสารที่ต้องแก้ไข ${invalidEntries.length} รายการ`
-    : 'เอกสารที่ระบบตรวจสอบผ่านตามเกณฑ์ที่กำหนด';
+    : hasTimingFailure
+      ? 'เอกสารถูกต้อง แต่ไม่ผ่านเงื่อนไขช่วงเวลาตามที่กำหนด'
+      : 'เอกสารที่ระบบตรวจสอบผ่านตามเกณฑ์ที่กำหนด';
 
   const missingItems = invalidEntries.map(([fileKey]) => fileKey);
-  const timingRule = aiValidationContext?.timing_rule || null;
-  const timingMissingContext = timingRule?.enabled
-    ? (timingRule.required_runtime_fields || []).filter((field) => {
-        const value = submissionContext?.[field];
-        return value === undefined || value === null || value === '';
-      })
+  const timingMissingContext = Array.isArray(timingCheck?.missing_context)
+    ? timingCheck.missing_context
     : [];
-
-  const timingCheck = timingRule?.enabled
-    ? {
-        status: timingMissingContext.length > 0 ? 'unknown' : 'needs_human_review',
-        reason_th: timingMissingContext.length > 0
-          ? `ยังประเมินเงื่อนไขเวลาไม่ได้ เนื่องจากขาดข้อมูล ${timingMissingContext.join(', ')}`
-          : 'มีข้อมูลกฎเวลาแล้ว แต่ผลการตรวจเอกสารรอบนี้ยังเน้นความครบถ้วนของไฟล์เป็นหลัก',
-        missing_context: timingMissingContext,
-        human_review_required: true
-      }
-    : {
-        status: 'not_applicable',
-        reason_th: 'ฟอร์มนี้ยังไม่มีเงื่อนไขเวลาที่ต้องใช้ประกอบการสรุปผลในรอบนี้',
-        missing_context: [],
-        human_review_required: false
-      };
 
   const structuredResult = {
     status: 'success',
@@ -186,7 +485,7 @@ const buildStructuredValidationResult = ({
     sub_type: subType || null,
     overall_result: {
       decision,
-      confidence: invalidEntries.length > 0 ? 0.82 : 0.9,
+      confidence: decision === 'fail' ? 0.82 : 0.9,
       summary_th: summaryTh
     },
     checks: {
@@ -337,10 +636,6 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
       : '';
 
     const aiValidationContext = formConfig.ai_validation_context || null;
-    const resolvedAcademicCalendarContext = resolveAcademicCalendarContext({
-      academicYear: submission_context?.academic_year,
-      explicitCalendarContext: academic_calendar_context
-    });
     const aiTimingRuleText = aiValidationContext?.timing_rule?.enabled
       ? `
     กฎเวลา/ช่วงภาคการศึกษาที่ AI ต้องใช้ประกอบการตรวจ:
@@ -369,10 +664,10 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
     `
       : '';
 
-    const academicCalendarText = resolvedAcademicCalendarContext
+    const academicCalendarText = academic_calendar_context
       ? `
     ปฏิทินการศึกษาที่ระบบส่งมา:
-    ${JSON.stringify(resolvedAcademicCalendarContext, null, 2)}
+    ${JSON.stringify(academic_calendar_context, null, 2)}
     `
       : '';
 
@@ -478,10 +773,21 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
 
     รูปแบบการตอบกลับ (JSON Format เท่านั้น):
     {
-      "document_key_from_system": {
-        "status": "valid" หรือ "invalid",
-        "reason": "อธิบายเหตุผลภาษาไทยอย่างสุภาพ ทางการ และชัดเจน (สามารถอธิบายยาวได้หากจำเป็น)",
-        "confidence": "high" หรือ "medium" หรือ "low"
+      "document_results": {
+        "document_key_from_system": {
+          "status": "valid" หรือ "invalid",
+          "reason": "อธิบายเหตุผลภาษาไทยอย่างสุภาพ ทางการ และชัดเจน (สามารถอธิบายยาวได้หากจำเป็น)",
+          "confidence": "high" หรือ "medium" หรือ "low"
+        }
+      },
+      "extracted_submission_context": {
+        "academic_year": "ตัวเลขปีการศึกษา เช่น 2568 หรือ null",
+        "semester": "\"semester_1\" หรือ \"semester_2\" หรือ \"summer\" หรือ null",
+        "exam_date": "YYYY-MM-DD หรือ null",
+        "grade_announcement_date": "YYYY-MM-DD หรือ null",
+        "planned_payment_date": "YYYY-MM-DD หรือ null",
+        "is_registered_current_term": "true / false / null",
+        "notes": ["ข้อสังเกตเพิ่มเติมถ้ามี"]
       }
     }
 
@@ -539,17 +845,30 @@ router.post('/check-completeness', authMiddleware, strictLimiter, validate(valid
 
     const parsedResult = JSON.parse(aiText);
     const expectedFileKeys = validFiles.map((file) => file.fileKey).filter(Boolean);
-    const parsedEntries = parsedResult && typeof parsedResult === 'object' && !Array.isArray(parsedResult)
-      ? Object.entries(parsedResult)
-      : [];
-
     const normalizedResult = buildLegacyValidationResults(parsedResult, expectedFileKeys);
+    const extractedSubmissionContext = extractSubmissionContextFromMainForm({
+      files: latestUserFiles
+    });
+    const extractedSubmissionContextFromAi = normalizeExtractedSubmissionContext(
+      parsedResult?.extracted_submission_context
+    );
+    const effectiveSubmissionContext = buildEffectiveSubmissionContext({
+      submissionContext: submission_context,
+      extractedSubmissionContext: {
+        ...extractedSubmissionContext,
+        ...extractedSubmissionContextFromAi
+      }
+    });
+    const resolvedAcademicCalendarContext = resolveAcademicCalendarContext({
+      academicYear: effectiveSubmissionContext?.academic_year,
+      explicitCalendarContext: academic_calendar_context
+    });
     const structuredResult = buildStructuredValidationResult({
       formCode: form_code,
       subType: sub_type,
       legacyDocumentResults: normalizedResult,
       aiValidationContext,
-      submissionContext: submission_context,
+      submissionContext: effectiveSubmissionContext,
       academicCalendarContext: resolvedAcademicCalendarContext
     });
 

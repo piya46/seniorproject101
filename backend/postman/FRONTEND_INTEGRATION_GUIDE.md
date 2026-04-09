@@ -68,6 +68,14 @@ secure JSON endpoints:
 - `POST /documents/merge`
 - `POST /chat/recommend`
 
+หมายเหตุสำหรับ `POST /validation/check-completeness`:
+
+- frontend สามารถส่ง `submission_context` เพื่อช่วยให้ backend/AI ตรวจเงื่อนไขเวลาได้แม่นขึ้น
+- ถ้า frontend ไม่ส่ง `submission_context.submission_date` backend จะเติมวันที่ปัจจุบันตามเวลา Bangkok ให้อัตโนมัติ
+- frontend สามารถส่ง `academic_calendar_context` ได้ถ้ามีข้อมูลปฏิทินปีการศึกษาจริงอยู่แล้ว
+- ถ้ายังไม่มี `academic_calendar_context` แต่มี `submission_context.academic_year` backend จะพยายาม lookup จาก dataset ภายใน
+- response `200` เป็น structured validation result และมี `legacy_document_results` เพื่อให้ UI เดิมยังอ่านผลรายเอกสารได้
+
 ถ้าเปิด `PFS_V2_ENABLED=true`:
 
 - secure JSON endpoints ด้านบนสามารถใช้ envelope แบบ `v2` ได้

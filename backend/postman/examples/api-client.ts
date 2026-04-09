@@ -168,12 +168,16 @@ export class SciRequestApiClient {
     degreeLevel: string;
     subType?: string | null;
     caseKey?: string | null;
+    submissionContext?: JsonObject | null;
+    academicCalendarContext?: JsonObject | null;
   }): Promise<JsonObject> {
     return this.postEncrypted<JsonObject>("/validation/check-completeness", {
       form_code: params.formCode,
       degree_level: params.degreeLevel,
       sub_type: params.subType ?? null,
       case_key: params.caseKey ?? null,
+      submission_context: params.submissionContext ?? undefined,
+      academic_calendar_context: params.academicCalendarContext ?? undefined,
     });
   }
 

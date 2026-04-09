@@ -19,6 +19,11 @@ Last updated: `2026-04-08`
 
 ## Base URLs
 
+หมายเหตุเพิ่มเติม:
+
+- `POST /validation/check-completeness` รองรับ `submission_context` และ `academic_calendar_context`
+- response `200` ของ validation ปัจจุบันเป็น structured result พร้อม `legacy_document_results`
+
 - Local: `http://localhost:8080/api/v1`
 - Production: `https://ai-formcheck-backend-499335698145.asia-southeast3.run.app/api/v1`
 - Canonical OAuth callback: `https://ai-formcheck-backend-<project-number>.asia-southeast3.run.app/api/v1/oidc/google/callback`

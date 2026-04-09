@@ -422,6 +422,20 @@ response ตัวอย่าง:
 - route นี้จะ stage ไฟล์ไว้ก่อนและตอบ `200 success`
 - document preparation job จะถูกสร้างตอน `POST /validation/check-completeness` ถ้าไฟล์ยังไม่อยู่ในสถานะ `ready`
 
+## Validation Endpoint
+
+### `POST /validation/check-completeness`
+
+ข้อจำกัดและพฤติกรรมเพิ่มเติม:
+
+- request body หลักยังใช้ `form_code`, `degree_level`, `sub_type`, `case_key`
+- route นี้รองรับ `submission_context` เพิ่มเติม เช่น `submission_date`, `academic_year`, `semester`, `exam_date`, `grade_announcement_date`, `planned_payment_date`, `is_registered_current_term`
+- ถ้า client ไม่ส่ง `submission_context.submission_date` backend จะเติมวันที่ปัจจุบันของฝั่ง server ตามเขตเวลา `Asia/Bangkok` ให้อัตโนมัติ
+- route นี้รองรับ `academic_calendar_context` เพื่อส่งปฏิทินการศึกษาจริงของปีการศึกษานั้นเข้ามาประกอบการตรวจ
+- ถ้า client ไม่ส่ง `academic_calendar_context` แต่ส่ง `submission_context.academic_year` มา backend จะพยายาม lookup ปฏิทินจาก dataset ภายในก่อน
+- response `200` ตอนนี้เป็น structured validation result ที่มี `overall_result`, `checks`, `raw_policy_refs` และ `legacy_document_results`
+- `legacy_document_results` ถูกคงไว้เพื่อ backward compatibility กับ frontend/client ที่ยังอ่านผลแบบ map รายเอกสาร
+
 ## Support Endpoint
 
 ### `POST /support/technical-email`

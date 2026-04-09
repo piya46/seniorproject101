@@ -11,6 +11,50 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const parseApiResponse = (data) => (typeof data === 'string' ? JSON.parse(data) : data);
 
+const buildValidationSummaryFromLegacyResults = (legacyResults = {}) => {
+  const entries = Object.values(legacyResults || {});
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const invalidCount = entries.filter((entry) => entry?.status !== 'valid').length;
+  return {
+    decision: invalidCount > 0 ? 'fail' : 'pass',
+    summary_th: invalidCount > 0
+      ? `ตรวจพบเอกสารที่ต้องแก้ไข ${invalidCount} รายการ`
+      : 'เอกสารที่อัปโหลดผ่านการตรวจสอบในรอบนี้'
+  };
+};
+
+const normalizeValidationResponse = (payload, requiredDocuments = []) => {
+  const actualData = payload?.data || payload;
+  const docKeys = requiredDocuments.map((doc) => doc.key);
+
+  if (!actualData || typeof actualData !== 'object' || Array.isArray(actualData)) {
+    return { summary: null, documentResults: null };
+  }
+
+  if (actualData.legacy_document_results && typeof actualData.legacy_document_results === 'object') {
+    return {
+      summary: actualData.overall_result || buildValidationSummaryFromLegacyResults(actualData.legacy_document_results),
+      documentResults: actualData.legacy_document_results
+    };
+  }
+
+  const isLegacyDocumentMap = Object.keys(actualData).some((key) => docKeys.includes(key));
+  if (isLegacyDocumentMap) {
+    return {
+      summary: buildValidationSummaryFromLegacyResults(actualData),
+      documentResults: actualData
+    };
+  }
+
+  return {
+    summary: actualData.overall_result || null,
+    documentResults: null
+  };
+};
+
 const buildCachedUploadedFiles = (files) =>
   Object.keys(files).reduce((acc, key) => {
     acc[key] = {
@@ -126,6 +170,7 @@ export default function Formdetail() {
   const [showValidationDelayHint, setShowValidationDelayHint] = useState(false);
   const [validationPreparationJobs, setValidationPreparationJobs] = useState([]);
   const [validationResults, setValidationResults] = useState({}); 
+  const [validationSummary, setValidationSummary] = useState(null);
   const [isStep2Validated, setIsStep2Validated] = useState(false); 
   const [isMerging, setIsMerging] = useState(false);
   const [mergeResult, setMergeResult] = useState(null);
@@ -205,6 +250,7 @@ export default function Formdetail() {
 
   const resetValidationForIndex = (index) => {
     setIsStep2Validated(false);
+    setValidationSummary(null);
     setValidationResults(prev => {
       const newResults = { ...prev };
       if (formData?.required_documents?.[index]) {
@@ -379,6 +425,7 @@ export default function Formdetail() {
     setValidationStage('checking');
     setShowValidationDelayHint(false);
     setValidationPreparationJobs([]);
+    setValidationSummary(null);
     trackAnalyticsEvent('validation_started', {
       form_code: formData?.form_code || id,
       degree_level: degreeLevel,
@@ -422,6 +469,10 @@ export default function Formdetail() {
           const partialFailedJobs = finalJobs.filter((job) => job?.status === 'partial_failed');
           if (partialFailedJobs.length > 0) {
             setValidationResults(buildBatchPreparationErrors(partialFailedJobs));
+            setValidationSummary({
+              decision: 'fail',
+              summary_th: 'การเตรียมเอกสารบางรายการไม่สำเร็จ กรุณาตรวจสอบไฟล์ที่ระบบแจ้ง'
+            });
             setIsStep2Validated(true);
             return { res, responseData, actualData: 'partial_failed', partialFailed: true };
           }
@@ -446,12 +497,33 @@ export default function Formdetail() {
         return;
       }
 
-      if (responseData?.status === 'success' || actualData === 'success') {
+      const normalizedValidation = normalizeValidationResponse(responseData, formData.required_documents);
+
+      if (normalizedValidation.documentResults) {
+        setValidationResults(normalizedValidation.documentResults);
+        setValidationSummary(normalizedValidation.summary);
+
+        const hasInvalidDocuments = Object.values(normalizedValidation.documentResults).some(
+          (entry) => entry?.status !== 'valid'
+        );
+
+        trackAnalyticsEvent(hasInvalidDocuments ? 'validation_failed' : 'validation_succeeded', {
+          form_code: formData?.form_code || id,
+          degree_level: degreeLevel,
+          sub_type: subType || 'default',
+          required_document_count: Array.isArray(formData?.required_documents) ? formData.required_documents.length : 0,
+          failure_stage: hasInvalidDocuments ? 'validation_rules' : undefined
+        }).catch(() => {});
+      } else if (responseData?.status === 'success' || actualData === 'success') {
         const successResults = {};
         formData.required_documents.forEach(doc => {
           successResults[doc.key] = { status: 'valid', reason: 'ตรวจสอบสำเร็จ' };
         });
         setValidationResults(successResults);
+        setValidationSummary({
+          decision: 'pass',
+          summary_th: 'เอกสารที่อัปโหลดผ่านการตรวจสอบในรอบนี้'
+        });
         trackAnalyticsEvent('validation_succeeded', {
           form_code: formData?.form_code || id,
           degree_level: degreeLevel,
@@ -464,6 +536,7 @@ export default function Formdetail() {
         
         if (isDetailedError) {
           setValidationResults(actualData);
+          setValidationSummary(buildValidationSummaryFromLegacyResults(actualData));
           trackAnalyticsEvent('validation_failed', {
             form_code: formData?.form_code || id,
             degree_level: degreeLevel,
@@ -485,6 +558,10 @@ export default function Formdetail() {
             fallbackErrors[doc.key] = { status: 'error', reason: `[API Error]: ${errorMsg}` };
           });
           setValidationResults(fallbackErrors);
+          setValidationSummary({
+            decision: 'fail',
+            summary_th: errorMsg
+          });
           trackAnalyticsEvent('validation_failed', {
             form_code: formData?.form_code || id,
             degree_level: degreeLevel,
@@ -510,6 +587,10 @@ export default function Formdetail() {
         fallbackErrors[doc.key] = { status: 'error', reason: `[Network Error]: ${errMsg}` };
       });
       setValidationResults(fallbackErrors);
+      setValidationSummary({
+        decision: 'fail',
+        summary_th: errMsg
+      });
       setIsStep2Validated(true);
       trackAnalyticsEvent('validation_failed', {
         form_code: formData?.form_code || id,
@@ -959,6 +1040,12 @@ export default function Formdetail() {
             {currentStep === 2 && (
               <>
                 <div className="min-h-[250px] pt-6 text-left sm:ml-4 sm:pl-8 sm:pr-6 lg:ml-7 lg:pl-12 lg:pr-12 lg:pt-8">
+                  {validationSummary?.summary_th && (
+                    <div className={`mb-6 rounded-2xl border px-4 py-3 sm:px-5 ${validationSummary.decision === 'pass' ? 'border-[#B7DDBB] bg-[#F2FBF3] text-[#256B2A]' : 'border-[#F0C7C2] bg-[#FFF5F3] text-[#A53A2A]'}`}>
+                      <p className="text-sm font-semibold sm:text-base">ผลลัพธ์การตรวจสอบ</p>
+                      <p className="mt-1 text-sm sm:text-base">{validationSummary.summary_th}</p>
+                    </div>
+                  )}
                   {formData?.required_documents?.map((doc, index) => (
                     <div key={index} className="mb-8">
                       <div className="mb-3">
